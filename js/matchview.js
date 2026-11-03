@@ -35,26 +35,36 @@
     root.id = 'match';
     root.innerHTML = `
       <div class="mh">
-        <div class="comp">${esc(L.name)} · Jornada ${S.week + 1} · Árbitro: ${esc(m.ref.name)} (${m.ref.label})</div>
+        <div class="comp">${esc(L.name)} · J${S.week + 1} · Árbitro: ${esc(m.ref.name)} (${m.ref.label})</div>
         <div class="score">
-          <div class="t">${UI.crest(h, 'lg')}<b>${esc(h.name)}</b></div>
+          <div class="t">${UI.crest(h)}<b>${esc(h.name)}</b></div>
           <div><div class="res num" id="mv-score">0-0</div><div class="min" id="mv-min">0'</div></div>
-          <div class="t">${UI.crest(a, 'lg')}<b>${esc(a.name)}</b></div>
+          <div class="t">${UI.crest(a)}<b>${esc(a.name)}</b></div>
         </div>
         <div class="mprog"><i id="mv-prog" style="width:0%"></i></div>
-        <div class="seg" style="margin-top:10px" id="mv-tabs">
+      </div>
+      <div class="pitch-box"><canvas id="pitch" aria-label="Vista del partido"></canvas></div>
+      <div class="mtabs"><div class="seg" id="mv-tabs">
           <button class="on" data-act="mv-tab" data-k="feed">Narración</button>
           <button data-act="mv-tab" data-k="stats">Estadísticas</button>
           <button data-act="mv-tab" data-k="lineups">Alineaciones</button>
-        </div>
-      </div>
+      </div></div>
       <div class="mbody" id="mv-body"><div id="mv-feed"></div></div>
       <div class="mfoot"><div class="inner"><div id="mv-prompt"></div><div id="mv-foot"></div></div></div>`;
     document.body.appendChild(root);
     document.body.style.overflow = 'hidden';
     for (const e of m.events) addEvent(e);
+    MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
+    MV.pitch.speed = settings().speed || 1;
     renderFoot();
-    schedule();
+    TL.SFX.startCrowd();
+    TL.SFX.whistle(false);
+    UI.Music.duck(true);
+    // Primer partido: tutorial de controles (en pausa mientras se explica)
+    if (!TL.Tutorial.done('match')) {
+      pause('manual', null);
+      setTimeout(() => { TL.Tutorial.start('match'); TL.Tutorial.onEnd(() => resume()); }, 400);
+    } else schedule();
   }
 
   function addEvent(e) {
@@ -95,6 +105,8 @@
     if (!m || MV.paused || m.done) return;
     const evs = m.step();
     evs.forEach(addEvent);
+    if (MV.pitch) MV.pitch.push(evs);
+    if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
     if (MV.tab !== 'feed') renderTab();
     if (m.min === 45 && !MV.htDone) {
@@ -126,6 +138,7 @@
 
   function pause(reason, ev) {
     MV.paused = true;
+    if (MV.pitch) MV.pitch.hold = true;
     clearTimeout(MV.timer);
     MV.prompt = reason ? { reason, ev } : null;
     renderFoot();
@@ -133,6 +146,7 @@
 
   function resume() {
     MV.paused = false;
+    if (MV.pitch) MV.pitch.hold = false;
     MV.prompt = null;
     renderFoot();
     schedule();
@@ -275,7 +289,7 @@
     if (m.min === 45 && !m.teams[MV.me].talk) m.teamTalk(MV.me, 'calm');
     resume();
   };
-  A['mv-speed'] = b => { settings().speed = +b.dataset.v; renderFoot(); schedule(); };
+  A['mv-speed'] = b => { settings().speed = +b.dataset.v; if (MV.pitch) MV.pitch.speed = +b.dataset.v; TL.SFX.click(); renderFoot(); schedule(); };
   A['mv-talk'] = b => {
     const r = MV.m.teamTalk(MV.me, b.dataset.k);
     const last = MV.m.events[MV.m.events.length - 1];
@@ -304,7 +318,9 @@
     if (k === 'end') {
       clearTimeout(MV.timer);
       while (!m.done) {
-        m.step().forEach(addEvent);
+        const evs = m.step();
+        evs.forEach(addEvent);
+        if (MV.pitch) MV.pitch.push(evs);
         if (m.min === 45 && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
       }
       MV.htDone = true;
@@ -315,6 +331,7 @@
     MV.skip = k === 'event' ? { type: 'event' } : { type: 'min', min: k === 'ht' ? 45 : +k };
     if (k === 'ht') MV.skip = { type: 'min', min: 45 };
     MV.paused = false; MV.prompt = null;
+    if (MV.pitch) MV.pitch.hold = false;
     renderFoot();
     schedule(0);
   };
@@ -413,6 +430,8 @@
     const body = el('mv-body');
     const letter = UI.resultLetter(S, res);
     const inc = (m.incidents || []).length;
+    if (letter === 'V') { TL.FX.confetti(); TL.SFX.goal(true); }
+    else if (letter === 'D') TL.SFX.groan();
     body.innerHTML = `<div class="card center" style="margin-bottom:12px"><div style="font-family:var(--font-c);font-weight:800;font-size:28px;color:${letter === 'V' ? 'var(--accent2)' : letter === 'D' ? 'var(--danger)' : 'var(--muted)'}">
         ${letter === 'V' ? 'Victoria' : letter === 'D' ? 'Derrota' : 'Empate'}</div>
         ${mom != null ? `<p class="note" style="margin:6px 0 0">MVP: <b>${esc(S.players[mom].name)}</b> (${esc(S.clubs[m.teams[m.pl[mom].team].club].name)})</p>` : ''}
@@ -433,12 +452,16 @@
   };
   A['mv-close'] = () => {
     clearTimeout(MV.timer);
+    if (MV.pitch) { MV.pitch.destroy(); MV.pitch = null; }
+    TL.SFX.stopCrowd();
+    UI.Music.duck(false);
     const r = el('match');
     if (r) r.remove();
     document.body.style.overflow = '';
     MV.m = null;
     UI.tab = 'home';
     UI.render(false);
+    UI.celebrate(G.S);
   };
 
   A['play-live'] = () => open();

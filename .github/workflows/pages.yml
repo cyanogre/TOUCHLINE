@@ -1,5 +1,9 @@
 # Publica el juego en GitHub Pages en cada push a main.
-# Activa en GitHub: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+#
+# Funciona con los dos modos de GitHub Pages (Settings → Pages → Build and deployment):
+#  - Source: "GitHub Actions"  → este workflow publica solo los archivos del juego (recomendado).
+#  - Source: "Deploy from a branch" (main, / root) → GitHub publica el repositorio tal cual
+#    y este workflow se salta la publicación sin dar error.
 name: Publicar en GitHub Pages
 
 on:
@@ -23,9 +27,32 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Comprobar el modo de GitHub Pages
+        id: mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o pages.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          type=$(grep -o '"build_type": *"[a-z]*"' pages.json | grep -o '[a-z]*"$' | tr -d '"' || true)
+          echo "HTTP $code · build_type=$type"
+          if [ "$code" = "200" ] && [ "$type" = "workflow" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            if [ "$code" = "200" ]; then
+              echo "::notice::GitHub Pages publica desde una rama (modo clásico): la web se actualiza sola, este workflow no hace falta. Para publicar solo los archivos del juego, cambia Settings → Pages → Source a 'GitHub Actions'."
+            else
+              echo "::warning::GitHub Pages no está activado. Ve a Settings → Pages → Build and deployment → Source: 'GitHub Actions' y vuelve a lanzar este workflow."
+            fi
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.mode.outputs.deploy == 'true'
 
       - name: Preparar el sitio (solo los archivos del juego)
+        if: steps.mode.outputs.deploy == 'true'
         run: |
           mkdir -p _site/data
           cp -r index.html manifest.webmanifest sw.js .nojekyll css js assets _site/
@@ -36,10 +63,13 @@ jobs:
           du -sh _site
 
       - uses: actions/configure-pages@v5
+        if: steps.mode.outputs.deploy == 'true'
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.mode.outputs.deploy == 'true'
         with:
           path: _site
 
       - id: deployment
+        if: steps.mode.outputs.deploy == 'true'
         uses: actions/deploy-pages@v4

@@ -542,3 +542,144 @@ details summary { list-style: revert; }
 .ctl .btn { padding: 0 8px; }
 .ev.hot { background: rgb(255 93 93 / 0.07); border-radius: 10px; padding: 8px 6px; }
 .mfoot .inner > div:empty { display: none; }
+
+/* ---------------------------------------------------------------- v3: juicy, escudos reales, campo 2D, tutorial */
+/* Escudos reales: la imagen tapa el escudo generado cuando carga */
+.crest { position: relative; }
+.crest > b { font: inherit; }
+.crest > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.25s; }
+.crest.ok { background: none; clip-path: none; color: transparent; text-shadow: none; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45)); }
+.crest.ok > b { visibility: hidden; }
+.crest.ok > img { opacity: 1; }
+
+/* Botones con efecto */
+.btn, .chip, .pick, .seg button, .nav button, .prow { position: relative; overflow: hidden; isolation: isolate; }
+.btn { transition: transform 0.12s cubic-bezier(.3, 1.6, .5, 1), box-shadow 0.2s, background 0.15s, filter 0.15s; }
+.btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.btn:active { transform: translateY(1px) scale(0.96); }
+.btn.primary { box-shadow: 0 4px 0 #6c9a1d, 0 8px 20px rgb(184 245 61 / 0.22); }
+.btn.primary:active { box-shadow: 0 1px 0 #6c9a1d, 0 3px 10px rgb(184 245 61 / 0.2); transform: translateY(3px) scale(0.98); }
+.btn.primary::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; z-index: -1; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  animation: shine 3.2s ease-in-out infinite;
+}
+@keyframes shine { 0%, 60% { left: -60%; } 100% { left: 130%; } }
+.ripple {
+  position: absolute; border-radius: 50%; pointer-events: none; z-index: -1;
+  background: rgb(255 255 255 / 0.28); transform: scale(0); animation: ripple 0.55s ease-out forwards;
+}
+.btn.primary .ripple { background: rgb(255 255 255 / 0.55); }
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
+.chip:active, .seg button:active, .pick:active { transform: scale(0.96); }
+.pick { transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s; }
+.pick:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgb(0 0 0 / 0.3); }
+.nav button.on svg { animation: bounce 0.45s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes bounce { 0% { transform: scale(0.6) translateY(4px); } 100% { transform: none; } }
+
+/* Entrada de las vistas */
+#view > * { animation: rise 0.35s cubic-bezier(.2, .8, .2, 1) both; }
+.grid > * { animation: rise 0.4s cubic-bezier(.2, .8, .2, 1) both; }
+.grid > *:nth-child(2) { animation-delay: 0.04s; } .grid > *:nth-child(3) { animation-delay: 0.08s; }
+.grid > *:nth-child(4) { animation-delay: 0.12s; } .grid > *:nth-child(5) { animation-delay: 0.16s; }
+.grid > *:nth-child(6) { animation-delay: 0.2s; } .grid > *:nth-child(n+7) { animation-delay: 0.24s; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+.card { transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+@media (hover: hover) { .card:hover { border-color: #2f4a3c; } }
+
+/* Próximo partido más vistoso */
+.next-match { background: radial-gradient(120% 90% at 50% -10%, #2c6b45 0%, #173526 45%, #0f2119 100%); }
+.next-match::before {
+  content: ''; position: absolute; inset: -40% -10% auto; height: 120%; pointer-events: none;
+  background: conic-gradient(from 200deg at 15% 0%, transparent 0 40deg, rgb(255 255 255 / 0.07) 50deg, transparent 70deg),
+              conic-gradient(from 110deg at 85% 0%, transparent 0 40deg, rgb(255 255 255 / 0.07) 50deg, transparent 70deg);
+  animation: lights 7s ease-in-out infinite alternate;
+}
+@keyframes lights { to { transform: rotate(4deg) scale(1.05); opacity: 0.6; } }
+.nm-team .crest.lg { transition: transform 0.3s cubic-bezier(.3, 1.6, .5, 1); }
+.next-match:hover .crest.lg { transform: scale(1.08) rotate(-2deg); }
+.nm-vs { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.15); color: var(--accent); } }
+
+/* Animaciones de apoyo */
+.pop { animation: popk 0.45s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes popk { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.topbar .cash.up { color: var(--accent2); } .topbar .cash.down { color: var(--warn); }
+.topbar .cash { transition: color 1.2s; }
+.shake { animation: shake 0.45s; } .shake-strong { animation: shake 0.6s 2; }
+@keyframes shake { 20% { transform: translateX(-6px) rotate(-1deg); } 40% { transform: translateX(6px) rotate(1deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+.flash { position: fixed; inset: 0; z-index: 94; pointer-events: none; animation: flash 0.6s ease-out forwards; }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+#fx { position: fixed; inset: 0; z-index: 96; pointer-events: none; }
+#toast.show { animation: toastIn 0.35s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes toastIn { from { transform: translateX(-50%) translateY(30px) scale(0.8); } }
+
+/* Portada */
+.title-screen { position: relative; overflow: hidden; }
+.title-screen::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 118px, rgb(255 255 255 / 0.08) 119px 121px, transparent 122px),
+    linear-gradient(90deg, transparent calc(50% - 1px), rgb(255 255 255 / 0.08) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px));
+}
+.title-ball { font-size: 46px; animation: ballbob 2.4s ease-in-out infinite; filter: drop-shadow(0 12px 10px rgb(0 0 0 / 0.5)); }
+@keyframes ballbob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-18px) rotate(180deg); } }
+.logo h1 { background: linear-gradient(100deg, #fff 0 40%, #e9ffb8 50%, #fff 60% 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: logoShine 4s linear infinite; }
+.logo h1 span { color: var(--accent); -webkit-text-fill-color: var(--accent); }
+@keyframes logoShine { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.title-actions { max-width: 330px; }
+.title-toggles { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.title-toggles button { font-size: 13px; color: var(--muted); padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: rgb(0 0 0 / 0.2); }
+.title-toggles button:hover { color: var(--text); }
+
+/* Partido: campo 2D */
+.match .mh { padding: 8px 14px 8px; }
+.match .score { margin: 6px 0 6px; }
+.match .score .res { font-size: 38px; }
+.match .score .t { flex-direction: row; justify-content: center; gap: 8px; }
+.match .score .t:last-child { flex-direction: row-reverse; }
+.match .score .t b { font-size: 15px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match .score .t:last-child b { text-align: right; }
+.pitch-box { background: #10301e; padding: 6px 10px; display: flex; justify-content: center; }
+#pitch { width: 100%; max-width: 760px; aspect-ratio: 105 / 68; max-height: 34vh; display: block; border-radius: 10px; }
+.mtabs { padding: 8px 14px 0; width: 100%; max-width: 788px; margin: 0 auto; }
+.mtabs .seg button { padding: 6px; font-size: 13px; }
+@media (max-height: 700px) { #pitch { max-height: 28vh; } }
+
+/* Tutorial */
+#tut { position: fixed; inset: 0; z-index: 120; }
+#tut.center { background: rgb(0 0 0 / 0.65); }
+.tut-hole {
+  position: fixed; border-radius: 14px; pointer-events: none; transition: all 0.35s cubic-bezier(.2, .8, .2, 1);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.68), 0 0 0 3px var(--accent), 0 0 24px 6px rgb(184 245 61 / 0.35);
+  animation: glow 1.4s ease-in-out infinite;
+}
+@keyframes glow { 50% { box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.68), 0 0 0 3px var(--accent), 0 0 34px 10px rgb(184 245 61 / 0.5); } }
+.tut-card {
+  position: fixed; width: min(320px, calc(100vw - 24px)); background: #13261c; border: 1px solid #3b6b4f; border-radius: 16px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+#tut.center .tut-card { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%); }
+.tut-card.in { animation: tutIn 0.35s cubic-bezier(.3, 1.5, .5, 1); }
+#tut.center .tut-card.in { animation: tutInC 0.35s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes tutIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } }
+@keyframes tutInC { from { opacity: 0; transform: translate(-50%, -45%) scale(0.95); } }
+.tut-card h3 { font-size: 21px; margin: 2px 0 6px; }
+.tut-card p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.tut-card p b { color: var(--text); }
+.tut-step { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 0.08em; }
+
+/* Escritorio: botones más contenidos */
+@media (min-width: 1024px) {
+  .btn { min-height: 40px; font-size: 15px; padding: 0 16px; }
+  .btn.sm { min-height: 32px; font-size: 13px; }
+  .nm-actions { max-width: 520px; margin: 0 auto; }
+  .title-actions { max-width: 300px; }
+  .continue-card .t { font-size: 18px; }
+  .logo h1 { font-size: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary::after, .next-match::before, .nm-vs, .title-ball, .logo h1, .tut-hole { animation: none !important; }
+}
+.match .comp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 1024px) { #pitch { max-height: 42vh; } }

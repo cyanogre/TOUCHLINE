@@ -29,6 +29,18 @@ enganchaba, lo que chirriaba y qué se ha cambiado en la versión 2.
 | Mercado con estrellas imposibles por defecto | Frustrante | Filtro "Lo que puedo pagar" |
 | Alineaciones con lesionados sin aviso | Sorpresa desagradable | Aviso antes del partido de quién no está disponible y quién lo sustituye |
 
+## v3: lo que pediste tras probarlo
+
+| Problema | Solución |
+|---|---|
+| No se ve a los jugadores jugando | Vista 2D en canvas: 22 jugadores con dorsal, movimiento según formación y posesión, pases, tiros, paradas, goles con celebración, tarjetas y rótulos de VAR, penalti o tangana |
+| Sin tutorial | Tutorial guiado con foco sobre cada zona: inicio, plantilla, tácticas, mercado, club y noticias, y controles en el primer partido |
+| Botones de inicio enormes en PC (icono de música gigante) | Portada nueva y compacta. Interruptores pequeños de música y sonido, y botones más contenidos en escritorio |
+| Poco divertido visualmente | Botones con relieve, brillo, onda y chispas. Confeti y partículas en goles, victorias, fichajes, patrocinios y subidas de nivel. Animaciones de entrada, focos en la tarjeta del partido, saldo que parpadea al cambiar |
+| Sin efectos de sonido | Web Audio: silbato, ambiente de estadio, rugido del gol, abucheos, tarjetas, monedas y fanfarria de nivel |
+| La música no arranca sola | Arranca con fundido al empezar o continuar partida y baja durante los partidos |
+| Escudos inventados | Escudos reales de ≈350 clubes vía jsDelivr, con colores de equipación sacados del escudo |
+
 ## Lo que todavía falta (hoja de ruta)
 
 Por orden de impacto para un jugador de FM:
