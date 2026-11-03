@@ -1,0 +1,14 @@
+{
+  "name": "Touchline — Football Manager",
+  "short_name": "Touchline",
+  "description": "Juego de gestión de fútbol con los datos de EA SPORTS FC 27.",
+  "lang": "es",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08110d",
+  "theme_color": "#08110d",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
