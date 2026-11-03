@@ -1,0 +1,130 @@
+# TOUCHLINE — Football Manager
+
+Juego de gestión de fútbol para móvil (de momento en HTML responsive) con los
+jugadores reales del dataset **EA SPORTS FC 27** (19.789 jugadores, 702 clubes).
+
+## Jugar online (GitHub Pages)
+
+El repositorio incluye el workflow `.github/workflows/pages.yml`, que publica el
+juego en cada push a `main`:
+
+1. En GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Haz merge de esta rama a `main`. Desde entonces se publica sola en cada push, y también puedes lanzarla a mano en **Actions → Publicar en GitHub Pages → Run workflow**.
+3. El juego queda en `https://cyanogre.github.io/TOUCHLINE/`.
+
+Solo se publican los archivos del juego (~10 MB con la música). Los CSV y el zip originales no
+se suben a la web. Una vez publicado, se puede **instalar en el móvil** (Añadir a
+pantalla de inicio) y funciona **sin conexión** gracias al service worker (`sw.js`).
+
+## Jugar en local
+
+Abre `index.html` en el navegador. No hace falta compilar nada. También
+funciona con doble clic (`file://`), aunque se recomienda un servidor local:
+
+```bash
+python3 -m http.server 8000
+```
+
+Después entra en <http://localhost:8000>.
+
+### Qué incluye
+
+- **Nueva partida:** fútbol masculino (34 ligas jugables) o femenino (5 ligas), elige liga y club.
+- **Partido en directo:**
+  - Velocidades **x1, x2, x4, x8 y x16**.
+  - **Saltar** al próximo momento clave, al descanso, a los minutos 60/75/85 o al final.
+  - **Pausas automáticas** configurables (goles, rojas, lesiones, penaltis, VAR, grada) con decisiones rápidas.
+  - **Charla del descanso**, cambio de **sistema** y de mentalidad en pleno partido, y 5 cambios.
+- **Reglamento y arbitraje:**
+  - Faltas, amarillas (con ciclo de 5) y rojas con sanciones según la gravedad.
+  - Penaltis y faltas directas.
+  - Árbitros con perfil y errores, VAR y fueras de juego.
+  - Tanganas, agresiones e incidentes de grada (racismo, bengalas, objetos, invasiones).
+- **Noticias y polémicas:**
+  - Crónicas, goleadas, campanadas, hat-tricks, fichajes y rumores.
+  - Escándalos de vestuario y extradeportivos (indisciplina, redes, fiesta, tráfico, Hacienda, apuestas, dopaje, drogas, violencia, agresión sexual…) con probabilidades realistas por temporada. Ver [docs/POLEMICAS.md](docs/POLEMICAS.md).
+  - Las polémicas de tu club llegan como **decisiones** con consecuencias.
+- **Moral** de los jugadores (minutos, resultados, contrato, escándalos), que afecta al rendimiento.
+- **Mánager:** experiencia, niveles y **árbol de habilidades** con 6 ramas (táctica, motivación, preparación física, cantera, negocios, disciplina).
+- **Comercial:**
+  - Afición y TV.
+  - **Patrocinios** (camiseta, proveedor técnico, naming del estadio, secundarios). Pueden ser estables, por objetivos o arriesgados; los de criptomonedas y apuestas pueden quebrar, y las apuestas están prohibidas en España e Italia.
+  - Merchandising, **precio de entradas**, **campañas de marketing** y **gira de pretemporada**.
+  - **Préstamos** con interés según tu deuda y **ampliación del estadio**.
+- **Tácticas:** 8 formaciones, once ideal, adaptación por puesto, mentalidad y cambios automáticos.
+- **Mercado:**
+  - Buscador con filtros, incluido "lo que puedo pagar".
+  - Negociación, agentes libres, transferibles, ofertas de la IA, venta rápida y rescisión.
+  - Ventanas de fichajes en verano e invierno.
+- **Temporadas:**
+  - Clasificación, goleadores, ascensos y descensos.
+  - Evolución de los jugadores, retiradas, cantera y renovaciones.
+  - Objetivos de la directiva: te pueden destituir.
+- **Guardado automático**, exportar e importar partida, y música (`Strategic Swing.mp3`).
+
+La evaluación del juego desde el punto de vista de un jugador de Football
+Manager y la hoja de ruta están en [docs/EVALUACION.md](docs/EVALUACION.md).
+
+## Estructura
+
+```
+index.html               Entrada del juego
+sw.js                    Service worker (offline / app instalable)
+manifest.webmanifest     Manifest PWA
+.github/workflows/       Publicación automática en GitHub Pages
+css/styles.css           Estilos mobile-first (barra inferior en móvil, lateral en escritorio)
+js/formulas.js           Fórmulas compartidas juego/Node: valor, salario, potencial, contrato
+js/util.js               Azar, formato de dinero/fechas, escudos y colores de club
+js/events-data.js        Probabilidades de incidentes y polémicas (calibradas)
+js/manager.js            Experiencia, niveles y árbol de habilidades del mánager
+js/world.js              Mundo, plantillas mínimas, economía base, guardar/cargar
+js/engine.js             Motor de partido: faltas, tarjetas, árbitro, VAR, penaltis, charla, táctica
+js/season.js             Calendario, clasificación, jornada, fin de temporada, evolución
+js/market.js             Fichajes, ventas, contratos e IA de mercado
+js/commerce.js           Afición, patrocinios, marketing, entradas, préstamos, estadio
+js/news.js               Noticias, polémicas, moral y decisiones
+js/game.js               Orquestación: carga de datos, partida, buzón, guardado
+js/ui.js                 Interfaz (vistas, fichas, club, mánager, asistente)
+js/matchview.js          Partido en directo
+assets/flags/            Banderas SVG (flag-icons, licencia MIT)
+tools/build-data.js      Genera los datos del juego desde data/players.csv
+data/players.csv         Dataset original (extraído de EA_FC_ANALYSIS-main.zip)
+data/players_clean.csv   Dataset limpio y enriquecido
+data/game/men.js         Datos compactos del juego (masculino)
+data/game/women.js       Datos compactos del juego (femenino)
+docs/                    Evaluación y tabla de polémicas
+```
+
+Para regenerar los datos tras cambiar el CSV o las fórmulas:
+
+```bash
+node tools/build-data.js
+```
+
+Para volver a copiar las banderas (opcional), descarga `flag-icons` y pasa su carpeta:
+
+```bash
+npm pack flag-icons && tar xzf flag-icons-*.tgz
+```
+
+```bash
+FLAG_ICONS_DIR=package/flags/4x3 node tools/build-data.js
+```
+
+## Correcciones aplicadas al dataset
+
+| Problema en el original | Solución |
+|---|---|
+| `common_name` vacío en el 85% de jugadores | Nombre visible = `common_name` o `first_name + last_name`; nombre corto para el campo |
+| Porteros: `pace…physicality` contienen en realidad DIV/HAN/KIC/REF/SPD/POS | Se etiquetan como estadísticas de portero (`card_stat_labels` en el CSV limpio) |
+| `height_cm` y `weight_kg` vacíos en todas las filas | Se eliminan (no se inventan) |
+| Sin edad | Calculada al 1-jul-2026 desde `birthdate` |
+| Sin valor de mercado, salario, contrato ni potencial | Estimados con fórmulas deterministas (`js/formulas.js`) según media, edad, posición y riqueza de la liga |
+| Economía femenina en la misma escala que la masculina | Escala propia (valores ×0,015, salarios ×0,04) |
+| "Ligas" que son copas (CONMEBOL) o con 1–4 clubes | Marcadas como no jugables; sus jugadores siguen disponibles en el mercado |
+| Plantillas incompletas (p. ej. Sabadell con 11 jugadores) | El juego completa hasta 22 jugadores y mínimos por línea con jugadores ficticios de la cantera |
+| Sin estadios | Aforo y precio de entrada generados según el nivel del club y la liga |
+| Nacionalidades en inglés y banderas emoji (no se ven en Windows) | Traducidas al español con bandera SVG local |
+
+Los clubes y traspasos son los del snapshot de EA del 12-09-2026; no se han
+cotejado con fuentes externas.
