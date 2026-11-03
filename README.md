@@ -5,16 +5,14 @@ jugadores reales del dataset **EA SPORTS FC 27** (19.789 jugadores, 702 clubes).
 
 ## Jugar online (GitHub Pages)
 
-El repositorio incluye el workflow `.github/workflows/pages.yml`, que publica el
-juego en cada push a `main`:
+La web queda en `https://cyanogre.github.io/TOUCHLINE/`. Hay dos formas de
+publicarla, en **Settings → Pages → Build and deployment → Source**:
 
-1. En GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Haz merge de esta rama a `main`. Desde entonces se publica sola en cada push, y también puedes lanzarla a mano en **Actions → Publicar en GitHub Pages → Run workflow**.
-3. El juego queda en `https://cyanogre.github.io/TOUCHLINE/`.
+- **GitHub Actions** (recomendado): el workflow `.github/workflows/pages.yml` publica en cada push a `main` solo los archivos del juego (unos 10 MB con la música) y versiona el caché sin conexión.
+- **Deploy from a branch** (`main`, carpeta `/ (root)`): GitHub publica el repositorio tal cual, incluidos los CSV y el zip. También funciona. En este modo el workflow detecta la configuración y se salta la publicación sin dar error.
 
-Solo se publican los archivos del juego (~10 MB con la música). Los CSV y el zip originales no
-se suben a la web. Una vez publicado, se puede **instalar en el móvil** (Añadir a
-pantalla de inicio) y funciona **sin conexión** gracias al service worker (`sw.js`).
+Una vez publicado, se puede **instalar en el móvil** (Añadir a pantalla de
+inicio) y funciona **sin conexión** gracias al service worker (`sw.js`).
 
 ## Jugar en local
 

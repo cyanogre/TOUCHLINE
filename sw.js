@@ -1,6 +1,6 @@
 /* TOUCHLINE — service worker: juego offline y carga rápida en móvil.
  * La versión la sustituye el workflow de GitHub Pages por el commit. */
-const VERSION = 'touchline-__BUILD__';
+const VERSION = 'touchline-v3-__BUILD__'; // sube "v3" en cada versión si publicas desde una rama
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/world.js', 'js/engine.js',
