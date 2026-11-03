@@ -3,7 +3,20 @@
 Juego de gestión de fútbol para móvil (de momento en HTML responsive) con los
 jugadores reales del dataset **EA SPORTS FC 27** (19.789 jugadores, 702 clubes).
 
-## Cómo jugar
+## Jugar online (GitHub Pages)
+
+El repositorio incluye el workflow `.github/workflows/pages.yml`, que publica el
+juego en cada push a `main`:
+
+1. En GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Haz merge de esta rama a `main`. Desde entonces se publica sola en cada push, y también puedes lanzarla a mano en **Actions → Publicar en GitHub Pages → Run workflow**.
+3. El juego queda en `https://cyanogre.github.io/TOUCHLINE/`.
+
+Solo se publican los archivos del juego (~10 MB con la música). Los CSV y el zip originales no
+se suben a la web. Una vez publicado, se puede **instalar en el móvil** (Añadir a
+pantalla de inicio) y funciona **sin conexión** gracias al service worker (`sw.js`).
+
+## Jugar en local
 
 Abre `index.html` en el navegador. No hace falta compilar nada. También
 funciona con doble clic (`file://`), aunque se recomienda un servidor local:
@@ -12,56 +25,90 @@ funciona con doble clic (`file://`), aunque se recomienda un servidor local:
 python3 -m http.server 8000
 ```
 
-Después entra en <http://localhost:8000>. Desde el móvil, en la misma red, usa la
-IP del ordenador. Se puede "añadir a pantalla de inicio" (manifest PWA incluido).
+Después entra en <http://localhost:8000>.
 
 ### Qué incluye
 
-- **Nueva partida**: fútbol masculino (34 ligas jugables) o femenino (5 ligas), elige liga y club.
-- **Partidos en directo** con narración, estadísticas, alineaciones, cambios
-  manuales (5) y mentalidad en tiempo real. También hay **resultado rápido**.
-- **Tácticas**: 8 formaciones, once ideal automático, elección de jugador por
-  puesto con su % de adaptación, mentalidad y cambios automáticos.
-- **Plantilla**: forma física, lesiones, sanciones, contratos y estadísticas de temporada.
-- **Mercado**: buscador con filtros (posición, media, edad, valor, liga) y
-  negociación (oferta, contraoferta y contrato). Incluye agentes libres, lista
-  de transferibles, ofertas de la IA, venta rápida y rescisión. Hay ventanas de
-  fichajes en verano e invierno.
-- **Temporadas**: calendario a doble vuelta (una sola vuelta en ligas de más de 24
-  equipos), clasificación, goleadores y ascensos y descensos entre divisiones
-  (Inglaterra, España, Italia, Alemania y Francia). Al final de cada temporada
-  hay evolución de jugadores, retiradas, cantera y renovaciones.
-- **Club**: finanzas (taquilla, comercial y TV, premios, salarios, traspasos),
-  estadio renombrable, directiva con objetivo y confianza (te pueden destituir)
-  e historial.
-- **Guardado automático** en el navegador, con exportación e importación a archivo `.json`.
-- **Música** de fondo (`Strategic Swing.mp3`), que se activa y desactiva desde la barra superior.
+- **Nueva partida:** fútbol masculino (34 ligas jugables) o femenino (5 ligas), elige liga y club.
+- **Partido en directo:**
+  - Velocidades **x1, x2, x4, x8 y x16**.
+  - **Saltar** al próximo momento clave, al descanso, a los minutos 60/75/85 o al final.
+  - **Pausas automáticas** configurables (goles, rojas, lesiones, penaltis, VAR, grada) con decisiones rápidas.
+  - **Charla del descanso**, cambio de **sistema** y de mentalidad en pleno partido, y 5 cambios.
+- **Reglamento y arbitraje:**
+  - Faltas, amarillas (con ciclo de 5) y rojas con sanciones según la gravedad.
+  - Penaltis y faltas directas.
+  - Árbitros con perfil y errores, VAR y fueras de juego.
+  - Tanganas, agresiones e incidentes de grada (racismo, bengalas, objetos, invasiones).
+- **Noticias y polémicas:**
+  - Crónicas, goleadas, campanadas, hat-tricks, fichajes y rumores.
+  - Escándalos de vestuario y extradeportivos (indisciplina, redes, fiesta, tráfico, Hacienda, apuestas, dopaje, drogas, violencia, agresión sexual…) con probabilidades realistas por temporada. Ver [docs/POLEMICAS.md](docs/POLEMICAS.md).
+  - Las polémicas de tu club llegan como **decisiones** con consecuencias.
+- **Moral** de los jugadores (minutos, resultados, contrato, escándalos), que afecta al rendimiento.
+- **Mánager:** experiencia, niveles y **árbol de habilidades** con 6 ramas (táctica, motivación, preparación física, cantera, negocios, disciplina).
+- **Comercial:**
+  - Afición y TV.
+  - **Patrocinios** (camiseta, proveedor técnico, naming del estadio, secundarios). Pueden ser estables, por objetivos o arriesgados; los de criptomonedas y apuestas pueden quebrar, y las apuestas están prohibidas en España e Italia.
+  - Merchandising, **precio de entradas**, **campañas de marketing** y **gira de pretemporada**.
+  - **Préstamos** con interés según tu deuda y **ampliación del estadio**.
+- **Tácticas:** 8 formaciones, once ideal, adaptación por puesto, mentalidad y cambios automáticos.
+- **Mercado:**
+  - Buscador con filtros, incluido "lo que puedo pagar".
+  - Negociación, agentes libres, transferibles, ofertas de la IA, venta rápida y rescisión.
+  - Ventanas de fichajes en verano e invierno.
+- **Temporadas:**
+  - Clasificación, goleadores, ascensos y descensos.
+  - Evolución de los jugadores, retiradas, cantera y renovaciones.
+  - Objetivos de la directiva: te pueden destituir.
+- **Guardado automático**, exportar e importar partida, y música (`Strategic Swing.mp3`).
+
+La evaluación del juego desde el punto de vista de un jugador de Football
+Manager y la hoja de ruta están en [docs/EVALUACION.md](docs/EVALUACION.md).
 
 ## Estructura
 
 ```
-index.html              Entrada del juego
-css/styles.css          Estilos mobile-first (barra inferior en móvil, lateral en escritorio)
-js/formulas.js          Fórmulas compartidas juego/Node: valor, salario, potencial, contrato
-js/util.js              Azar, formato de dinero/fechas, escudos y colores de club
-js/world.js             Construcción del mundo, plantillas mínimas, economía, guardar/cargar
-js/engine.js            Formaciones, alineaciones y motor de partido minuto a minuto
-js/season.js            Calendario, clasificación, jornada, fin de temporada, evolución
-js/market.js            Fichajes, ventas, contratos e IA de mercado
-js/game.js              Orquestación: carga de datos, partida, buzón, guardado
-js/ui.js                Interfaz (vistas, fichas, asistente de nueva partida)
-js/matchview.js         Partido en directo
-tools/build-data.js     Genera los datos del juego desde data/players.csv
-data/players.csv        Dataset original (extraído de EA_FC_ANALYSIS-main.zip)
-data/players_clean.csv  Dataset limpio y enriquecido
-data/game/men.js        Datos compactos del juego (masculino)
-data/game/women.js      Datos compactos del juego (femenino)
+index.html               Entrada del juego
+sw.js                    Service worker (offline / app instalable)
+manifest.webmanifest     Manifest PWA
+.github/workflows/       Publicación automática en GitHub Pages
+css/styles.css           Estilos mobile-first (barra inferior en móvil, lateral en escritorio)
+js/formulas.js           Fórmulas compartidas juego/Node: valor, salario, potencial, contrato
+js/util.js               Azar, formato de dinero/fechas, escudos y colores de club
+js/events-data.js        Probabilidades de incidentes y polémicas (calibradas)
+js/manager.js            Experiencia, niveles y árbol de habilidades del mánager
+js/world.js              Mundo, plantillas mínimas, economía base, guardar/cargar
+js/engine.js             Motor de partido: faltas, tarjetas, árbitro, VAR, penaltis, charla, táctica
+js/season.js             Calendario, clasificación, jornada, fin de temporada, evolución
+js/market.js             Fichajes, ventas, contratos e IA de mercado
+js/commerce.js           Afición, patrocinios, marketing, entradas, préstamos, estadio
+js/news.js               Noticias, polémicas, moral y decisiones
+js/game.js               Orquestación: carga de datos, partida, buzón, guardado
+js/ui.js                 Interfaz (vistas, fichas, club, mánager, asistente)
+js/matchview.js          Partido en directo
+assets/flags/            Banderas SVG (flag-icons, licencia MIT)
+tools/build-data.js      Genera los datos del juego desde data/players.csv
+data/players.csv         Dataset original (extraído de EA_FC_ANALYSIS-main.zip)
+data/players_clean.csv   Dataset limpio y enriquecido
+data/game/men.js         Datos compactos del juego (masculino)
+data/game/women.js       Datos compactos del juego (femenino)
+docs/                    Evaluación y tabla de polémicas
 ```
 
 Para regenerar los datos tras cambiar el CSV o las fórmulas:
 
 ```bash
 node tools/build-data.js
+```
+
+Para volver a copiar las banderas (opcional), descarga `flag-icons` y pasa su carpeta:
+
+```bash
+npm pack flag-icons && tar xzf flag-icons-*.tgz
+```
+
+```bash
+FLAG_ICONS_DIR=package/flags/4x3 node tools/build-data.js
 ```
 
 ## Correcciones aplicadas al dataset
@@ -77,7 +124,7 @@ node tools/build-data.js
 | "Ligas" que son copas (CONMEBOL) o con 1–4 clubes | Marcadas como no jugables; sus jugadores siguen disponibles en el mercado |
 | Plantillas incompletas (p. ej. Sabadell con 11 jugadores) | El juego completa hasta 22 jugadores y mínimos por línea con jugadores ficticios de la cantera |
 | Sin estadios | Aforo y precio de entrada generados según el nivel del club y la liga |
-| Nacionalidades en inglés | Traducidas al español con bandera |
+| Nacionalidades en inglés y banderas emoji (no se ven en Windows) | Traducidas al español con bandera SVG local |
 
 Los clubes y traspasos son los del snapshot de EA del 12-09-2026; no se han
 cotejado con fuentes externas.

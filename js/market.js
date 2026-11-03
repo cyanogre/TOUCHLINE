@@ -14,8 +14,8 @@
 
   function yearsLeft(S, p) { return p.contract - (S.season + 1); }
 
-  function askingPrice(S, p) {
-    const v = W.value(S, p);
+  function askingPrice(S, p, buyer) {
+    const v = W.value(S, p) * (buyer === S.user ? TL.Manager.B(S).neg : 1);
     if (p.club < 0) return 0;
     const sq = W.squad(S, p.club).sort((a, b) => b.ovr - a.ovr);
     const rank = sq.findIndex(x => x.id === p.id);
@@ -36,6 +36,7 @@
     let f = 1.1 + (from ? Math.max(0, from.rep - to.rep) * 0.03 : 0.1);
     let w = base * f;
     if (p.club >= 0 && p.club !== clubId) w = Math.max(w, p.wage * 1.08);
+    if (clubId === S.user) w *= TL.Manager.B(S).neg;
     return F.roundMoney(w);
   }
 
@@ -52,12 +53,12 @@
   /** Evalúa una oferta por un jugador de otro club. */
   function offer(S, p, amount) {
     if (!windowOpen(S)) return { result: 'closed' };
-    const ask = askingPrice(S, p);
+    const ask = askingPrice(S, p, S.user);
     const seller = W.squad(S, p.club);
     if (seller.length <= 18) return { result: 'reject', msg: `${S.clubs[p.club].name} no quiere vender: tiene la plantilla corta.` };
     if (amount >= ask) return { result: 'accept', price: amount };
     S.neg[p.id] = (S.neg[p.id] || 0) + 1;
-    if (amount >= ask * 0.8) return { result: 'counter', price: askingPrice(S, p), msg: `Piden ${U.money(askingPrice(S, p))}.` };
+    if (amount >= ask * 0.8) return { result: 'counter', price: askingPrice(S, p, S.user), msg: `Piden ${U.money(askingPrice(S, p, S.user))}.` };
     return { result: 'reject', msg: `Oferta insuficiente. Su valoración ronda ${U.money(ask * (1 + 0.05 * Math.random()))}.` };
   }
 
@@ -86,6 +87,10 @@
     W.dirty(S);
     TL.Game.mail(S, 'Fichaje cerrado', `${p.name} (${fromName}) firma hasta ${p.contract}` +
       (fee ? ` por ${U.money(fee)}` : '') + ` con un salario de ${U.money(wage)}/sem.`, 'market');
+    TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} ficha a ${p.name}`,
+      `Llega desde ${fromName}${fee ? ' por ' + U.money(fee) : ' con la carta de libertad'}. Firma hasta ${p.contract}.`, S.user, p.id, 'pos');
+    p.mor = Math.max(p.mor == null ? 70 : p.mor, 78);
+    if (S.com && p.ovr >= S.clubs[S.user].rep + 3) S.com.fans = Math.round(S.com.fans * 1.006);
     return { ok: true };
   }
 
@@ -196,6 +201,7 @@
     if (S.clubs[club].cash < amount) return { ok: false, msg: `${S.clubs[club].name} ya no puede pagarlo.` };
     transferOut(S, p, club, amount);
     msg.done = true; msg.res = 'Aceptada';
+    TL.News.add(S, 'fichajes', `${p.name} se marcha a ${S.clubs[club].name}`, `Operación cerrada por ${U.money(amount)}.`, club, p.id, 'neu');
     TL.Game.mail(S, 'Venta cerrada', `${p.name} se marcha a ${S.clubs[club].name} por ${U.money(amount)}.`, 'market');
     return { ok: true, msg: `${p.short} vendido por ${U.money(amount)}.` };
   }
@@ -221,8 +227,9 @@
       if (fee > buyer.cash * 0.6) continue;
       const fromClub = target.club;
       transferOut(S, target, buyer.id, fee);
-      if (buyer.league === userLeague || S.clubs[fromClub].league === userLeague) {
-        TL.Game.mail(S, 'Rumores confirmados', `${target.name} deja ${S.clubs[fromClub].name} y ficha por ${buyer.name} por ${U.money(fee)}.`, 'news');
+      if (buyer.league === userLeague || S.clubs[fromClub].league === userLeague || target.ovr >= 82) {
+        TL.News.add(S, 'fichajes', `${buyer.name} ficha a ${target.name}`,
+          `${target.name} deja ${S.clubs[fromClub].name} a cambio de ${U.money(fee)}.`, buyer.id, target.id, 'neu');
       }
     }
   }

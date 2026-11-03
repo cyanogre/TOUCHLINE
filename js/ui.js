@@ -55,7 +55,10 @@
   function ovrCls(v) { return v >= 85 ? 't1' : v >= 75 ? 't2' : v >= 65 ? 't3' : 't4'; }
   function ovrB(v) { return `<span class="ovr ${ovrCls(v)}">${v}</span>`; }
   function fitB(f) { return `<span class="fit ${f < 60 ? 'low' : f < 80 ? 'mid' : ''}" title="Forma física ${f}%"><i style="width:${f}%"></i></span>`; }
-  function flag(S, p) { return S.nations[p.nat] ? S.nations[p.nat][1] : ''; }
+  function flagImg(code, title) {
+    return code ? `<img class="flagi" src="assets/flags/${code}.svg" alt="${esc(title || '')}" title="${esc(title || '')}" loading="lazy" width="18" height="13">` : '';
+  }
+  function flag(S, p) { const n = S.nations[p.nat]; return n ? flagImg(n[1], n[0]) : ''; }
   function stars(rep, max) {
     const n = U.clamp(Math.round((rep - 57) / 5), 1, max || 5);
     return `<span class="stars" aria-label="${n} estrellas">${'★'.repeat(n)}<span class="faint">${'★'.repeat((max || 5) - n)}</span></span>`;
@@ -214,8 +217,13 @@
   }
 
   function msgHtml(S, m) {
-    const ic = { board: '🏛️', market: '💼', offer: '📩', news: '📰', med: '🏥', club: '📋' }[m.kind] || '✉️';
+    const ic = { board: '🏛️', market: '💼', offer: '📩', news: '📰', med: '🏥', club: '📋', decision: '⚖️', good: '⭐' }[m.kind] || '✉️';
     let actions = '';
+    if (m.kind === 'decision' && !m.done && m.data && m.data.opts) {
+      actions = `<div class="btn-row">${m.data.opts.map(([k, label], i) =>
+        `<button class="btn sm ${i === 0 ? 'primary' : ''}" data-act="decide" data-id="${m.id}" data-k="${k}">${esc(label)}</button>`).join('')}
+        ${m.data.pid != null ? `<button class="btn sm ghost" data-act="player" data-id="${m.data.pid}">Ficha</button>` : ''}</div>`;
+    }
     if (m.kind === 'offer' && !m.done) {
       actions = `<div class="btn-row"><button class="btn sm primary" data-act="offer-accept" data-id="${m.id}">Aceptar</button>
         <button class="btn sm" data-act="offer-reject" data-id="${m.id}">Rechazar</button>
@@ -263,7 +271,12 @@
     const board = `<section class="card"><div class="card-head"><h2>Directiva</h2><span class="muted">${played ? posOf(S.user) + 'º de ' + tab.length : 'Pretemporada'}</span></div>
       <div style="font-weight:700;font-size:16px">${esc(S.board.text)}</div>
       <div class="row between mt"><span class="muted" style="font-size:13px">Confianza</span><b class="num">${Math.round(conf)}%</b></div>
-      <div class="bar ${conf < 30 ? 'bad' : conf < 50 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${conf}%"></i></div></section>`;
+      <div class="bar ${conf < 30 ? 'bad' : conf < 50 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${conf}%"></i></div>
+      <button class="row between mt mgr-line" data-act="go-manager"><span>🎓 Mánager nivel <b>${S.mgr.level}</b></span>
+        ${S.mgr.points ? `<span class="tag new">${S.mgr.points} punto${S.mgr.points > 1 ? 's' : ''} por gastar</span>` : '<span class="faint">Ver habilidades</span>'}</button></section>`;
+
+    const news = `<section class="card span2"><div class="card-head"><h2>Noticias</h2><button class="link" data-act="news">Ver todas</button></div>
+      ${S.news.length ? S.news.slice(0, 5).map(n => newsHtml(S, n)).join('') : '<div class="empty">Sin noticias.</div>'}</section>`;
 
     const ms = userMatches(S).slice(-5).reverse();
     const results = `<section class="card"><div class="card-head"><h2>Últimos resultados</h2>${ms.length ? formHtml(ms.slice().reverse().map(m => resultLetter(S, m))) : ''}</div>
@@ -285,11 +298,45 @@
       <div class="row between mt"><span class="muted" style="font-size:13px">Presupuesto salarial</span><span class="num">${U.money(bill)} / ${U.money(c.wageBudget)}</span></div>
       <div class="bar ${bill > c.wageBudget ? 'bad' : bill > c.wageBudget * 0.95 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${Math.min(100, bill / c.wageBudget * 100)}%"></i></div></section>`;
 
-    return `<div class="grid two three">${next}${board}${inbox}${results}${mini}${fin}</div>`;
+    return `<div class="grid two three">${next}${board}${inbox}${news}${results}${mini}${fin}</div>`;
   };
   VIEWS.homeAfter = S => {
     // Lo mostrado en Inicio queda como leído
     S.inbox.slice(0, 4).forEach(m => { m.read = true; });
+  };
+
+  const NEWS_IC = {
+    liga: '⚽', fichajes: '🔁', polemica: '🔥', arbitraje: '⚖️', aficion: '📢', vestuario: '🚪', sucesos: '🚨',
+    tribunales: '🏛️', dopaje: '💉', redes: '📱', ocio: '🍸', mercado: '💼', club: '🏟️', positivo: '⭐', rumor: '👀'
+  };
+  function newsHtml(S, n) {
+    const club = n.club >= 0 ? S.clubs[n.club] : null;
+    return `<div class="news tone-${n.tone}" ${n.pid >= 0 ? `data-act="player" data-id="${n.pid}" role="button" tabindex="0"` : ''}>
+      <div class="ic">${NEWS_IC[n.cat] || '📰'}</div><div class="grow">
+      <div class="nt"><span class="ncat">${esc(TL.News.CAT[n.cat] || n.cat)}</span>${club && n.club === S.user ? '<span class="tag new">Tu club</span>' : ''}</div>
+      <div class="t">${esc(n.title)}</div><div class="b">${esc(n.body)}</div>
+      <div class="d">${U.seasonLabel(n.s)} · Semana ${n.w}</div></div></div>`;
+  }
+  const NEWS_FILTERS = [['all', 'Todas'], ['mine', 'Tu club'], ['hot', 'Polémicas'], ['liga', 'Liga'], ['fichajes', 'Fichajes'], ['aficion', 'Afición'], ['arbitraje', 'Arbitraje']];
+  A.news = el => {
+    const S = G.S;
+    const f = (el && el.dataset.f) || UI.newsFilter || 'all';
+    UI.newsFilter = f;
+    const hot = ['polemica', 'vestuario', 'sucesos', 'tribunales', 'dopaje', 'redes', 'ocio'];
+    const list = S.news.filter(n => f === 'all' || (f === 'mine' ? n.club === S.user : f === 'hot' ? hot.includes(n.cat) : n.cat === f));
+    sheet(sheetHead('Noticias') + `<div class="chips" style="margin-bottom:8px">${NEWS_FILTERS.map(([k, l]) =>
+      `<button class="chip ${f === k ? 'on' : ''}" data-act="news" data-f="${k}">${l}</button>`).join('')}</div>
+      ${list.length ? list.slice(0, 80).map(n => newsHtml(S, n)).join('') : '<div class="empty">No hay noticias en esta categoría.</div>'}`, { keepScroll: false });
+  };
+  A['go-manager'] = () => { UI.tab = 'club'; UI.clubTab = 'manager'; render(false); };
+  A.decide = el => {
+    const S = G.S;
+    const m = S.inbox.find(x => x.id === +el.dataset.id);
+    const r = TL.News.decide(S, m, el.dataset.k);
+    toast(r.msg || 'Decisión tomada', !r.ok);
+    G.save();
+    if (document.querySelector('.sheet')) A.inbox();
+    UI.refresh();
   };
 
   function fixtureHtml(S, m) {
@@ -354,7 +401,9 @@
       const st = S.stats[p.id];
       const cols = `<span class="w-s">${p.age}</span><span class="w-s">${fitB(p.fit)}</span><span>${U.money(W.value(S, p))}</span>
         <span>${U.money(p.wage)}</span><span class="w-s">${p.contract}</span><span class="w-s">${st ? st[0] + 'pj ' + st[1] + 'g' : '—'}</span>`;
-      const sub = `${flag(S, p)} ${p.age} años · ${U.money(W.value(S, p))} · ${fitB(p.fit)}`;
+      const [ml, me] = TL.News.moraleLabel(p.mor);
+      const yel = st && st[4] ? ` · 🟨${st[4]}` : '';
+      const sub = `${flag(S, p)} ${p.age} años · ${U.money(W.value(S, p))} · <span title="Moral: ${ml}">${me}</span> ${fitB(p.fit)}${yel}`;
       return playerRow(S, p, { cols, sub });
     };
     let list = '';
@@ -535,7 +584,7 @@
             <td>${s[0]}</td><td class="pts">${s[1]}</td><td>${s[2]}</td><td class="hide-m">${(s[3] / s[0]).toFixed(2)}</td></tr>`;
         }).join('') || '<tr><td colspan="6" class="empty">Todavía no hay goles.</td></tr>'}</tbody></table></div>`;
     }
-    return pageTitle(esc(L.name), `${L.flag} ${esc(L.country)} · ${U.seasonLabel(S.season)}`) + seg + body;
+    return pageTitle(esc(L.name), `${flagImg(L.flag, L.country)} ${esc(L.country)} · ${U.seasonLabel(S.season)}`) + seg + body;
   };
   A['lg-tab'] = el => { UI.league.tab = el.dataset.k; UI.league.round = null; UI.refresh(); };
   A['lg-round'] = el => { UI.league.round = (UI.league.round || 0) + +el.dataset.d; UI.refresh(); };
@@ -585,9 +634,10 @@
           <select data-change="mf" data-k="maxAge" style="flex:1 1 110px" aria-label="Edad máxima"><option value="">Edad máx.</option>
             ${[19, 21, 23, 25, 28, 30, 33].map(v => `<option value="${v}" ${+f.maxAge === v ? 'selected' : ''}>≤ ${v} años</option>`).join('')}</select>
           ${t === 'search' ? `<select data-change="mf" data-k="maxValue" style="flex:1 1 120px" aria-label="Valor máximo"><option value="">Valor máx.</option>
+            <option value="cash" ${f.maxValue === 'cash' ? 'selected' : ''}>Lo que puedo pagar</option>
             ${[1e5, 5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7, 1e8].map(v => Math.round(v * S.econ.value)).map(v => `<option value="${v}" ${+f.maxValue === v ? 'selected' : ''}>≤ ${U.money(v)}</option>`).join('')}</select>
           <select data-change="mf" data-k="league" style="flex:2 1 160px" aria-label="Liga"><option value="">Todas las ligas</option>
-            ${L.map(l => `<option value="${l.id}" ${f.league !== '' && +f.league === l.id ? 'selected' : ''}>${l.flag} ${esc(l.name)}</option>`).join('')}</select>` : ''}
+            ${L.map(l => `<option value="${l.id}" ${f.league !== '' && +f.league === l.id ? 'selected' : ''}>${esc(l.name)} (${esc(l.country)})</option>`).join('')}</select>` : ''}
           <select data-change="mf" data-k="sort" style="flex:1 1 120px" aria-label="Ordenar"><option value="ovr" ${f.sort === 'ovr' ? 'selected' : ''}>Por media</option>
             <option value="pot" ${f.sort === 'pot' ? 'selected' : ''}>Por potencial</option><option value="value" ${f.sort === 'value' ? 'selected' : ''}>Por valor</option>
             <option value="age" ${f.sort === 'age' ? 'selected' : ''}>Más jóvenes</option></select>
@@ -604,7 +654,8 @@
     const f = UI.market.f;
     const res = M.search(S, {
       q: f.q, pos: f.pos, alt: false, minOvr: +f.minOvr || 0, maxAge: +f.maxAge || 0,
-      maxValue: UI.market.tab === 'search' ? +f.maxValue || 0 : 0, league: UI.market.tab === 'search' ? f.league : '',
+      maxValue: UI.market.tab === 'search' ? (f.maxValue === 'cash' ? Math.max(1, S.clubs[S.user].cash / 1.25) : +f.maxValue || 0) : 0,
+      league: UI.market.tab === 'search' ? f.league : '',
       sort: f.sort, free: UI.market.tab === 'free'
     });
     const shown = res.slice(0, UI.market.limit);
@@ -629,47 +680,180 @@
 
   // ------------------------------------------------------------ Club
   VIEWS.club = S => {
+    const t = UI.clubTab || 'summary';
+    const seg = `<div class="seg" style="margin-bottom:12px">${[['summary', 'Resumen'], ['commercial', 'Comercial'], ['manager', 'Mánager']]
+      .map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-act="club-tab" data-k="${k}">${l}${k === 'manager' && S.mgr.points ? ' •' : ''}</button>`).join('')}</div>`;
+    const body = t === 'commercial' ? clubCommercial(S) : t === 'manager' ? clubManager(S) : clubSummary(S);
+    return pageTitle('Club', esc(S.manager) + ' · ' + esc(S.clubs[S.user].name)) + seg + body;
+  };
+  A['club-tab'] = el => { UI.clubTab = el.dataset.k; UI.refresh(); };
+
+  function clubSummary(S) {
     const c = S.clubs[S.user];
     const bill = W.wageBill(S, S.user);
     const fin = S.fin;
-    const inc = fin.tickets + fin.commercial + fin.prizes + fin.sales;
-    const exp = fin.wages + fin.buys + fin.other;
+    const inc = fin.tickets + fin.tv + fin.sponsors + fin.merch + fin.tour + fin.prizes + fin.sales + (fin.commercial || 0);
+    const exp = fin.wages + fin.buys + fin.loans + fin.marketing + fin.fines + fin.other;
     const line = (k, v, cls) => `<tr><td class="l" style="text-align:left;width:auto">${k}</td><td class="${cls || ''}">${U.money(v)}</td></tr>`;
     const total = U.sum(W.squad(S, S.user), p => W.value(S, p));
+    const debt = TL.Commerce.debt(S);
     const hist = S.history.length ? `<table class="table"><thead><tr><th class="l" style="text-align:left">Temp.</th><th class="l">Club</th><th>Pos</th><th class="hide-m l">Máx. goleador</th></tr></thead><tbody>
       ${S.history.map(h => `<tr><td class="l" style="text-align:left">${U.seasonLabel(h.season)}</td><td class="l ellipsis" style="max-width:140px">${esc(h.club)}</td>
         <td><b>${h.pos}º</b>/${h.n} ${h.moved === 'up' ? '<span class="pos-ok">↑</span>' : h.moved === 'down' ? '<span class="neg">↓</span>' : ''}</td><td class="hide-m l">${esc(h.top)}</td></tr>`).join('')}
       </tbody></table>` : '<div class="empty">Tu primera temporada aún está en juego.</div>';
-    return pageTitle('Club', esc(S.manager) + ' · ' + esc(c.name)) + `<div class="grid two">
+    const R = TL.News.risk(S);
+    const pct = v => (v * 100 < 1 ? (v * 100).toFixed(1) : Math.round(v * 100)) + '%';
+    const riskRows = R.rows.filter(r => r.tone === 'neg').sort((a, b) => b.p - a.p)
+      .map(r => `<tr><td class="l" style="text-align:left;width:auto">${esc(TL.News.LABEL[r.id] || r.id)}</td><td>${pct(r.p)}</td></tr>`).join('');
+    return `<div class="grid two">
       <section class="card span2"><div class="card-head"><h2>Finanzas</h2><span class="muted">Temporada ${U.seasonLabel(S.season)}</span></div>
         <div class="kpis"><div class="kpi"><div class="k">Saldo</div><div class="v ${c.cash < 0 ? 'neg' : ''}">${U.money(c.cash)}</div></div>
         <div class="kpi"><div class="k">Presup. salarial</div><div class="v">${U.money(c.wageBudget)}</div></div>
         <div class="kpi"><div class="k">Salarios/sem</div><div class="v ${bill > c.wageBudget ? 'neg' : ''}">${U.money(bill)}</div></div>
-        <div class="kpi"><div class="k">Valor plantilla</div><div class="v">${U.money(total)}</div></div></div>
+        <div class="kpi"><div class="k">Deuda</div><div class="v ${debt ? 'neg' : ''}">${U.money(debt)}</div></div></div>
         <div class="grid two mt">
           <table class="table"><thead><tr><th class="l" style="text-align:left">Ingresos</th><th></th></tr></thead><tbody>
-            ${line('Taquilla', fin.tickets)}${line('Comercial y TV', fin.commercial)}${line('Premios', fin.prizes)}${line('Ventas', fin.sales)}
+            ${line('Taquilla', fin.tickets)}${line('Derechos de TV', fin.tv)}${line('Patrocinios', fin.sponsors)}${line('Merchandising', fin.merch)}
+            ${fin.tour ? line('Gira de pretemporada', fin.tour) : ''}${line('Premios', fin.prizes)}${line('Ventas de jugadores', fin.sales)}
             <tr><td class="l" style="text-align:left"><b>Total</b></td><td><b>${U.money(inc)}</b></td></tr></tbody></table>
           <table class="table"><thead><tr><th class="l" style="text-align:left">Gastos</th><th></th></tr></thead><tbody>
-            ${line('Salarios', fin.wages)}${line('Fichajes', fin.buys)}${line('Rescisiones', fin.other)}
+            ${line('Salarios', fin.wages)}${line('Fichajes', fin.buys)}${line('Préstamos', fin.loans)}${line('Marketing', fin.marketing)}
+            ${line('Multas', fin.fines)}${line('Rescisiones y obras', fin.other)}
             <tr><td class="l" style="text-align:left"><b>Balance</b></td><td class="${inc - exp < 0 ? 'neg' : 'pos-ok'}"><b>${U.money(inc - exp)}</b></td></tr></tbody></table>
-        </div></section>
+        </div><p class="note mt">Valor de la plantilla: ${U.money(total)}. Gestiona patrocinios, marketing, entradas y préstamos en la pestaña Comercial.</p></section>
       <section class="card"><div class="card-head"><h2>Estadio</h2><button class="link" data-act="rename-stadium">Renombrar</button></div>
         <div style="font-weight:700;font-size:17px">${esc(c.stadium)}</div>
         <div class="info mt"><div><div class="k">Aforo</div><div class="v">${U.num(c.capacity)}</div></div>
-        <div><div class="k">Entrada media</div><div class="v">€${c.price}</div></div>
+        <div><div class="k">Entrada media</div><div class="v">€${Math.round(c.price * S.com.ticketMult)}</div></div>
         <div><div class="k">Última asistencia</div><div class="v">${S.lastAttendance ? U.num(S.lastAttendance) : '—'}</div></div></div></section>
       <section class="card"><div class="card-head"><h2>Directiva</h2><span class="muted">${Math.round(S.board.conf)}%</span></div>
         <div style="font-weight:700;font-size:16px">${esc(S.board.text)}</div>
         <div class="bar mt ${S.board.conf < 30 ? 'bad' : S.board.conf < 50 ? 'warn' : ''}"><i style="width:${S.board.conf}%"></i></div>
-        <p class="note mt">Si la confianza cae a cero, o por debajo del 15% al final de la temporada, serás destituido.</p></section>
+        <p class="note mt">Si la confianza cae a cero, o por debajo del 15% al final de la temporada, serás destituido. Los escándalos, la deuda y las derrotas la erosionan.</p></section>
+      <section class="card span2"><div class="card-head"><h2>Riesgo de polémicas esta temporada</h2><span class="muted">por club</span></div>
+        <div class="kpis"><div class="kpi"><div class="k">Algún problema</div><div class="v">${pct(R.any)}</div></div>
+        <div class="kpi"><div class="k">Escándalo grave</div><div class="v">${pct(R.anyGrave)}</div></div>
+        <div class="kpi"><div class="k">Incidente de tu afición</div><div class="v">${pct(R.match.crowd)}</div></div>
+        <div class="kpi"><div class="k">Racismo en grada</div><div class="v">${pct(R.match.racism)}</div></div></div>
+        <details class="mt"><summary class="note" style="cursor:pointer">Ver todas las probabilidades (ajustadas por tus habilidades)</summary>
+          <table class="table mt"><tbody>${riskRows}
+          <tr><td class="l" style="text-align:left">Agresión entre jugadores en un partido</td><td>${pct(R.match.fight)}</td></tr>
+          <tr><td class="l" style="text-align:left">Jugador que se encara con el árbitro</td><td>${pct(R.match.confront)}</td></tr>
+          <tr><td class="l" style="text-align:left">Agresión al árbitro</td><td>${pct(R.match.refAssault)}</td></tr></tbody></table></details></section>
       <section class="card span2"><div class="card-head"><h2>Historial</h2></div>${hist}</section>
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
         <div class="btn-row"><button class="btn" data-act="save">Guardar</button><button class="btn" data-act="export">Exportar</button>
         <button class="btn" data-act="import">Importar</button><button class="btn danger" data-act="quit">Nueva partida</button></div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
+  }
+
+  // ------------------------------------------------------------ Comercial
+  function clubCommercial(S) {
+    const CM = TL.Commerce, com = S.com, c = S.clubs[S.user];
+    const est = CM.estimate(S);
+    const slots = Object.entries(CM.SLOTS).map(([slot, def]) => {
+      const cur = CM.sponsor(S, slot);
+      if (cur) {
+        return `<div class="spon"><div class="row between"><b>${esc(def.name)}</b><span class="tag ${cur.style === 'risky' ? 'exp' : 'new'}">Hasta ${cur.until}</span></div>
+          <div class="row" style="margin-top:4px"><span class="grow"><b>${esc(cur.brand)}</b> <span class="note">· ${esc(CM.SECTOR_NAME[cur.sector])}</span></span>
+          <span class="num">${U.money(cur.weekly)}/sem${cur.winBonus ? ` + ${U.money(cur.winBonus)}/victoria` : ''}</span></div></div>`;
+      }
+      const offers = com.offers[slot] || [];
+      return `<div class="spon open"><div class="row between"><b>${esc(def.name)}</b><span class="tag exp">Libre</span></div>
+        ${offers.map((o, i) => `<div class="offer"><div class="grow"><b>${esc(o.brand)}</b> <span class="note">· ${esc(CM.SECTOR_NAME[o.sector])}${o.style === 'risky' ? ' · ⚠️ riesgo de impago' : o.style === 'perf' ? ' · por objetivos' : ' · estable'}</span>
+          <div class="note">${U.money(o.weekly)}/sem${o.winBonus ? ` + ${U.money(o.winBonus)} por victoria` : ''} · hasta ${o.until}</div></div>
+          <button class="btn sm primary" data-act="sponsor" data-slot="${slot}" data-i="${i}">Firmar</button></div>`).join('')}</div>`;
+    }).join('');
+    const camps = CM.CAMPAIGNS.map(k => {
+      const active = com.campaigns.find(x => x.id === k.id);
+      const disabled = active || (k.preseason && (S.week > 0 || com.tour === S.season));
+      const cost = k.preseason ? 'Ingreso' : U.money(CM.campaignCost(S, k));
+      return `<div class="offer"><div class="grow"><b>${esc(k.name)}</b><div class="note">${esc(k.desc)}</div>
+        ${active ? `<div class="note ok">En marcha · ${active.weeksLeft} semanas</div>` : ''}</div>
+        <button class="btn sm" data-act="campaign" data-id="${k.id}" ${disabled ? 'disabled' : ''}>${k.preseason ? 'Hacer gira' : 'Lanzar · ' + cost}</button></div>`;
+    }).join('');
+    const tm = Math.round(com.ticketMult * 100);
+    const debt = CM.debt(S), maxD = CM.maxDebt(S);
+    UI.loan = UI.loan || { pct: 0.25, seasons: 2 };
+    const amount = F.roundMoney(Math.max(0, maxD - debt) * UI.loan.pct);
+    const q = amount > 0 ? CM.loanQuote(S, amount, UI.loan.seasons) : null;
+    const loans = com.loans.map(l => `<div class="offer"><div class="grow"><b>Préstamo de ${U.money(l.principal)}</b>
+      <div class="note">${(l.rate * 100).toFixed(1)}% · pendiente ${U.money(l.balance)} · ${U.money(l.weekly)}/sem · ${l.weeksLeft} semanas</div></div>
+      <button class="btn sm" data-act="repay" data-id="${l.id}">Cancelar</button></div>`).join('');
+    const exp = CM.expansionOptions(S);
+    return `<div class="grid two">
+      <section class="card span2"><div class="card-head"><h2>Afición e ingresos</h2><span class="muted">estimación semanal</span></div>
+        <div class="kpis"><div class="kpi"><div class="k">Aficionados</div><div class="v">${U.num(com.fans)}</div></div>
+        <div class="kpi"><div class="k">TV</div><div class="v">${U.money(est.tv)}</div></div>
+        <div class="kpi"><div class="k">Patrocinios</div><div class="v">${U.money(est.spons)}</div></div>
+        <div class="kpi"><div class="k">Merchandising</div><div class="v">${U.money(est.merch)}</div></div></div>
+        <p class="note mt">La afición crece con las victorias, los fichajes estrella y el marketing, y cae con las derrotas, las entradas caras y los escándalos. Más afición = más taquilla y merchandising.</p></section>
+      <section class="card span2"><div class="card-head"><h2>Patrocinios</h2></div>${slots}
+        <p class="note mt">Las ofertas arriesgadas (criptomonedas, apuestas, moda rápida) pagan más pero pueden quebrar y molestan a parte de la afición. Las casas de apuestas no pueden patrocinar en España ni en Italia.</p></section>
+      <section class="card"><div class="card-head"><h2>Precio de las entradas</h2><b class="num">${tm}%</b></div>
+        <input type="range" min="50" max="200" step="5" value="${tm}" data-change="ticket" aria-label="Precio de las entradas">
+        <p class="note">Entrada media: €${Math.round(c.price * com.ticketMult)} (base €${c.price}). Más caro = más ingresos por espectador pero menos asistencia${tm > 130 ? '; la afición empieza a protestar' : ''}.</p></section>
+      <section class="card"><div class="card-head"><h2>Préstamos</h2><span class="muted">Deuda ${U.money(debt)} / ${U.money(maxD)}</span></div>
+        ${loans || '<p class="note">Sin préstamos activos.</p>'}
+        <div class="row wrap mt" style="gap:8px">
+          <select data-change="loan" data-k="pct" style="flex:1 1 140px" aria-label="Importe">${[0.1, 0.25, 0.5, 1].map(v =>
+            `<option value="${v}" ${UI.loan.pct === v ? 'selected' : ''}>${U.money(F.roundMoney(Math.max(0, maxD - debt) * v))}</option>`).join('')}</select>
+          <select data-change="loan" data-k="seasons" style="flex:1 1 120px" aria-label="Plazo">${[1, 2, 3, 5].map(v =>
+            `<option value="${v}" ${UI.loan.seasons === v ? 'selected' : ''}>${v} temporada${v > 1 ? 's' : ''}</option>`).join('')}</select></div>
+        ${q ? `<p class="note">Interés ${(q.rate * 100).toFixed(1)}% anual · cuota ${U.money(q.weekly)}/sem · total a devolver ${U.money(q.total)}</p>
+          <button class="btn sm primary" data-act="loan-take">Solicitar préstamo</button>` : '<p class="note bad">Has alcanzado el límite de endeudamiento.</p>'}</section>
+      <section class="card span2"><div class="card-head"><h2>Marketing</h2></div>${camps}</section>
+      <section class="card span2"><div class="card-head"><h2>Ampliar el estadio</h2><span class="muted">${U.num(c.capacity)} localidades</span></div>
+        ${com.expansion ? `<p class="note ok">Obras en marcha: +${U.num(com.expansion.seats)} localidades, faltan ${com.expansion.weeksLeft} semanas.</p>` :
+          exp.map((o, i) => `<div class="offer"><div class="grow"><b>+${U.num(o.seats)} localidades</b><div class="note">${o.weeks} semanas de obras</div></div>
+          <button class="btn sm" data-act="expand" data-i="${i}">${U.money(o.cost)}</button></div>`).join('') || '<p class="note">El estadio ya está en su capacidad máxima.</p>'}</section>
+    </div>`;
+  }
+  A.sponsor = el => { const r = TL.Commerce.signSponsor(G.S, el.dataset.slot, +el.dataset.i); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
+  A.campaign = el => { const r = TL.Commerce.launch(G.S, el.dataset.id); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
+  A.repay = el => { const r = TL.Commerce.repayLoan(G.S, +el.dataset.id); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
+  A.expand = el => {
+    const o = TL.Commerce.expansionOptions(G.S)[+el.dataset.i];
+    confirmBox('Ampliar estadio', `¿Invertir ${U.money(o.cost)} en ${U.num(o.seats)} nuevas localidades?`, 'Iniciar obras', () => {
+      const r = TL.Commerce.expand(G.S, +el.dataset.i); toast(r.msg, !r.ok); G.save(); UI.refresh();
+    });
   };
+  A['loan-take'] = () => {
+    const S = G.S, CM = TL.Commerce;
+    const amount = F.roundMoney(Math.max(0, CM.maxDebt(S) - CM.debt(S)) * UI.loan.pct);
+    const q = CM.loanQuote(S, amount, UI.loan.seasons);
+    confirmBox('Pedir préstamo', `Recibirás ${U.money(amount)} y pagarás ${U.money(q.weekly)} cada semana durante ${q.weeks} semanas (total ${U.money(q.total)}).`, 'Firmar', () => {
+      const r = CM.takeLoan(S, amount, UI.loan.seasons); toast(r.msg, !r.ok); G.save(); UI.refresh();
+    });
+  };
+  C.loan = el => { UI.loan[el.dataset.k] = +el.value; UI.refresh(); };
+  C.ticket = el => { G.S.com.ticketMult = +el.value / 100; G.save(); UI.refresh(); };
+
+  // ------------------------------------------------------------ Mánager
+  function clubManager(S) {
+    const MG = TL.Manager, m = S.mgr;
+    const need = MG.xpToNext(m.level);
+    const tree = MG.TREE.map(br => `<section class="card branch"><div class="card-head"><h2>${br.icon} ${esc(br.name)}</h2></div>
+      ${br.nodes.map((n, i) => {
+        const l = MG.lvl(S, n.id), can = MG.can(S, n.id);
+        const pips = Array.from({ length: n.max }, (_, k) => `<i class="${k < l ? 'on' : ''}"></i>`).join('');
+        return `<div class="skill ${l ? 'has' : ''} ${!can.ok && !l && can.reason !== 'Sin puntos de habilidad' ? 'locked' : ''}">
+          <div class="row between"><b>${i + 1}. ${esc(n.name)}</b><span class="pips">${pips}</span></div>
+          <div class="note">${esc(n.desc)}</div>
+          <div class="row between" style="margin-top:6px"><span class="faint" style="font-size:12px">${can.ok ? '' : esc(can.reason)}</span>
+          <button class="btn sm ${can.ok ? 'primary' : ''}" data-act="skill" data-id="${n.id}" ${can.ok ? '' : 'disabled'}>${l ? 'Mejorar' : 'Aprender'}</button></div></div>`;
+      }).join('')}</section>`).join('');
+    return `<section class="card" style="margin-bottom:12px"><div class="row">
+        <div class="mgr-badge num">${m.level}</div>
+        <div class="grow"><div style="font-family:var(--font-c);font-weight:800;font-size:22px">${esc(S.manager)}</div>
+        <div class="note">Nivel ${m.level} · ${m.xp}/${need} XP · ${m.points} punto${m.points === 1 ? '' : 's'} disponible${m.points === 1 ? '' : 's'}</div>
+        <div class="bar" style="margin-top:6px"><i style="width:${m.xp / need * 100}%"></i></div></div></div>
+        <p class="note mt">Ganas experiencia con cada partido (más con victorias y contra rivales mejores) y al cumplir objetivos, ganar títulos o ascender.</p></section>
+      <div class="grid two three">${tree}</div>`;
+  }
+  A.skill = el => { const r = TL.Manager.buy(G.S, el.dataset.id); toast(r.msg || r.reason, !r.ok); G.save(); UI.refresh(); };
+
   A.save = () => { const ok = G.save(); toast(ok ? 'Partida guardada' : 'No se pudo guardar (almacenamiento lleno)', !ok); };
   A.export = () => {
     const blob = new Blob([G.exportSave()], { type: 'application/json' });
@@ -741,11 +925,16 @@
       <div><div class="k">Estado</div><div class="v">${status}</div></div>
       <div><div class="k">Filigranas</div><div class="v">${starsN(p.sm)}</div></div>
       <div><div class="k">Pierna mala</div><div class="v">${starsN(p.wf)}</div></div>
-      <div><div class="k">Forma física</div><div class="v">${p.fit}%</div></div></div>`;
+      <div><div class="k">Forma física</div><div class="v">${p.fit}%</div></div>
+      <div><div class="k">Moral</div><div class="v">${TL.News.moraleLabel(p.mor)[1]} ${TL.News.moraleLabel(p.mor)[0]}</div></div>
+      <div><div class="k">Faltas temporada</div><div class="v">${st ? st[7] || 0 : 0}</div></div>
+      <div><div class="k">Ciclo amarillas</div><div class="v">${st ? st[4] % 5 : 0}/5</div></div></div>`;
+    const pnews = S.news.filter(n => n.pid === p.id).slice(0, 4);
+    const newsBox = pnews.length ? `<div class="group-title">En la prensa</div>${pnews.map(n => newsHtml(S, { ...n, pid: -1 })).join('')}` : '';
     let actions = '';
     if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
-    sheet(head + `<div class="stats6">${stats6}</div>` + info + season + actions, { keepScroll: UI.nego && UI.nego.pid === id });
+    sheet(head + `<div class="stats6">${stats6}</div>` + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
   }
   UI.openPlayer = openPlayer;
   A.player = el => { UI.nego = null; openPlayer(+el.dataset.id); };
@@ -887,6 +1076,7 @@
         <div><div class="k">Objetivo</div><div class="v ${ok ? 'pos-ok' : 'neg'}">${ok ? 'Cumplido' : 'No cumplido'}</div></div>
         <div><div class="k">Confianza</div><div class="v">${sum.conf}% (${sum.confDelta >= 0 ? '+' : ''}${sum.confDelta})</div></div>
         <div><div class="k">Premio liga</div><div class="v">${U.money(sum.prize || 0)}</div></div>
+        <div><div class="k">Experiencia</div><div class="v">+${sum.xp || 0} XP · nivel ${S.mgr.level}</div></div>
         <div><div class="k">Pichichi</div><div class="v">${sum.topScorer ? esc(sum.topScorer[0]) + ' (' + sum.topScorer[1] + ')' : '—'}</div></div>
         <div><div class="k">Tu goleador</div><div class="v">${sum.myTop ? esc(sum.myTop[0]) + ' (' + sum.myTop[1] + ')' : '—'}</div></div>
       </div>
@@ -980,7 +1170,7 @@
         html = wizHead('Elige liga', 1) + `<div class="pick-list two">${leagues.map(l => {
           const clubs = byLeague[l.i] || [];
           const avg = U.sum(clubs, ci => z.prev.reps[ci]) / clubs.length;
-          return `<button class="pick" data-act="wz-league" data-l="${l.i}"><span class="flag">${l.flag}</span>
+          return `<button class="pick" data-act="wz-league" data-l="${l.i}"><span class="flag">${flagImg(l.flag, l.country) || '🌎'}</span>
             <span class="grow"><div class="t ellipsis">${esc(l.name)}</div><div class="s">${esc(l.country)} · ${clubs.length} clubes · ${stars(avg)}</div></span></button>`;
         }).join('')}</div>`;
       }
@@ -1041,9 +1231,19 @@
   };
 
   // ------------------------------------------------------------ Jugar jornada
+  /** Avisa si el once tenía jugadores no disponibles (se sustituyen automáticamente). */
+  function lineupWarning(S) {
+    const before = (S.tactics.slots || []).slice();
+    const l = E.userLineup(S);
+    const out = l.changed.map(i => before[i]).filter(id => id >= 0).map(id => S.players[id].short);
+    if (out.length) toast(`No disponibles: ${out.join(', ')}. Se sustituyen en el once.`, true);
+  }
+  UI.lineupWarning = lineupWarning;
+
   A['play-quick'] = () => {
     const S = G.S;
     if (S.over) return;
+    lineupWarning(S);
     G.completeRound(null);
     const m = S.fixtures[S.week - 1].find(m => m[0] === S.user || m[1] === S.user) || null;
     showRoundResults(S, S.week - 1, m);
@@ -1087,7 +1287,7 @@
 
   Object.assign(UI, {
     icon, crest, posB, ovrB, fitB, flag, playerRow, toast, sheet, closeSheet, sheetHead, confirmBox,
-    renderShell, renderTop, fixtureHtml, resultLetter, MENT
+    renderShell, renderTop, fixtureHtml, resultLetter, MENT, flagImg, newsHtml
   });
   TL.UI = UI;
 })();

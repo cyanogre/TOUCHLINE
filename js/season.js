@@ -99,35 +99,50 @@
       results.push(res);
     }
     const L = W.userLeague(S);
-    // Finanzas semanales de los clubes de la liga
-    for (const cid of L.clubs) weeklyFinances(S, cid, round);
+    const um = round.find(m => m[0] === S.user || m[1] === S.user);
+    const letter = um ? (um[0] === S.user ? Math.sign(um[2] - um[3]) : Math.sign(um[3] - um[2])) : null;
+    const resLetter = letter == null ? null : letter > 0 ? 'V' : letter < 0 ? 'D' : 'E';
+    // Finanzas semanales: el usuario con su área comercial; la IA, modelo simple
+    for (const cid of L.clubs) {
+      if (cid === S.user) TL.Commerce.weekly(S, round, resLetter);
+      else weeklyFinances(S, cid, round);
+    }
     // Forma física y lesiones
+    const fb = TL.Manager.B(S);
     for (const p of S.players) {
       if (p.club < -1) continue;
       if (p.inj > 0) p.inj--;
-      if (p.fit < 100) p.fit = Math.min(100, p.fit + 13 + Math.round(p.st[5] / 25));
+      if (p.fit < 100) {
+        const rec = 13 + Math.round(p.st[5] / 25);
+        p.fit = Math.min(100, p.fit + (p.club === S.user ? Math.round(rec * (2 - fb.fatigue)) : rec));
+      }
     }
-    // Confianza de la directiva
-    const um = round.find(m => m[0] === S.user || m[1] === S.user);
+    // Directiva, experiencia y avisos propios
     if (um) {
       const mine = um[0] === S.user ? um[2] : um[3], opp = um[0] === S.user ? um[3] : um[2];
       const oppId = um[0] === S.user ? um[1] : um[0];
       const repGap = (S.clubs[oppId].rep - S.clubs[S.user].rep) / 4;
-      const delta = mine > opp ? 2 + Math.max(0, repGap) : mine < opp ? -2.5 + Math.max(0, repGap * 0.5) : Math.max(-1, repGap * 0.5);
+      let delta = mine > opp ? 2 + Math.max(0, repGap) : mine < opp ? -2.5 + Math.max(0, repGap * 0.5) : Math.max(-1, repGap * 0.5);
+      if (delta < 0) delta *= fb.boardLoss;
       S.board.conf = U.clamp(Math.round((S.board.conf + delta) * 10) / 10, 0, 100);
-      // Lesiones y sanciones propias
+      TL.Manager.addXp(S, (mine > opp ? 25 : mine === opp ? 10 : 4) + mine + (opp === 0 ? 5 : 0) + Math.max(0, Math.round(repGap * 2)));
       for (const r of results) {
         for (const [pid, weeks] of r.injuries || []) {
           const p = S.players[pid];
           if (p.club === S.user) TL.Game.mail(S, 'Parte médico', `${p.name} estará de baja ${weeks} semana${weeks > 1 ? 's' : ''}.`, 'med');
         }
-        for (const [pid, games] of r.reds || []) {
+        for (const [pid, games, kind] of r.reds || []) {
           const p = S.players[pid];
-          if (p.club === S.user) TL.Game.mail(S, 'Sanción', `${p.name} se perderá ${games} partido${games > 1 ? 's' : ''} por expulsión.`, 'med');
+          if (p.club === S.user && !['fight', 'confront', 'refAssault'].includes(kind)) {
+            TL.Game.mail(S, 'Sanción', `${p.name} se perderá ${games} partido${games > 1 ? 's' : ''} por expulsión.`, 'med');
+          }
         }
       }
     }
     S.week++;
+    TL.News.afterRound(S, results);
+    TL.News.morale(S, results);
+    TL.News.weekly(S);
     TL.Market.weekly(S);
     // Avisos
     const total = S.fixtures.length;
@@ -157,12 +172,8 @@
       const opp = S.clubs[m[1]];
       const fill = U.clamp(0.72 + (c.rep - avgRep) * 0.02 + (opp.rep - avgRep) * 0.015 + U.rand(-0.05, 0.05), 0.35, 1);
       tickets = Math.round(c.capacity * fill * c.price);
-      if (cid === S.user) S.lastAttendance = Math.round(c.capacity * fill);
     }
     c.cash += commercial + tickets - wages;
-    if (cid === S.user) {
-      S.fin.wages += wages; S.fin.commercial += commercial; S.fin.tickets += tickets;
-    }
   }
 
   // ------------------------------------------------------------ Fin de temporada
@@ -225,8 +236,11 @@
     if (sum.moved === 'up') delta += 20;
     if (sum.moved === 'down') delta -= 30;
     if (pos === 1) delta += 15;
+    if (delta < 0) delta = Math.round(delta * TL.Manager.B(S).boardLoss);
     S.board.conf = U.clamp(Math.round(S.board.conf + delta), 0, 100);
     sum.conf = S.board.conf; sum.confDelta = delta;
+    sum.xp = (pos <= S.board.target ? 150 : 40) + (pos === 1 ? 250 : 0) + (sum.moved === 'up' ? 200 : 0);
+    TL.Manager.addXp(S, sum.xp);
     // Primera temporada: la directiva da una segunda oportunidad
     if (S.board.conf < 15 && !S.history.length) {
       S.board.conf = 20; sum.conf = 20; sum.lastChance = true;
@@ -281,7 +295,8 @@
     sum.youth = [];
     for (const c of S.clubs) {
       const sq = W.squad(S, c.id);
-      const k = sq.length < 22 ? 4 : sq.length < 26 ? 3 : sq.length < 32 ? 2 : 0;
+      const yb = TL.Manager.bonus(S, c.id);
+      const k = (sq.length < 22 ? 4 : sq.length < 26 ? 3 : sq.length < 32 ? 2 : 0) + (sq.length < 34 ? yb.youthExtra : 0);
       const nats = sq.length ? sq.map(p => p.nat) : [0];
       for (let i = 0; i < k; i++) {
         const line = U.weighted([0, 1, 2, 3], l => [1, 3, 3, 2][l]);
@@ -289,7 +304,7 @@
         const ovr = U.clamp(c.rep - 20 + U.int(-6, 6), 40, 68);
         const p = W.makePlayer(S, {
           club: c.id, nat: U.pick(nats.slice(0, 12)), pos, age: U.int(16, 18), ovr,
-          pot: Math.min(c.rep + 12, ovr + U.int(8, 30)), contract: S.season + 1 + U.int(2, 3)
+          pot: Math.min(c.rep + 12 + yb.youthPot, ovr + U.int(8, 30) + yb.youthPot), contract: S.season + 1 + U.int(2, 3)
         });
         p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
         if (c.id === S.user) sum.youth.push(p.id);
@@ -310,7 +325,7 @@
     // Economía de la nueva temporada
     for (const c of S.clubs) {
       const income = c.revScale * W.revenueCurve(c.rep);
-      if (c.id === S.user) c.wageBudget = F.roundMoney(Math.max(W.wageBill(S, c.id) * 1.02, income / 0.72 * 1.12));
+      if (c.id === S.user) c.wageBudget = F.roundMoney(Math.max(W.wageBill(S, c.id) * 1.02, income / 0.72 * 1.12 * TL.Manager.B(S).wageBudget));
       else c.wageBudget = F.roundMoney(W.wageBill(S, c.id) * 1.12);
       if (c.id !== S.user && c.cash < 0) c.cash = Math.round(c.cash * 0.5);
     }
@@ -324,7 +339,8 @@
     let d = 0;
     const apps = (S.stats[p.id] || [0])[0];
     const playBonus = apps >= 20 ? 1.15 : apps >= 8 ? 1 : 0.85;
-    if (p.age <= 23) d = Math.round((p.pot - p.ovr) * U.rand(0.18, 0.45) * playBonus);
+    const grow = p.club === S.user ? TL.Manager.B(S).youthGrowth : 1;
+    if (p.age <= 23) d = Math.round((p.pot - p.ovr) * U.rand(0.18, 0.45) * playBonus * grow);
     else if (p.age <= 27) d = p.pot > p.ovr ? Math.round((p.pot - p.ovr) * U.rand(0.2, 0.6)) : U.int(-1, 1);
     else if (p.age <= 30) d = U.int(-2, 1);
     else if (p.age <= 32) d = U.int(-3, 0);
@@ -347,11 +363,14 @@
     S.over = false;
     S.results = [];
     S.fin = W.newFin();
+    S.log = { crowd: {} };
     compactPlayers(S);
     W.dirty(S);
     makeFixtures(S);
     setObjective(S);
     S.tactics.slots = E.autoLineup(W.squad(S, S.user), S.tactics.formation, false);
+    TL.Commerce.newSeason(S);
+    for (const p of W.squad(S, S.user)) if (p.mor == null) p.mor = 70;
     TL.Game.mail(S, `Temporada ${U.seasonLabel(S.season)}`,
       `Objetivo de la directiva: ${S.board.text}. Presupuesto salarial: ${U.money(S.clubs[S.user].wageBudget)}/sem. ` +
       'El mercado de verano está abierto hasta la jornada 3.', 'board');

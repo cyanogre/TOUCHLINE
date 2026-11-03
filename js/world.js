@@ -187,11 +187,16 @@
     S.board = { conf: 60 };
     S.fin = newFin();
     S.tactics = { formation: '4-3-3', slots: [], mentality: 1, autoSubs: true };
+    dirty(S);
+    migrate(S);
     return S;
   }
 
   function newFin() {
-    return { tickets: 0, commercial: 0, prizes: 0, sales: 0, buys: 0, wages: 0, other: 0 };
+    return {
+      tickets: 0, tv: 0, sponsors: 0, merch: 0, tour: 0, prizes: 0, sales: 0,
+      wages: 0, buys: 0, loans: 0, marketing: 0, fines: 0, other: 0
+    };
   }
 
   /** Completa plantillas cortas o con huecos por línea con jugadores ficticios. */
@@ -340,9 +345,10 @@
     const pb = [], pg = [];
     for (const p of S.players) {
       const flags = (p.listed ? 1 : 0);
-      if (!p.gen) pb.push([p.club, p.age, p.ovr, p.pot, p.contract, p.wage, p.fit, p.inj, p.sus, flags]);
+      const mor = p.mor == null ? -1 : Math.round(p.mor);
+      if (!p.gen) pb.push([p.club, p.age, p.ovr, p.pot, p.contract, p.wage, p.fit, p.inj, p.sus, flags, mor]);
       else pg.push([p.name, p.short, p.club, p.nat, p.pos, p.alt.join(' '), p.age, p.ovr, p.pot, p.foot, p.sm, p.wf,
-        p.st.join(','), p.contract, p.wage, p.fit, p.inj, p.sus, flags]);
+        p.st.join(','), p.contract, p.wage, p.fit, p.inj, p.sus, flags, mor]);
     }
     return {
       v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager,
@@ -351,6 +357,7 @@
       pb, pg,
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
+      mgr: S.mgr, com: S.com, news: S.news, newsId: S.newsId, settings: S.settings, log: S.log, leader: S.leader,
       over: !!S.over, fired: !!S.fired, savedAt: Date.now()
     };
   }
@@ -368,6 +375,7 @@
       const d = r[2] - p.ovr;
       [p.club, p.age, p.ovr, p.pot, p.contract, p.wage, p.fit, p.inj, p.sus] = r;
       p.listed = !!(r[9] & 1);
+      if (r[10] != null && r[10] >= 0) p.mor = r[10];
       if (d) p.st = p.st.map(v => U.clamp(v + d, 15, 99));
     });
     for (const r of save.pg) {
@@ -375,19 +383,37 @@
         id: S.players.length, name: r[0], short: r[1], club: r[2], nat: r[3], pos: r[4],
         alt: r[5] ? r[5].split(' ') : [], age: r[6], ovr: r[7], pot: r[8], foot: r[9], sm: r[10], wf: r[11],
         st: r[12].split(',').map(Number), contract: r[13], wage: r[14], fit: r[15], inj: r[16], sus: r[17],
-        listed: !!(r[18] & 1), gen: true, base: -1
+        listed: !!(r[18] & 1), gen: true, base: -1, mor: r[19] != null && r[19] >= 0 ? r[19] : undefined
       });
     }
     Object.assign(S, {
       fixtures: save.fixtures, stats: save.stats, tactics: save.tactics, inbox: save.inbox, msgId: save.msgId,
-      neg: save.neg || {}, history: save.history || [], board: save.board, fin: save.fin, results: save.results || [],
+      neg: save.neg || {}, history: save.history || [], board: save.board, fin: Object.assign(newFin(), save.fin || {}),
+      results: save.results || [], mgr: save.mgr, com: save.com, news: save.news || [], newsId: save.newsId || 1,
+      settings: save.settings, log: save.log || { crowd: {} }, leader: save.leader,
       over: save.over, fired: save.fired
     });
+    migrate(S);
     dirty(S);
     return S;
   }
 
+  /** Valores por defecto para partidas antiguas o recién creadas. */
+  function migrate(S) {
+    TL.Manager.init(S);
+    S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
+    S.news = S.news || [];
+    S.log = S.log || { crowd: {} };
+    S.fin = Object.assign(newFin(), S.fin || {});
+    if (S.user != null) {
+      TL.Commerce.init(S);
+      for (const p of squad(S, S.user)) if (p.mor == null) p.mor = Math.round(U.rand(62, 80));
+    }
+    return S;
+  }
+
   TL.World = {
+    migrate,
     create, restore, serialize, makePlayer, maintainSquads, genName, squad, dirty, value, repOf, wageBill, userLeague,
     revenueCurve, newFin, LINE_POS
   };

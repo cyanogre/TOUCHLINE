@@ -15,6 +15,11 @@
     });
   }
 
+  // Modo offline / app instalable (GitHub Pages sirve por https; en file:// no aplica)
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname !== 'localhost') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

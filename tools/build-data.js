@@ -12,7 +12,9 @@
  *    (deterministas, mismas fórmulas que el juego: js/formulas.js).
  *  - Marca qué ligas son jugables (≥10 clubes y no son copas CONMEBOL) y
  *    deduce el país de cada liga.
- *  - Traduce nacionalidades al español y añade su bandera.
+ *  - Traduce nacionalidades al español y añade su bandera (SVG local,
+ *    copiadas de flag-icons a assets/flags/ — los emojis de bandera no se
+ *    ven en Windows).
  *
  * Salidas:
  *  - data/players_clean.csv   dataset limpio y enriquecido
@@ -64,7 +66,7 @@ function csvCell(v) {
 // ---------------------------------------------------------------- Naciones
 const NATION_OVERRIDES = {
   England: ['Inglaterra', 'GB-ENG'], Scotland: ['Escocia', 'GB-SCT'], Wales: ['Gales', 'GB-WLS'],
-  'Northern Ireland': ['Irlanda del Norte', 'GB'], 'Republic of Ireland': ['Irlanda', 'IE'],
+  'Northern Ireland': ['Irlanda del Norte', 'GB-NIR'], 'Republic of Ireland': ['Irlanda', 'IE'],
   'Korea Republic': ['Corea del Sur', 'KR'], 'Korea DPR': ['Corea del Norte', 'KP'],
   'China PR': ['China', 'CN'], "Côte d'Ivoire": ['Costa de Marfil', 'CI'],
   'Congo DR': ['RD del Congo', 'CD'], Congo: ['Congo', 'CG'], 'Türkiye': ['Turquía', 'TR'],
@@ -102,19 +104,15 @@ function buildNationTable(names) {
     if (NATION_OVERRIDES[name]) [es_name, code] = NATION_OVERRIDES[name];
     else if (byName[name]) { code = byName[name]; es_name = es.of(code); }
     else { es_name = name; code = ''; missing.push(name); }
-    out[name] = { es: es_name, flag: flagEmoji(code) };
+    out[name] = { es: es_name, flag: flagCode(code) };
   }
   if (missing.length) console.warn('Naciones sin traducción:', missing.join(', '));
   return out;
 }
 
-function flagEmoji(code) {
-  if (!code) return '🏳️';
-  const sub = { 'GB-ENG': 'gbeng', 'GB-SCT': 'gbsct', 'GB-WLS': 'gbwls' }[code];
-  if (sub) {
-    return '\u{1F3F4}' + [...sub].map(ch => String.fromCodePoint(0xe0000 + ch.charCodeAt(0))).join('') + '\u{E007F}';
-  }
-  return [...code].map(ch => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65)).join('');
+/** Código de bandera (archivo assets/flags/<code>.svg, de flag-icons). */
+function flagCode(code) {
+  return code ? code.toLowerCase() : '';
 }
 
 // ---------------------------------------------------------------- Ligas
@@ -182,7 +180,7 @@ function main() {
   for (const L of Object.values(leagues)) {
     const isCup = /CONMEBOL/.test(L.name);
     L.country = isCup ? 'Sudamérica' : nations[Object.entries(L.nats).sort((a, b) => b[1] - a[1])[0][0]].es;
-    L.flag = isCup ? '🌎' : nations[Object.entries(L.nats).sort((a, b) => b[1] - a[1])[0][0]].flag;
+    L.flag = isCup ? '' : nations[Object.entries(L.nats).sort((a, b) => b[1] - a[1])[0][0]].flag;
     L.playable = !isCup && L.clubs.size >= 10;
     let reps = [];
     for (const players of L.clubs.values()) {
@@ -202,8 +200,24 @@ function main() {
   }
 
   writeCleanCSV(rows, nations);
+  copyFlags(Object.values(nations).map(n => n.flag).filter(Boolean));
   fs.mkdirSync(OUT_DIR, { recursive: true });
   for (const g of ['M', 'F']) writeGameFile(g, rows.filter(r => r._g === g), leagues, nations);
+}
+
+/** Copia las banderas usadas desde flag-icons (npm pack flag-icons) si está disponible. */
+function copyFlags(codes) {
+  const src = process.env.FLAG_ICONS_DIR;
+  const dst = path.join(ROOT, 'assets', 'flags');
+  if (!src) { console.log('FLAG_ICONS_DIR no definido: se mantienen las banderas de assets/flags'); return; }
+  fs.mkdirSync(dst, { recursive: true });
+  let n = 0;
+  for (const c of new Set(codes)) {
+    const f = path.join(src, c + '.svg');
+    if (fs.existsSync(f)) { fs.copyFileSync(f, path.join(dst, c + '.svg')); n++; }
+    else console.warn('Sin bandera para', c);
+  }
+  console.log(`${n} banderas copiadas a assets/flags`);
 }
 
 function writeCleanCSV(rows, nations) {

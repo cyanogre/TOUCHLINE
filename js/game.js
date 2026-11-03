@@ -53,6 +53,8 @@
         `La directiva te da la bienvenida, ${S.manager}. Objetivo para la temporada: ${S.board.text}. ` +
         `Saldo disponible: ${U.money(c.cash)}. Presupuesto salarial: ${U.money(c.wageBudget)}/sem ` +
         `(gasto actual ${U.money(W.wageBill(S, S.user))}/sem). El mercado de verano está abierto hasta la jornada 3.`, 'board');
+      TL.News.add(S, 'club', `${S.manager}, nuevo entrenador de ${c.name}`,
+        `El club presenta a su nuevo técnico con un objetivo claro: ${S.board.text.toLowerCase()}.`, S.user, null, 'pos');
       Game.S = S;
       Game.save();
       return S;
