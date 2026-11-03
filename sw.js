@@ -1,6 +1,6 @@
 /* TOUCHLINE — service worker: juego offline y carga rápida en móvil.
  * La versión la sustituye el workflow de GitHub Pages por el commit. */
-const VERSION = 'touchline-v3-__BUILD__'; // sube "v3" en cada versión si publicas desde una rama
+const VERSION = 'touchline-v4-__BUILD__'; // sube el número en cada versión si publicas desde una rama
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/world.js', 'js/engine.js',
@@ -10,7 +10,10 @@ const CORE = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // cache: 'reload' evita guardar copias viejas del caché HTTP del navegador
+  e.waitUntil(caches.open(VERSION)
+    .then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -42,7 +45,10 @@ self.addEventListener('fetch', e => {
       return res;
     }
     try {
-      const res = await fetch(req);
+      // Siempre se comprueba con el servidor (ETag/304): las nuevas versiones llegan al instante
+      const res = req.mode === 'navigate'
+        ? await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        : await fetch(req, { cache: 'no-cache' });
       if (res.ok) cache.put(req, res.clone());
       return res;
     } catch (err) {
