@@ -5,6 +5,7 @@ const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/world.js', 'js/engine.js',
   'js/season.js', 'js/market.js', 'js/commerce.js', 'js/news.js', 'js/game.js', 'js/ui.js', 'js/matchview.js', 'js/main.js',
+  'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'data/game/crests.js',
   'assets/icon.svg', 'assets/icon-192.png', 'assets/icon-512.png'
 ];
 
@@ -26,10 +27,11 @@ self.addEventListener('fetch', e => {
   if (url.pathname.endsWith('.mp3')) return;
   const sameOrigin = url.origin === self.location.origin;
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
-  if (!sameOrigin && !isFont) return;
+  const isCrest = url.hostname === 'cdn.jsdelivr.net' && url.pathname.includes('football-logos');
+  if (!sameOrigin && !isFont && !isCrest) return;
   // Datos y banderas: primero caché (no cambian entre versiones salvo regenerar)
   // Resto: red primero con respaldo en caché (así las actualizaciones llegan al momento)
-  const cacheFirst = isFont || url.pathname.includes('/data/game/') || url.pathname.includes('/assets/flags/');
+  const cacheFirst = isFont || isCrest || url.pathname.includes('/data/game/') || url.pathname.includes('/assets/flags/');
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     if (cacheFirst) {

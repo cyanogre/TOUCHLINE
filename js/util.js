@@ -70,6 +70,12 @@
       if (ws.length === 1) return ws[0].slice(0, 3).toUpperCase();
       return (ws[0][0] + ws[ws.length - 1].slice(0, 2)).toUpperCase();
     },
+    /** URL del escudo real (si existe en data/game/crests.js). */
+    crestUrl(gender, name) {
+      const C = window.TL_CRESTS;
+      const path = C && C[gender] && C[gender][name];
+      return path ? C.base + path : null;
+    },
     clubColors(name) {
       const h = F.hash(name);
       const hue = h % 360;

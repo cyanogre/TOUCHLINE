@@ -30,7 +30,8 @@ Después entra en <http://localhost:8000>.
 ### Qué incluye
 
 - **Nueva partida:** fútbol masculino (34 ligas jugables) o femenino (5 ligas), elige liga y club.
-- **Partido en directo:**
+- **Partido en directo con vista 2D:** los 22 jugadores con su dorsal se mueven según la formación, el balón circula con pases, tiros, paradas y goles. Hay celebración con confeti, tarjetas sobre el jugador, red que tiembla y rótulos de penalti, VAR o tangana. Los colores de las equipaciones salen del escudo real.
+- **Controles del partido:**
   - Velocidades **x1, x2, x4, x8 y x16**.
   - **Saltar** al próximo momento clave, al descanso, a los minutos 60/75/85 o al final.
   - **Pausas automáticas** configurables (goles, rojas, lesiones, penaltis, VAR, grada) con decisiones rápidas.
@@ -60,6 +61,13 @@ Después entra en <http://localhost:8000>.
   - Clasificación, goleadores, ascensos y descensos.
   - Evolución de los jugadores, retiradas, cantera y renovaciones.
   - Objetivos de la directiva: te pueden destituir.
+- **Tutorial guiado** la primera vez (inicio y primer partido). Se puede repetir desde Club → Partida.
+- **Sonido:**
+  - Efectos sintetizados con Web Audio, sin archivos: silbato, gol con rugido de la grada, abucheos, tarjetas, monedas y subida de nivel.
+  - Ambiente de estadio durante el partido.
+  - La música arranca sola al empezar o continuar partida y baja de volumen durante los partidos.
+- **Interfaz con efectos:** botones con relieve, brillo y onda al pulsar, partículas y confeti en goles, fichajes, patrocinios, victorias y subidas de nivel, y animaciones de entrada.
+- **Escudos reales** de primeras divisiones europeas (≈300 clubes masculinos y 50 femeninos), cargados desde el repositorio público [luukhopman/football-logos](https://github.com/luukhopman/football-logos) vía jsDelivr. Si un club no está o no hay conexión, se usa el escudo generado. Los escudos son marcas registradas de sus clubes: no se copian en este repositorio, solo se enlazan.
 - **Guardado automático**, exportar e importar partida, y música (`Strategic Swing.mp3`).
 
 La evaluación del juego desde el punto de vista de un jugador de Football
@@ -85,7 +93,13 @@ js/commerce.js           Afición, patrocinios, marketing, entradas, préstamos,
 js/news.js               Noticias, polémicas, moral y decisiones
 js/game.js               Orquestación: carga de datos, partida, buzón, guardado
 js/ui.js                 Interfaz (vistas, fichas, club, mánager, asistente)
-js/matchview.js          Partido en directo
+js/matchview.js          Partido en directo (controles, pausas, decisiones)
+js/pitch.js              Vista 2D del partido (canvas)
+js/sfx.js                Efectos de sonido sintetizados (Web Audio)
+js/fx.js                 Partículas, confeti, ondas y sacudidas
+js/tutorial.js           Tutorial guiado
+tools/build-crests.js    Asocia clubes con escudos reales
+data/game/crests.js      Tabla club → escudo (URL en jsDelivr)
 assets/flags/            Banderas SVG (flag-icons, licencia MIT)
 tools/build-data.js      Genera los datos del juego desde data/players.csv
 data/players.csv         Dataset original (extraído de EA_FC_ANALYSIS-main.zip)
@@ -99,6 +113,20 @@ Para regenerar los datos tras cambiar el CSV o las fórmulas:
 
 ```bash
 node tools/build-data.js
+```
+
+Para regenerar la tabla de escudos (`data/game/crests.js`):
+
+```bash
+git clone --depth 1 --filter=blob:none --no-checkout https://github.com/luukhopman/football-logos fl
+```
+
+```bash
+(cd fl && git -c core.quotepath=off ls-tree -r --name-only HEAD | grep '\.png$') > tree.txt
+```
+
+```bash
+node tools/build-crests.js tree.txt "$(git -C fl rev-parse HEAD)"
 ```
 
 Para volver a copiar las banderas (opcional), descarga `flag-icons` y pasa su carpeta:

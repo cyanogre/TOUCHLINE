@@ -72,6 +72,7 @@
       m.xp -= xpToNext(m.level);
       m.level++; m.points++; ups++;
     }
+    if (ups) S._levelUp = (S._levelUp || 0) + ups;
     if (ups && TL.Game) {
       TL.Game.mail(S, '¡Subes de nivel como mánager!',
         `Ahora eres nivel ${m.level}. Tienes ${m.points} punto${m.points > 1 ? 's' : ''} de habilidad para gastar en Club → Mánager.`, 'board');

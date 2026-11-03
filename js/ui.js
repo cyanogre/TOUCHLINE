@@ -44,12 +44,14 @@
   const app = () => document.getElementById('app');
 
   // ------------------------------------------------------------ Componentes
+  /** Escudo: el real si existe (CDN) y, si no carga, el generado con iniciales. */
   function crest(c, cls) {
-    return `<span class="crest ${cls || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true">${esc(c.code)}</span>`;
+    const img = c.logo ? `<img src="${esc(c.logo)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : '';
+    return `<span class="crest ${cls || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"><b>${esc(c.code)}</b>${img}</span>`;
   }
-  function crestFor(name, cls) {
+  function crestFor(name, cls, gender) {
     const [c1, c2] = U.clubColors(name);
-    return crest({ c1, c2, code: U.clubCode(name) }, cls);
+    return crest({ c1, c2, code: U.clubCode(name), logo: U.crestUrl(gender || (UI.wz && UI.wz.gender) || 'M', name) }, cls);
   }
   function posB(pos) { return `<span class="pos l${F.LINE[pos]}">${F.POS_ES[pos]}</span>`; }
   function ovrCls(v) { return v >= 85 ? 't1' : v >= 75 ? 't2' : v >= 65 ? 't3' : 't4'; }
@@ -89,6 +91,7 @@
   }
 
   function toast(msg, bad) {
+    if (bad && TL.SFX) TL.SFX.error();
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className = 'show' + (bad ? ' bad' : '');
@@ -142,10 +145,21 @@
     start() {
       const a = Music.el();
       if (!a || !Music.on()) return;
-      a.volume = 0.35;
+      if (!a.paused) return;
+      a.volume = 0;
       const p = a.play();
       if (p && p.catch) p.catch(() => { /* bloqueado hasta interacción */ });
+      Music.fade(Music.base);
     },
+    base: 0.32,
+    fade(to, ms) {
+      const a = Music.el(); if (!a) return;
+      clearInterval(Music._f);
+      const from = a.volume, steps = 20, dt = (ms || 1200) / steps;
+      let k = 0;
+      Music._f = setInterval(() => { k++; a.volume = Math.max(0, Math.min(1, from + (to - from) * k / steps)); if (k >= steps) clearInterval(Music._f); }, dt);
+    },
+    duck(on) { if (Music.on()) Music.fade(on ? 0.1 : Music.base, 800); },
     toggle() {
       const on = !Music.on();
       try { localStorage.setItem('touchline.music', on ? '1' : '0'); } catch (e) { /* nada */ }
@@ -155,6 +169,8 @@
     }
   };
   A.music = () => Music.toggle();
+  A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
+  A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); UI.refresh(); };
   UI.Music = Music;
 
   // ------------------------------------------------------------ Shell
@@ -174,8 +190,9 @@
     document.getElementById('topbar').innerHTML = `
       ${crest(c)}
       <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${U.seasonLabel(S.season)} · ${wk} · ${esc(L.name)}</div></div>
-      <div class="cash ${c.cash < 0 ? 'neg' : ''}">${U.money(c.cash)}<small>Saldo</small></div>
+      <div class="cash ${c.cash < 0 ? 'neg' : ''} ${UI.lastCash != null && UI.lastCash !== Math.round(c.cash) ? (c.cash > UI.lastCash ? 'up pop' : 'down pop') : ''}">${U.money(c.cash)}<small>Saldo</small></div>
       <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
+    UI.lastCash = Math.round(c.cash);
     const unread = S.inbox.filter(m => !m.read).length;
     document.getElementById('nav').innerHTML = TABS.map(([k, label]) =>
       `<button class="${UI.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" aria-current="${UI.tab === k ? 'page' : 'false'}">
@@ -196,7 +213,7 @@
   }
   UI.render = render;
   UI.refresh = () => render(true);
-  A.tab = el => { UI.tab = el.dataset.tab; render(false); };
+  A.tab = el => { UI.tab = el.dataset.tab; TL.SFX && TL.SFX.tab(); render(false); };
 
   function pageTitle(t, sub, right) {
     return `<div class="page-title"><div><h1>${t}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${right || ''}</div>`;
@@ -743,7 +760,11 @@
       <section class="card span2"><div class="card-head"><h2>Historial</h2></div>${hist}</section>
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
         <div class="btn-row"><button class="btn" data-act="save">Guardar</button><button class="btn" data-act="export">Exportar</button>
-        <button class="btn" data-act="import">Importar</button><button class="btn danger" data-act="quit">Nueva partida</button></div>
+        <button class="btn" data-act="import">Importar</button><button class="btn" data-act="tutorial">Ver tutorial</button>
+        <button class="btn danger" data-act="quit">Nueva partida</button></div>
+        <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
+          <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button></div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
@@ -810,8 +831,18 @@
           <button class="btn sm" data-act="expand" data-i="${i}">${U.money(o.cost)}</button></div>`).join('') || '<p class="note">El estadio ya está en su capacidad máxima.</p>'}</section>
     </div>`;
   }
-  A.sponsor = el => { const r = TL.Commerce.signSponsor(G.S, el.dataset.slot, +el.dataset.i); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
-  A.campaign = el => { const r = TL.Commerce.launch(G.S, el.dataset.id); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
+  A.sponsor = el => {
+    const r = TL.Commerce.signSponsor(G.S, el.dataset.slot, +el.dataset.i);
+    toast(r.msg, !r.ok);
+    if (r.ok) { TL.FX.coins(el); TL.SFX.coin(); }
+    G.save(); UI.refresh();
+  };
+  A.campaign = el => {
+    const r = TL.Commerce.launch(G.S, el.dataset.id);
+    toast(r.msg, !r.ok);
+    if (r.ok) { TL.FX.coins(el); TL.SFX.coin(); }
+    G.save(); UI.refresh();
+  };
   A.repay = el => { const r = TL.Commerce.repayLoan(G.S, +el.dataset.id); toast(r.msg, !r.ok); G.save(); UI.refresh(); };
   A.expand = el => {
     const o = TL.Commerce.expansionOptions(G.S)[+el.dataset.i];
@@ -852,7 +883,12 @@
         <p class="note mt">Ganas experiencia con cada partido (más con victorias y contra rivales mejores) y al cumplir objetivos, ganar títulos o ascender.</p></section>
       <div class="grid two three">${tree}</div>`;
   }
-  A.skill = el => { const r = TL.Manager.buy(G.S, el.dataset.id); toast(r.msg || r.reason, !r.ok); G.save(); UI.refresh(); };
+  A.skill = el => {
+    const r = TL.Manager.buy(G.S, el.dataset.id);
+    toast(r.msg || r.reason, !r.ok);
+    if (r.ok) { TL.FX.sparkle(el); TL.SFX.levelUp(); }
+    G.save(); UI.refresh();
+  };
 
   A.save = () => { const ok = G.save(); toast(ok ? 'Partida guardada' : 'No se pudo guardar (almacenamiento lleno)', !ok); };
   A.export = () => {
@@ -1015,6 +1051,7 @@
     const r = M.sign(S, p, n.fee, M.wageDemand(S, p, S.user), n.years);
     if (r.ok) {
       G.save(); closeSheet(); toast(`¡${p.short} es nuevo jugador del club!`); UI.refresh();
+      TL.FX.confetti(); TL.SFX.success(); setTimeout(() => TL.SFX.coin(), 200);
     } else { n.msg = r.msg; n.ok = false; openPlayer(p.id); }
   };
   A.renew = el => {
@@ -1065,6 +1102,7 @@
     UI.seasonSum = sum;
     const champ = S.clubs[sum.champion];
     const ok = sum.pos <= sum.target;
+    if (ok || sum.moved === 'up') setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); }, 300);
     const moved = sum.moved === 'up' ? '<p class="pos-ok" style="font-weight:700">¡Ascenso conseguido!</p>' :
       sum.moved === 'down' ? '<p class="neg" style="font-weight:700">Descenso de categoría.</p>' : '';
     const youth = sum.youth.map(id => S.players[id]);
@@ -1114,17 +1152,23 @@
   function renderTitle() {
     const meta = G.meta();
     app().innerHTML = `<div class="title-screen">
+      <div class="title-ball" aria-hidden="true">⚽</div>
       <div class="logo"><h1>TOUCH<span>LINE</span></h1><p>Football Manager</p></div>
       <div class="title-actions">
-        ${meta ? `<button class="btn primary continue-card" data-act="continue"><div class="t">Continuar</div>
+        ${meta ? `<button class="btn primary continue-card" data-act="continue"><div class="t">▶ Continuar</div>
           <div class="s">${esc(meta.club)} · ${U.seasonLabel(meta.season)} · Jornada ${meta.week + 1} · ${esc(meta.manager)}</div></button>` : ''}
         <button class="btn ${meta ? '' : 'primary'}" data-act="new-game">Nueva partida</button>
         <button class="btn ghost" data-act="import">Importar partida</button>
-        <button class="btn ghost" data-act="music">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>
       </div>
-      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Valores de mercado, salarios, contratos y potencial estimados por el juego. Música: “Strategic Swing”.</p>
+      <div class="title-toggles">
+        <button data-act="title-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
+        <button data-act="title-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
+      </div>
+      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Música: “Strategic Swing”.</p>
     </div>`;
   }
+  A['title-music'] = () => { Music.toggle(); renderTitle(); };
+  A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); renderTitle(); };
   UI.renderTitle = renderTitle;
 
   A.continue = async () => {
@@ -1221,12 +1265,15 @@
   A['wz-start'] = () => {
     const z = UI.wz;
     const name = (document.getElementById('mgr').value || '').trim() || 'Míster';
+    Music.start();
     app().innerHTML = '<div class="title-screen"><div class="spinner"></div><p class="muted">Creando el mundo…</p></div>';
     setTimeout(() => {
       G.newGame(z.data, z.club, name);
       UI.wz = null;
       UI.tab = 'home';
       renderShell(); render();
+      TL.FX.confetti(); TL.SFX.success();
+      setTimeout(() => TL.Tutorial.start('main'), 700);
     }, 30);
   };
 
@@ -1244,10 +1291,20 @@
     const S = G.S;
     if (S.over) return;
     lineupWarning(S);
+    TL.SFX.whistle(false);
     G.completeRound(null);
     const m = S.fixtures[S.week - 1].find(m => m[0] === S.user || m[1] === S.user) || null;
     showRoundResults(S, S.week - 1, m);
   };
+
+  /** Celebraciones pendientes (subida de nivel del mánager). */
+  function celebrate(S) {
+    if (S._levelUp) {
+      S._levelUp = 0;
+      setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); toast(`¡Nivel ${S.mgr.level} de mánager! Tienes puntos de habilidad.`); }, 400);
+    }
+  }
+  UI.celebrate = celebrate;
 
   function showRoundResults(S, r, my) {
     const L = W.userLeague(S);
@@ -1262,14 +1319,24 @@
         <p class="center" style="margin:0;font-weight:700;color:${res === 'V' ? 'var(--accent2)' : res === 'D' ? 'var(--danger)' : 'var(--muted)'}">${res === 'V' ? 'Victoria' : res === 'D' ? 'Derrota' : 'Empate'}</p></div>`;
     }
     sheet(sheetHead(`Jornada ${r + 1}`) + head + `<div class="card" style="padding:6px 10px">${S.fixtures[r].map(m => fixtureHtml(S, m)).join('')}</div>
-      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => render(false) });
+      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { render(false); celebrate(S); } });
+    if (my) {
+      const res = resultLetter(S, my);
+      setTimeout(() => {
+        if (res === 'V') { TL.FX.confetti({ palette: 'green' }); TL.SFX.goal(true); }
+        else if (res === 'D') TL.SFX.groan();
+        else TL.SFX.chance();
+      }, 150);
+    }
   }
   UI.showRoundResults = showRoundResults;
 
   // ------------------------------------------------------------ Eventos globales
+  document.addEventListener('pointerdown', () => TL.SFX && TL.SFX.unlock(), { once: true });
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    if (TL.SFX && !/^(tab|mv-|tut-)/.test(el.dataset.act)) TL.SFX.click();
     const f = A[el.dataset.act];
     if (f) { ev.preventDefault(); f(el, ev); }
   });

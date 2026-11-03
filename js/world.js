@@ -157,7 +157,7 @@
       promotion: data.promotion,
       clubs: data.clubs.map((c, i) => {
         const [c1, c2] = U.clubColors(c[0]);
-        return { id: i, name: c[0], league: c[1], code: U.clubCode(c[0]), c1, c2 };
+        return { id: i, name: c[0], league: c[1], code: U.clubCode(c[0]), c1, c2, logo: U.crestUrl(data.gender, c[0]) };
       }),
       players: data.players.map((r, i) => ({
         id: i, name: r[0], short: r[1], club: r[2], nat: r[3], pos: r[4],
