@@ -290,9 +290,13 @@
         }
         // Conductor, apoyos y desmarques del que ataca
         const car = b.owner != null ? this.A[b.owner] : null;
-        if (car && car.team === att && !this.isGK(car)) {
+        if (car && this.hold) { car.tx = car.x; car.ty = car.y; car.run = 0.2; }
+        else if (car && car.team === att && !this.isGK(car)) {
           const dx = this.dir[att];
-          car.tx = car.x + dx * 5; car.ty = car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2;
+          // Conduce hacia delante, pero sin pasarse del borde del área rival
+          const [mx] = this.world(att, 90, 0);
+          car.tx = dx > 0 ? Math.min(car.x + dx * 5, mx) : Math.max(car.x + dx * 5, mx);
+          car.ty = clamp(car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2, 3, Wd - 3);
           car.run = 0.55;
           // Dos compañeros se ofrecen cerca
           const mates = atts.filter(a => a !== car).sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2);
@@ -307,6 +311,7 @@
           r.tx = b.path.tx; r.ty = b.path.ty; r.run = 0.95;
         }
       }
+      for (const id in this.A) { const a = this.A[id]; a.tx = clamp(a.tx, 0.6, L - 0.6); a.ty = clamp(a.ty, 0.6, Wd - 0.6); }
       // Guion: posiciones forzadas (balón parado, celebraciones…)
       if (this.ov) {
         for (const id in this.ov.p || {}) {
@@ -415,8 +420,9 @@
           const sp = Math.hypot(a.vx, a.vy);
           const fx = sp > 0.3 ? a.vx / sp : this.dir[a.team], fy = sp > 0.3 ? a.vy / sp : 0;
           const hold = a.held;
-          b.x = lerp(b.x, a.x + fx * (hold ? 0 : 0.75), Math.min(1, dt * 12));
-          b.y = lerp(b.y, a.y + fy * (hold ? 0 : 0.75), Math.min(1, dt * 12));
+          const tx = a.x + fx * (hold ? 0 : 0.75), ty = a.y + fy * (hold ? 0 : 0.75);
+          const ddx = tx - b.x, ddy = ty - b.y, dd = Math.hypot(ddx, ddy), mx = 22 * dt;
+          if (dd > mx) { b.x += ddx / dd * mx; b.y += ddy / dd * mx; } else { b.x = tx; b.y = ty; }
           b.z = hold ? 1.6 : Math.max(0, b.z - dt * 6);
         }
       } else if (b.roll) {
@@ -430,11 +436,20 @@
       if (b.trail.length > 7) b.trail.shift();
     }
 
-    _receive(pid) {
+    _receive(pid, force) {
       const a = this.A[pid];
       if (!a) return;
-      this.ball.owner = pid;
-      this.ball.z = 0;
+      const b = this.ball;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (!force && d > 2.2 && b.owner !== pid) {
+        // Lejos del balón: el balón le llega rodando (nada de teletransportes)
+        b.owner = null; b.roll = null;
+        b.path = { fx: b.x, fy: b.y, fz: b.z, tx: a.x + a.vx * 0.3, ty: a.y + a.vy * 0.3, tz: 0, h: d > 20 ? Math.min(6, d * 0.12) : 0, T: clamp(d / 18, 0.15, 1.2), t: 0, to: null, curve: 0, nx: 0, ny: 0, done: () => this._receive(pid, true) };
+        this.poss = a.team;
+        return;
+      }
+      b.owner = pid;
+      b.z = 0;
       this.poss = a.team;
     }
 
@@ -597,7 +612,8 @@
     _kickoffSeq(i) {
       let taker = null;
       return [
-        { d: 1.6, start: () => { const k = this._placeKickoff(i, false); taker = k.taker; this.ov = { p: k.p }; this.refOv = { x: L / 2 - 6, y: Wd / 2 + 10, run: 0.5 }; this._clearStates(); this._cut(0.8); } },
+        { d: 1.6, start: () => { const k = this._placeKickoff(i, false); taker = k.taker; this.ov = { p: k.p }; this.refOv = { x: L / 2 - 6, y: Wd / 2 + 10, run: 0.5 }; this._clearStates(); this._cut(0.85); } },
+        { d: 0.05, waitHold: true },
         { d: 0.4, start: () => { this.ov = null; this.refOv = null; TL.SFX && !this.instant && TL.SFX.whistle(false); if (taker != null && this.A[taker]) this._receive(taker); } }
       ];
     }
@@ -630,6 +646,7 @@
         if (this.beat.slow) this.slowT = this.beat.slow;
       }
       const bt = this.beat;
+      if (bt.waitHold && this.hold) return true;
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
       const waitBall = bt.ball && this.ball.path;
@@ -668,7 +685,7 @@
       while (this.queue.length) {
         const e = this.queue.shift();
         if (e.type === 'goal' || e.type === 'disallowed') { this._placeKickoff(1 - e.team, true); this.ball.owner = this._kickTaker(1 - e.team); }
-        if (e.type === 'ht') { this.dir = [-this.dir[0], -this.dir[1]]; this._placeKickoff(1, true); this.ball.owner = this._kickTaker(1); }
+        if (e.type === 'ht') { this.dir = [-this.dir[0], -this.dir[1]]; this._placeKickoff(1, true); this.htKick = true; }
         if (e.type === 'ft') this._finalWhistle(true);
       }
       this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1;
@@ -676,6 +693,8 @@
       this._clearStates();
       this._unfocus();
       this._sync();
+      // Segunda parte: todos colocados y el saque espera a que reanudes
+      if (this.htKick) { this.htKick = false; this._seq(this._kickoffSeq(1)); }
       this.instant = false;
     }
 
@@ -1271,9 +1290,9 @@
           this.poss = i;
           this.ov = { p: { [e.pid]: { x: tx, y: ty, run: 1 } } };
           const carrier = this.nearest(this.team(i).filter(a => a !== runner && !this.isGK(a)), { x: tx - dir * 22, y: ty });
-          if (carrier && this.ball.owner !== carrier.pid) { this.ball.owner = null; this.ball.path = null; this.ball.x = carrier.x; this.ball.y = carrier.y; this._receive(carrier.pid); }
+          if (carrier && this.ball.owner !== carrier.pid) this._receive(carrier.pid);
         } },
-        { d: 0.5, start: () => { this._kick(tx, ty, { h: 0.1, to: e.pid }); } },
+        { d: 0.5, ball: true, start: () => { this._kick(tx, ty, { h: 0.1, to: e.pid }); } },
         { d: 1.3, start: () => {
           ar.flag = this.t + 1.6;
           if (!this.instant && TL.SFX) TL.SFX.whistle(false);
@@ -1295,7 +1314,7 @@
           this._banner('DESCANSO', '#ffffff', 1.8, true);
           if (!this.instant && TL.SFX) TL.SFX.whistle(true);
           const p = {};
-          for (const id in this.A) p[id] = { x: TUNNEL.x + U.rand(-3, 3), y: -0.5, run: 0.3 };
+          for (const id in this.A) p[id] = { x: TUNNEL.x + U.rand(-4, 4), y: -0.5, run: 0.55 };
           this.ov = { p };
           this.ball.owner = null; this.ball.roll = null;
           this.refOv = { x: TUNNEL.x, y: -0.8, run: 0.3 };

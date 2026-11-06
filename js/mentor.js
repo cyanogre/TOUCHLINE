@@ -238,9 +238,11 @@
     r.querySelector('.vn-text').innerHTML = renderTokens(cur.tk, cur.n);
     cur.face.say(t.ch);
     if (TL.SFX && TL.SFX.voice && cur.n % 1 === 0) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
-    let ms = 28;
-    if ('.!?…'.includes(t.ch)) ms = 230;
-    else if (',;:'.includes(t.ch)) ms = 120;
+    // Ritmo de lectura cómodo: ~22 letras por segundo, con pausas en la puntuación
+    let ms = 46;
+    if ('.!?…'.includes(t.ch)) ms = 420;
+    else if (',;:'.includes(t.ch)) ms = 220;
+    else if (t.ch === ' ') ms = 30;
     cur.timer = setTimeout(type, ms);
   }
 
