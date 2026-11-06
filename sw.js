@@ -5,7 +5,7 @@ const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/world.js', 'js/engine.js', 'js/coach.js',
   'js/season.js', 'js/market.js', 'js/commerce.js', 'js/news.js', 'js/game.js', 'js/ui.js', 'js/matchview.js', 'js/main.js',
-  'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'js/career.js', 'js/mentor.js', 'js/school.js',
+  'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'js/career.js', 'js/locker.js', 'js/mentor.js', 'js/school.js',
   'assets/mentor/neutral-talk.png', 'assets/mentor/neutral-idle.png', 'data/game/crests.js',
   'assets/icon.svg', 'assets/icon-192.png', 'assets/icon-512.png'
 ];

@@ -72,7 +72,7 @@
       two: true,
       title: (S, p, c) => `Pelea en el entrenamiento del ${c.name}`,
       body: (S, p, c, q) => `${p.name} y ${q.name} llegan a las manos en la sesión de hoy. Los compañeros tuvieron que separarlos.`,
-      now: (S, p, q) => { mor(p, -8); mor(q, -8); },
+      now: (S, p, q) => { mor(p, -8); mor(q, -8); if (TL.Locker && q && q.id != null) TL.Locker.bond(S, p.id, q.id, -40); },
       opts: [
         ['fine', 'Multar a ambos', (S, p, q) => { mor(p, -4); mor(q, -4); teamMor(S, 1); return 'Multa ejemplar. El vestuario toma nota.'; }],
         ['talk', 'Mediar entre ellos', (S, p, q) => {

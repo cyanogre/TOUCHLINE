@@ -141,8 +141,11 @@
     }
     // Repaso del Profe (solo a posteriori) y la vida de los banquillos rivales
     for (const r of results) if (r.review) TL.Coach.store(S, r.review);
+    TL.Locker.afterRound(S, results);
     S.week++;
     TL.Coach.weekly(S);
+    TL.Locker.weekly(S);
+    TL.Locker.windowStart(S);
     TL.News.afterRound(S, results);
     TL.News.morale(S, results);
     TL.News.weekly(S);
@@ -275,6 +278,8 @@
     sum.jobs = TL.Career.makeOffers(S, sum.fired ? 'fired' : 'season', sum);
     S.endDone = true;
 
+    // Los cedidos vuelven a su club antes de contratos y retiradas
+    TL.Locker.endLoans(S);
     // Evolución, retiradas y contratos
     const userPlayers = new Set(W.squad(S, S.user).map(p => p.id));
     const retired = [], left = [];
@@ -283,7 +288,7 @@
       develop(S, p);
       const retireP = p.age >= 39 ? 1 : p.age >= 36 ? 0.5 : p.age >= 34 ? 0.22 : p.age >= 33 && p.ovr < 65 ? 0.15 : 0;
       if (Math.random() < retireP || (p.club === -1 && p.age >= 33 && Math.random() < 0.5)) {
-        if (userPlayers.has(p.id)) retired.push(p.name);
+        if (userPlayers.has(p.id)) { retired.push(p.name); TL.Locker.onRetire(S, p); }
         p.club = -2; p.listed = false;
         continue;
       }
@@ -322,6 +327,9 @@
       }
     }
     W.dirty(S);
+    // El vestuario: líderes, y cada 5-10 temporadas, una joya con ADN de leyenda
+    TL.Locker.seasonEnd(S);
+    W.dirty(S);
 
     // Clubes de la IA: cubren huecos con agentes libres o, si no, jugadores generados
     W.maintainSquads(S, S.clubs.filter(c => c.id !== S.user).map(c => c.id));
@@ -353,7 +361,7 @@
     let d = 0;
     const apps = (S.stats[p.id] || [0])[0];
     const playBonus = apps >= 20 ? 1.15 : apps >= 8 ? 1 : 0.85;
-    const grow = p.club === S.user ? TL.Manager.B(S).youthGrowth : 1;
+    const grow = (p.club === S.user ? TL.Manager.B(S).youthGrowth : 1) * TL.Locker.growth(S, p);
     if (p.age <= 23) d = Math.round((p.pot - p.ovr) * U.rand(0.18, 0.45) * playBonus * grow);
     else if (p.age <= 27) d = p.pot > p.ovr ? Math.round((p.pot - p.ovr) * U.rand(0.2, 0.6)) : U.int(-1, 1);
     else if (p.age <= 30) d = U.int(-2, 1);
@@ -366,6 +374,7 @@
     const delta = p.ovr - before;
     if (delta) p.st = p.st.map(v => U.clamp(v + delta, 15, 99));
     p.fit = 100; p.inj = 0; p.sus = 0;
+    TL.Locker.afterDevelop(S, p);
   }
 
   /** Arranca la temporada siguiente tras endSeason. */
@@ -400,6 +409,7 @@
     keep.forEach((p, i) => { remap.set(p.id, i); p.id = i; });
     S.players = keep;
     S.tactics.slots = (S.tactics.slots || []).map(id => remap.has(id) ? remap.get(id) : -1);
+    if (TL.Locker) TL.Locker.remap(S, remap);
     for (const n of S.news || []) n.pid = n.pid >= 0 && remap.has(n.pid) ? remap.get(n.pid) : -1;
     for (const m of S.inbox) if (m.data && m.data.pid != null) m.done = true;
   }

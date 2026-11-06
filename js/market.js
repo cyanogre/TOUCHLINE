@@ -53,6 +53,7 @@
   /** Evalúa una oferta por un jugador de otro club. */
   function offer(S, p, amount) {
     if (!windowOpen(S)) return { result: 'closed' };
+    if (TL.Locker.onLoan(S, p.id)) return { result: 'reject', msg: 'Está cedido: su club de origen no negocia ahora.' };
     const ask = askingPrice(S, p, S.user);
     const seller = W.squad(S, p.club);
     if (seller.length <= 18) return { result: 'reject', msg: `${S.clubs[p.club].name} no quiere vender: tiene la plantilla corta.` };
@@ -127,6 +128,7 @@
   /** Venta rápida a un club cualquiera al 70% del valor. */
   function quickSell(S, p) {
     if (!windowOpen(S)) return { ok: false, msg: 'El mercado está cerrado.' };
+    if (TL.Locker.onLoan(S, p.id)) return { ok: false, msg: 'Está cedido: no puedes venderlo.' };
     if (W.squad(S, S.user).length <= 16) return { ok: false, msg: 'No puedes quedarte con menos de 16 jugadores.' };
     const fee = F.roundMoney(W.value(S, p) * 0.7);
     const buyers = buyersFor(S, p, fee);
@@ -144,6 +146,7 @@
   }
 
   function release(S, p) {
+    if (TL.Locker.onLoan(S, p.id)) return { ok: false, msg: 'Está cedido: no puedes rescindir su contrato.' };
     if (W.squad(S, S.user).length <= 16) return { ok: false, msg: 'No puedes quedarte con menos de 16 jugadores.' };
     const cost = releaseCost(S, p);
     if (cost > S.clubs[S.user].cash) return { ok: false, msg: 'No tienes saldo para pagar la rescisión.' };
@@ -199,7 +202,7 @@
     let offers = 0;
     for (const p of U.shuffle(mine.slice())) {
       if (offers >= 3) break;
-      if (pending.has(p.id)) continue;
+      if (pending.has(p.id) || TL.Locker.onLoan(S, p.id)) continue;
       const userRep = S.clubs[S.user].rep;
       const prob = p.listed ? (lastWeek ? 1 : 0.55) : p.ovr >= userRep + 1 ? 0.05 : 0.012;
       if (!U.chance(prob)) continue;
@@ -261,7 +264,7 @@
     let pick = null;
     for (let t = 0; t < 320; t++) {
       const p = S.players[U.int(0, S.players.length - 1)];
-      if (p.club < -1 || p.club === buyer.id || p.club === S.user || F.LINE[p.pos] !== need.line) continue;
+      if (p.club < -1 || p.club === buyer.id || p.club === S.user || F.LINE[p.pos] !== need.line || TL.Locker.onLoan(S, p.id)) continue;
       if (p.age > 32 || p.ovr <= need.weakest + 1 || p.ovr > buyer.rep + 5) continue;
       if (p.club >= 0) {
         const from = S.clubs[p.club];

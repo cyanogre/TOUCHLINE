@@ -78,6 +78,15 @@
     if (p.sus > 0) t.push('<span class="tag sus">SANC</span>');
     if (p.listed) t.push('<span class="tag list">EN VENTA</span>');
     if (p.club === S.user && p.contract <= S.season + 1) t.push(`<span class="tag exp">FIN ${p.contract}</span>`);
+    const LK = TL.Locker;
+    if (LK && S.lk) {
+      const l = LK.loanOf(S, p.id);
+      if (l) t.push(`<span class="tag loan">${l.to === S.user ? 'CEDIDO' : 'CEDIDO FUERA'}</span>`);
+      const g = S.lk.gems[p.id];
+      if (g && p.club === S.user) t.push(`<span class="tag gem" title="Talento oculto">✨${g.stage >= 2 ? ' ADN' : ''}</span>`);
+      const tr = LK.traits(S, p.id);
+      if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.TRAITS[k].name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
+    }
     return t.join('');
   }
 
@@ -451,7 +460,7 @@
         if (g.length) list += `<div class="group-title">${names[l]} · ${g.length}</div>` + g.map(row).join('');
       }
     } else list = sorted.map(row).join('');
-    return pageTitle('Plantilla', `${sq.length}/${M.MAX_SQUAD} jugadores`) +
+    return pageTitle('Plantilla', `${sq.length}/${M.MAX_SQUAD} jugadores`) + lockerCard(S) +
       `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
         <div class="kpi"><div class="k">Nivel club</div><div class="v">${S.clubs[S.user].rep.toFixed(1)}</div></div>
@@ -1077,8 +1086,13 @@
     const pnews = S.news.filter(n => n.pid === p.id).slice(0, 4);
     const newsBox = pnews.length ? `<div class="group-title">En la prensa</div>${pnews.map(n => newsHtml(S, { ...n, pid: -1 })).join('')}` : '';
     let actions = '';
-    if (mine) actions = ownActions(S, p);
+    const loan = TL.Locker.loanOf(S, p.id);
+    if (loan && loan.from === S.user) {
+      actions = `<div class="nego"><p class="note">Cedido por ti al <b>${esc(S.clubs[loan.to].name)}</b> hasta final de temporada. Vuelve en verano.</p>
+        ${M.windowOpen(S) ? `<button class="btn sm" data-act="loan-recall" data-id="${p.id}">Repescarle ahora</button>` : ''}</div>`;
+    } else if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
+    if (mine || (loan && loan.from === S.user)) actions = lockerSection(S, p) + actions;
     const sh = sheet(head + `<div class="stats6">${stats6}</div>` + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
     if (UI.nego && UI.nego.pid === id && UI.nego.focus) {
       UI.nego.focus = false;
@@ -1107,8 +1121,11 @@
           ${n.msg ? `<p class="note ${n.ok ? 'ok' : 'bad'}">${esc(n.msg)}</p>` : ''}</div>`;
       }
     }
+    const loan = TL.Locker.loanOf(S, p.id);
+    if (loan && loan.to === S.user) return `<div class="nego mt"><p class="note">Llega cedido por el <b>${esc(S.clubs[loan.from].name)}</b> hasta final de temporada. No se puede vender ni renovar.</p></div>`;
     return `<div class="btn-row mt">
       <button class="btn sm" data-act="renew" data-id="${p.id}">Renovar</button>
+      ${open ? `<button class="btn sm" data-act="loan-out" data-id="${p.id}">Ceder</button>` : ''}
       <button class="btn sm" data-act="list" data-id="${p.id}">${p.listed ? 'Quitar de venta' : 'Poner en venta'}</button>
       ${open ? `<button class="btn sm" data-act="quick-sell" data-id="${p.id}">Venta rápida · ${U.money(F.roundMoney(W.value(S, p) * 0.7))}</button>` : ''}
       <button class="btn sm danger" data-act="release" data-id="${p.id}">Rescindir</button></div>${renew}`;
