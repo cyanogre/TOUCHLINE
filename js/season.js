@@ -385,6 +385,7 @@
     S.jobOffers = null;
     S.stats = {};
     S.neg = {};
+    S.tlog = [];
     S.over = false;
     S.results = [];
     S.fin = W.newFin();

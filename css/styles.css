@@ -386,7 +386,10 @@ h1, h2, h3 { font-family: var(--font-c); letter-spacing: 0.01em; margin: 0; line
   display: grid; gap: 8px;
 }
 .mfoot .inner { width: 100%; max-width: 760px; margin: 0 auto; display: grid; gap: 8px; }
-.ev { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgb(255 255 255 / 0.04); animation: fade 0.3s ease; }
+.ev { display: flex; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgb(255 255 255 / 0.05); animation: fade 0.3s ease; font-size: 15px; line-height: 1.42; }
+.ev.side-0 { box-shadow: inset 3px 0 0 rgb(184 245 61 / 0.55); padding-left: 8px; }
+.ev.side-1 { box-shadow: inset 3px 0 0 rgb(143 196 255 / 0.5); padding-left: 8px; }
+#mv-feed .ev:first-child { background: rgb(255 255 255 / 0.04); border-radius: 8px; }
 .ev .m { flex: none; width: 34px; font-family: var(--font-c); font-weight: 700; color: var(--muted); text-align: right; }
 .ev .i { flex: none; width: 22px; text-align: center; }
 .ev.goal { background: rgb(184 245 61 / 0.08); border-radius: 10px; padding: 10px 6px; }
@@ -642,7 +645,19 @@ details summary { list-style: revert; }
 .match .score .t:last-child { flex-direction: row-reverse; }
 .match .score .t b { font-size: 15px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match .score .t:last-child b { text-align: right; }
-.pitch-box { background: #10301e; padding: 6px 10px; display: flex; justify-content: center; }
+.pitch-box { background: #10301e; padding: 6px 10px; display: flex; justify-content: center; position: relative; }
+.pitch-toggle { position: absolute; right: 14px; top: 10px; z-index: 2; font-size: 12px; font-weight: 700; color: #fff; padding: 4px 9px; border-radius: 99px;
+  background: rgb(8 17 13 / 0.72); border: 1px solid rgb(255 255 255 / 0.18); backdrop-filter: blur(4px); }
+.pitch-toggle .pt-max { display: none; }
+/* Campo minimizado (como en los mánager de PC): miniatura flotante que sigue jugando */
+.match.mini .pitch-box { position: absolute; right: 10px; top: calc(var(--mh, 110px) + 8px); width: min(42vw, 250px); padding: 0; z-index: 6;
+  background: none; border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(184 245 61 / 0.35); }
+.match.mini #pitch { width: 100%; border-radius: 10px; }
+.match.mini .pitch-toggle { inset: 0; width: 100%; height: 100%; border-radius: 10px; background: transparent; border: 0; backdrop-filter: none; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; }
+.match.mini .pitch-toggle .pt-min { display: none; }
+.match.mini .pitch-toggle .pt-max { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgb(8 17 13 / 0.75); font-size: 15px; }
+.match.mini .mbody { padding-right: 16px; }
+.match.mini .mbody::before { content: ''; float: right; width: calc(min(42vw, 250px) + 2px); height: calc(min(42vw, 250px) * 85 / 117 - 4px); }
 #pitch { width: min(100%, 800px, 42vh * 117 / 85); aspect-ratio: 117 / 85; height: auto; display: block; border-radius: 10px; }
 .mtabs { padding: 8px 14px 0; width: 100%; max-width: 788px; margin: 0 auto; }
 .mtabs .seg button { padding: 6px; font-size: 13px; }
@@ -851,3 +866,47 @@ details summary { list-style: revert; }
 .office-head { display: flex; gap: 12px; align-items: center; padding: 6px 0 4px; }
 .office-opt { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; min-height: 54px; }
 .office-opt small { font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.vn-face.head { display: inline-block; width: calc(36px / var(--dpr, 1)); height: calc(36px / var(--dpr, 1)); vertical-align: middle; margin: -4px 4px -4px 0; }
+/* Historial de traspasos */
+.tl-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 2px; border-bottom: 1px solid rgb(255 255 255 / 0.05); }
+.tl-row.me { background: rgb(184 245 61 / 0.06); border-radius: 8px; }
+.tl-w { flex: none; width: 30px; font-family: var(--font-c); font-weight: 700; color: var(--muted); font-size: 13px; }
+.tl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tl-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-move { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.tl-club { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 38%; }
+.tl-arrow { color: var(--accent); }
+.tl-fee { flex: none; font-family: var(--font-c); font-weight: 800; font-size: 15px; }
+.tl-fee.free { color: var(--muted); font-weight: 600; }
+.tl-fee.loan { color: #8fd0ff; font-size: 13px; }
+.crest.xs { --s: 18px; }
+
+/* ---------------------------------------------------------------- Responsive: pantallas estrechas y móvil en horizontal */
+.seg { overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { flex: 1 0 auto; }
+@media (max-width: 380px) {
+  .seg button { font-size: 12.5px; padding: 7px 8px; }
+  .topbar { gap: 7px; padding-left: 10px; padding-right: 8px; }
+  .topbar .club-name { font-size: 16px; }
+  .topbar .cash { font-size: 15px; }
+  .help-btn { width: 30px; height: 30px; font-size: 17px; }
+  .content { padding-left: 12px; padding-right: 12px; }
+  .nav button { font-size: 9.5px; }
+}
+/* Móvil en horizontal: el partido a dos columnas (campo a la izquierda, narración y controles a la derecha) */
+@media (orientation: landscape) and (max-height: 560px) {
+  .match { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .match .mh { grid-column: 1 / -1; padding: 4px 12px; }
+  .match .mh .comp { display: none; }
+  .match .score { margin: 2px 0; }
+  .match .score .res { font-size: 28px; }
+  .match .pitch-box { grid-column: 1; grid-row: 2 / span 3; align-items: center; }
+  .match #pitch { width: min(100%, (100vh - 70px) * 117 / 85); }
+  .match .mtabs { grid-column: 2; grid-row: 2; padding-top: 6px; }
+  .match .mbody { grid-column: 2; grid-row: 3; padding: 8px 12px; }
+  .match .mfoot { grid-column: 2; grid-row: 4; }
+  .match.mini .pitch-box { position: static; width: auto; box-shadow: none; }
+  .match.mini .mbody::before { display: none; }
+  .nav { --nav-h: 52px; }
+}

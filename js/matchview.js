@@ -43,7 +43,8 @@
         </div>
         <div class="mprog"><i id="mv-prog" style="width:0%"></i></div>
       </div>
-      <div class="pitch-box"><canvas id="pitch" aria-label="Vista del partido"></canvas></div>
+      <div class="pitch-box"><canvas id="pitch" aria-label="Vista del partido"></canvas>
+        <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
       <div class="mtabs"><div class="seg" id="mv-tabs">
           <button class="on" data-act="mv-tab" data-k="feed">Narración</button>
           <button data-act="mv-tab" data-k="stats">Estadísticas</button>
@@ -56,6 +57,7 @@
     for (const e of m.events) addEvent(e);
     MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
     MV.pitch.speed = settings().speed || 1;
+    if (settings().mini) setMini(true);
     renderFoot();
     TL.SFX.startCrowd();
     TL.SFX.whistle(false);
@@ -303,6 +305,17 @@
     renderFoot();
   };
 
+  /** Campo minimizado: sigue jugándose en una miniatura y la narración ocupa la pantalla. */
+  function setMini(on) {
+    const root = el('match');
+    if (!root) return;
+    root.classList.toggle('mini', on);
+    const mh = root.querySelector('.mh'), tabs = root.querySelector('.mtabs');
+    root.style.setProperty('--mh', ((mh ? mh.getBoundingClientRect().height : 110) + (tabs ? tabs.getBoundingClientRect().height : 40)) + 'px');
+    requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
+  }
+  A['mv-mini'] = () => { const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
+
   A['mv-skipmenu'] = () => {
     const m = MV.m;
     pause(null, null);
@@ -454,7 +467,7 @@
         }).join('')}</div>
       <div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
         ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`;
-    if (TL.Mentor) body.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
+    UI.mountFaces(body);
     el('mv-prompt').innerHTML = '';
     el('mv-foot').innerHTML = `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
     document.querySelectorAll('#mv-tabs button').forEach(x => { x.disabled = true; x.classList.remove('on'); });

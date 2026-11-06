@@ -104,10 +104,12 @@
       this.decide = 0.8;
       this.nextThrow = 14 + Math.random() * 20;
       this.runner = null;
+      this.st = this._stadium();
       this.crowd = this._crowd();
       for (const i of [0, 1]) for (const o of match.teams[i].onPitch) this._spawn(i, o.pid);
       this._placeKickoff(0, true);
       this.ball.owner = this._kickTaker(0);
+      if (this.st.name) this._banner(this.st.name + (this.st.night ? ' · partido nocturno' : ''), '#ffffff', 2.6);
       for (const i of [0, 1]) {
         const club = this.S.clubs[match.teams[i].club];
         if (club.logo) crestColor(club.logo, col => { this.colors[i].main = col; });
@@ -148,14 +150,63 @@
       }
     }
 
+    /** Cada estadio es distinto: colores de la grada, dibujo del césped, de día o de noche. */
+    _stadium() {
+      const home = this.S.clubs[this.m.teams[0].club], away = this.S.clubs[this.m.teams[1].club];
+      let h = 7;
+      for (const ch of String(home.name)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const patterns = ['v', 'h', 'check', 'diag', 'wide', 'v'];
+      const grass = [['#1b5a34', '#1f683b'], ['#1d5f2e', '#24723a'], ['#185338', '#1e6343'], ['#205a2b', '#296d34'], ['#1a5a3d', '#1f6a47']];
+      return {
+        pattern: patterns[h % patterns.length], grass: grass[(h >>> 5) % grass.length],
+        seat: home.c1 || '#2fbf71', seat2: home.c2 || '#ffffff', away: (this.colors && this.colors[1].main) || away.c1 || '#ffffff',
+        code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
+        night: (this.S.week * 7 + home.id) % 3 === 0
+      };
+    }
+
     _crowd() {
       const out = [];
-      const cols = ['#c9d3cf', '#9aa8a2', '#6c7a74', '#e6e0d0', '#54605b'];
-      for (let k = 0; k < 520; k++) {
+      const st = this.st;
+      const neutral = ['#c9d3cf', '#9aa8a2', '#6c7a74', '#e6e0d0'];
+      for (let k = 0; k < 560; k++) {
         const top = k % 2 === 0;
-        out.push({ x: U.rand(VIEW.x0, VIEW.x1), y: top ? U.rand(VIEW.y0, VIEW.y0 + 1.8) : U.rand(Wd + 2.6, VIEW.y1), c: U.pick(cols), p: Math.random() * 6 });
+        const x = U.rand(VIEW.x0, VIEW.x1), y = top ? U.rand(VIEW.y0, VIEW.y0 + 1.8) : U.rand(Wd + 2.6, VIEW.y1);
+        // Esquina de la afición visitante; el resto, camisetas del local
+        const awayZone = !top && x > L * 0.84;
+        const r = Math.random();
+        const c = awayZone ? (r < 0.75 ? st.away : U.pick(neutral)) : r < 0.45 ? st.seat : r < 0.62 ? st.seat2 : U.pick(neutral);
+        out.push({ x, y, c, p: Math.random() * 6 });
       }
       return out;
+    }
+
+    /** Césped del estadio pintado una vez (10 px por metro) y reutilizado en cada fotograma. */
+    _grass() {
+      if (this._grassCv) return this._grassCv;
+      const k = 8, cv = document.createElement('canvas');
+      cv.width = L * k; cv.height = Wd * k;
+      const g = cv.getContext('2d');
+      const [a, b] = this.st.grass;
+      g.fillStyle = a; g.fillRect(0, 0, cv.width, cv.height);
+      g.fillStyle = b;
+      const p = this.st.pattern;
+      if (p === 'v' || p === 'wide') { const n = p === 'wide' ? 8 : 14; for (let i = 1; i < n; i += 2) g.fillRect(i * cv.width / n, 0, cv.width / n + 1, cv.height); }
+      else if (p === 'h') { for (let i = 1; i < 10; i += 2) g.fillRect(0, i * cv.height / 10, cv.width, cv.height / 10 + 1); }
+      else if (p === 'check') { const cw = cv.width / 14, ch = cv.height / 8; for (let i = 0; i < 14; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2) g.fillRect(i * cw, j * ch, cw + 1, ch + 1); }
+      else if (p === 'diag') {
+        g.save(); g.beginPath(); g.rect(0, 0, cv.width, cv.height); g.clip();
+        g.translate(cv.width / 2, cv.height / 2); g.rotate(Math.PI / 4);
+        const w = 7 * k;
+        for (let x = -cv.width; x < cv.width; x += w * 2) g.fillRect(x, -cv.width, w, cv.width * 2);
+        g.restore();
+      }
+      // Un poco de textura
+      g.globalAlpha = 0.05;
+      for (let i = 0; i < 1400; i++) { g.fillStyle = Math.random() < 0.5 ? '#000' : '#fff'; g.fillRect(Math.random() * cv.width, Math.random() * cv.height, 2, 2); }
+      g.globalAlpha = 1;
+      this._grassCv = cv;
+      return cv;
     }
 
     resize() {
@@ -1397,8 +1448,21 @@
       const Y = y => this.h / 2 + (y - cyw) * s;
       this.X = X; this.Y = Y; this.s = s;
       // Grada y pista
-      c.fillStyle = '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
-      c.fillStyle = '#14351f'; c.fillRect(X(VIEW.x0), Y(-10), (VIEW.x1 - VIEW.x0) * s, (Wd + 12.5) * s);
+      const night = this.st.night;
+      c.fillStyle = night ? '#060b12' : '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
+      // Gradas con los colores del club local y tifo con sus siglas
+      c.globalAlpha = night ? 0.28 : 0.38;
+      c.fillStyle = this.st.seat; c.fillRect(X(VIEW.x0), Y(VIEW.y0), (VIEW.x1 - VIEW.x0) * s, 2.1 * s);
+      c.fillRect(X(VIEW.x0), Y(Wd + 2.4), (VIEW.x1 - VIEW.x0) * s, (VIEW.y1 - Wd - 2.4) * s);
+      c.globalAlpha = 1;
+      c.save();
+      c.globalAlpha = 0.35;
+      c.fillStyle = this.st.seat2;
+      c.font = `900 ${Math.max(8, 2.2 * s)}px Barlow Condensed, sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (const tx of [L * 0.18, L * 0.82]) c.fillText(this.st.code, X(tx), Y(VIEW.y0 + 1));
+      c.restore();
+      c.fillStyle = night ? '#0f2a1b' : '#14351f'; c.fillRect(X(VIEW.x0), Y(-10), (VIEW.x1 - VIEW.x0) * s, (Wd + 12.5) * s);
       for (const p of this.crowd) {
         const jump = this.sparkUntil && this.sparkUntil > this.t ? Math.abs(Math.sin(this.t * 9 + p.p)) * 0.3 : 0;
         c.fillStyle = p.c;
@@ -1418,18 +1482,15 @@
         }
       }
       // Vallas publicitarias
-      const boards = ['#b8f53d', '#ffffff', '#2fbf71', '#f2c94c'];
+      const boards = [this.st.seat, '#ffffff', this.st.seat2, '#b8f53d'];
       for (let k = 0; k < 14; k++) {
         c.fillStyle = boards[k % boards.length]; c.globalAlpha = 0.28;
         c.fillRect(X(k * L / 14 + 0.5), Y(Wd + 1.7), (L / 14 - 1) * s, 0.6 * s);
       }
       for (const gx of [-2.6, L + 2]) { c.fillStyle = '#ffffff'; c.globalAlpha = 0.18; c.fillRect(X(gx), Y(6), 0.6 * s, (Wd - 12) * s); }
       c.globalAlpha = 1;
-      // Césped a franjas
-      for (let k = 0; k < 14; k++) {
-        c.fillStyle = k % 2 ? '#1b5a34' : '#1f653a';
-        c.fillRect(X(k * L / 14), Y(0), L / 14 * s + 1, Wd * s);
-      }
+      // Césped con el dibujo de este estadio
+      c.drawImage(this._grass(), X(0), Y(0), L * s, Wd * s);
       // Líneas
       c.strokeStyle = 'rgb(255 255 255 / 0.6)';
       c.lineWidth = Math.max(1, s * 0.12);
@@ -1528,6 +1589,17 @@
         c.font = `800 ${Math.round(R * 1.2)}px Barlow Condensed, sans-serif`;
         c.fillStyle = '#ff5050'; c.fillText(String(this.board.outN || ''), x - R, y);
         c.fillStyle = '#5dff7a'; c.fillText(String(this.board.inN || ''), x + R, y);
+      }
+      // Focos en los partidos nocturnos
+      if (night) {
+        c.save(); c.globalCompositeOperation = 'lighter';
+        for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) {
+          const g = c.createRadialGradient(X(fx), Y(fy), 0, X(fx), Y(fy), 55 * s);
+          g.addColorStop(0, 'rgb(255 248 220 / 0.16)'); g.addColorStop(1, 'rgb(255 248 220 / 0)');
+          c.fillStyle = g; c.fillRect(0, 0, this.w, this.h);
+        }
+        c.restore();
+        for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) { c.fillStyle = '#fffbe6'; c.fillRect(X(fx) - 3, Y(fy) - 2, 6, 4); }
       }
       // Rótulo
       if (this.banner && this.banner.until > this.t) {

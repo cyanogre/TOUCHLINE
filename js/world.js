@@ -357,7 +357,7 @@
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
       coaches: TL.Coach.serialize(S), lastForm: S.lastForm || {}, reviews: S.reviews || [],
-      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null,
+      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [],
       pb, pg,
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
@@ -396,7 +396,7 @@
       results: save.results || [], mgr: save.mgr, com: save.com, news: save.news || [], newsId: save.newsId || 1,
       settings: save.settings, log: save.log || { crowd: {} }, leader: save.leader,
       wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone, mentor: save.mentor || null,
-      lastForm: save.lastForm || {}, reviews: save.reviews || [], lk: save.lk || null,
+      lastForm: save.lastForm || {}, reviews: save.reviews || [], lk: save.lk || null, tlog: save.tlog || [],
       over: save.over, fired: save.fired
     });
     TL.Coach.restore(S, save.coaches);

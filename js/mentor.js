@@ -45,13 +45,16 @@
 
   /** Cara animada: parpadea y gira la cabeza en reposo; mueve la boca al hablar. */
   class Face {
-    constructor(el) {
+    constructor(el, opts) {
       // Lienzo de 64×64 píxeles reales dentro del contenedor, con 1 píxel transparente
       // de margen: el navegador suaviza los bordes de los elementos transformados y así
-      // ese suavizado cae fuera del dibujo.
+      // ese suavizado cae fuera del dibujo. Con head: solo la cabeza (34×34), también 1:1.
+      opts = opts || {};
+      this.crop = opts.head ? { x: 14, y: 2, w: 36, h: 36 } : { x: 0, y: 0, w: SIZE, h: SIZE };
       el.innerHTML = '';
       const cv = document.createElement('canvas');
-      cv.width = SIZE + 2 * PAD; cv.height = SIZE + 2 * PAD;
+      cv.width = this.crop.w + 2 * PAD; cv.height = this.crop.h + 2 * PAD;
+      cv.style.width = cv.width + 'px'; cv.style.height = cv.height + 'px';
       cv.className = 'px1';
       el.appendChild(cv);
       this.el = cv;
@@ -80,8 +83,9 @@
       if (!img.complete || !img.naturalWidth) { img.addEventListener('load', () => this.show(kind, frame), { once: true }); return; }
       if (this.last === img.src + frame) return;
       this.last = img.src + frame;
-      this.cx.clearRect(0, 0, SIZE + 2 * PAD, SIZE + 2 * PAD);
-      this.cx.drawImage(img, (frame % COLS) * SIZE, Math.floor(frame / COLS) * SIZE, SIZE, SIZE, PAD, PAD, SIZE, SIZE);
+      const cr = this.crop;
+      this.cx.clearRect(0, 0, cr.w + 2 * PAD, cr.h + 2 * PAD);
+      this.cx.drawImage(img, (frame % COLS) * SIZE + cr.x, Math.floor(frame / COLS) * SIZE + cr.y, cr.w, cr.h, PAD, PAD, cr.w, cr.h);
     }
     /** Fotograma para la letra que se está diciendo. */
     say(ch) {

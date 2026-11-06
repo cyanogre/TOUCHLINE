@@ -227,7 +227,7 @@
     view.classList.toggle('enter', !keepScroll);
     view.innerHTML = VIEWS[UI.tab](S);
     if (VIEWS[UI.tab + 'After']) VIEWS[UI.tab + 'After'](S);
-    if (TL.Mentor) view.querySelectorAll('[data-face]').forEach(el => new TL.Mentor.Face(el));
+    mountFaces(view);
     window.scrollTo(0, keepScroll ? y : 0);
   }
   UI.render = render;
@@ -429,7 +429,10 @@
   // ------------------------------------------------------------ Vestuario
   const face = cls => `<div class="vn-portrait ${cls || 'sm'}"><div class="vn-face" data-face="1"></div></div>`;
   UI.face = face;
-  function mountFaces(root) { if (TL.Mentor && root) root.querySelectorAll('[data-face]').forEach(el => { if (!el.firstChild) new TL.Mentor.Face(el); }); }
+  function mountFaces(root) { if (TL.Mentor && root) root.querySelectorAll('[data-face]').forEach(el => { if (!el.firstChild) new TL.Mentor.Face(el, { head: el.dataset.face === 'head' }); }); }
+  /** La cabeza del Profe (a 1:1) para usarla como icono en lugar de un emoji. */
+  const profeIc = () => '<span class="vn-face head" data-face="head" aria-hidden="true"></span>';
+  UI.profeIc = profeIc;
   UI.mountFaces = mountFaces;
 
   function lockerCard(S) {
@@ -675,7 +678,7 @@
     tmp.innerHTML = html;
     const nu = tmp.firstElementChild;
     card.replaceWith(nu);
-    if (TL.Mentor) nu.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
+    mountFaces(nu);
   };
   A['review-talk'] = el => {
     const S = G.S, r = (S.reviews || [])[+el.dataset.k || 0];
@@ -686,7 +689,7 @@
   A['review-open'] = () => {
     const S = G.S;
     const sh = sheet(sheetHead('Repaso del partido') + reviewCard(S, 0) + '<button class="btn primary block mt" data-act="close-sheet">Cerrar</button>', { onClose: UI.onSheetClose });
-    if (TL.Mentor) sh.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
+    mountFaces(sh);
   };
 
   A['tac-form'] = el => {
@@ -814,6 +817,31 @@
   };
 
   // ------------------------------------------------------------ Mercado
+  /** Historial de traspasos de la temporada (tu liga, tu club o todo el mundo). */
+  function transferLog(S) {
+    const f = UI.market.log || 'league';
+    const L = W.userLeague(S);
+    const inL = id => id >= 0 && S.clubs[id].league === L.id;
+    let rows = (S.tlog || []).slice().reverse().filter(([, pid, a, b]) => S.players[pid] &&
+      (f === 'all' ? true : f === 'mine' ? a === S.user || b === S.user : inL(a) || inL(b)));
+    if (f === 'all') rows = rows.filter(r => r[4] > 0 || r[5] === 'loan').sort((x, y) => y[4] - x[4]);
+    const tot = rows.reduce((s, r) => s + r[4], 0);
+    const top = rows.filter(r => r[4] > 0).sort((x, y) => y[4] - x[4])[0];
+    const club = id => (id >= 0 ? `${crest(S.clubs[id], 'xs')}<span class="tl-club">${esc(S.clubs[id].short || S.clubs[id].name)}</span>` : '<span class="tl-club muted">Libre</span>');
+    const chips = [['league', esc(L.name)], ['mine', 'Tu club'], ['all', 'Mundo (los más caros)']].map(([k, l]) => `<button class="chip ${f === k ? 'on' : ''}" data-act="tl-f" data-k="${k}">${l}</button>`).join('');
+    return `<div class="chips" style="margin-bottom:10px">${chips}</div>
+      ${top ? `<div class="kpis" style="margin-bottom:12px"><div class="kpi"><div class="k">Operaciones</div><div class="v">${rows.length}</div></div>
+        <div class="kpi"><div class="k">Dinero movido</div><div class="v">${U.money(tot)}</div></div>
+        <div class="kpi" style="grid-column:span 2"><div class="k">Fichaje más caro</div><div class="v small">${esc(S.players[top[1]].name)} · ${U.money(top[4])}</div></div></div>` : ''}
+      <div class="card" style="padding:6px 10px">${rows.length ? rows.slice(0, 120).map(([w, pid, a, b, fee, kind]) => {
+        const p = S.players[pid];
+        return `<button class="tl-row ${a === S.user || b === S.user ? 'me' : ''}" data-act="player" data-id="${pid}">
+          <span class="tl-w">J${w + 1}</span>${posB(p.pos)}<span class="tl-main"><b>${esc(p.name)}</b><span class="tl-move">${club(a)}<span class="tl-arrow">→</span>${club(b)}</span></span>
+          <span class="tl-fee ${kind}">${kind === 'loan' ? 'Cesión' : fee ? U.money(fee) : 'Libre'}</span></button>`;
+      }).join('') : '<div class="empty">Todavía no hay traspasos esta temporada.</div>'}</div>`;
+  }
+  A['tl-f'] = el => { UI.market.log = el.dataset.k; UI.refresh(); };
+
   VIEWS.market = S => {
     const open = M.windowOpen(S);
     const t = UI.market.tab;
@@ -823,10 +851,11 @@
       <div class="row between wrap"><div><b style="color:${open ? 'var(--accent2)' : 'var(--warn)'}">${open ? '● Mercado abierto' : '● Mercado cerrado'}</b>
       <div class="note">${open ? (S.week <= 3 ? 'Cierra tras la jornada 3' : `Cierra tras la jornada ${mid + 2}`) : (S.week < mid ? `Reabre en la jornada ${mid}` : 'Reabre en verano')} · Los agentes libres se pueden fichar siempre.</div></div>
       <div class="num" style="text-align:right"><div style="font-size:20px;font-weight:700">${U.money(TL.Commerce.transferBudget(S))}</div><div class="note">para fichajes · salarios ${U.money(W.wageBill(S, S.user))} / ${U.money(c.wageBudget)}</div></div></div></div>`;
-    const seg = `<div class="seg" style="margin-bottom:12px">${[['search', 'Buscar'], ['free', 'Libres'], ['mine', 'Mis ventas']]
+    const seg = `<div class="seg" style="margin-bottom:12px">${[['search', 'Buscar'], ['free', 'Libres'], ['mine', 'Mis ventas'], ['log', 'Historial']]
       .map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-act="mk-tab" data-k="${k}">${l}</button>`).join('')}</div>`;
     let body;
-    if (t === 'mine') {
+    if (t === 'log') body = transferLog(S);
+    else if (t === 'mine') {
       const listed = W.squad(S, S.user).filter(p => p.listed);
       const offers = S.inbox.filter(m => m.kind === 'offer' && !m.done);
       body = `<div class="card"><div class="card-head"><h2>Ofertas recibidas</h2></div>${offers.length ? offers.map(m => msgHtml(S, m)).join('') : '<div class="empty">No tienes ofertas pendientes.</div>'}</div>
@@ -961,7 +990,7 @@
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
-          <button data-act="opt-mentor">🧓 Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
+          <button data-act="opt-mentor">${profeIc()} Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
@@ -1606,7 +1635,8 @@
     }
     const rv = my && S.reviews && S.reviews[0] && S.reviews[0].w === r && S.reviews[0].s === S.season;
     sheet(sheetHead(`Jornada ${r + 1}`) + head + `<div class="card" style="padding:6px 10px">${S.fixtures[r].map(m => fixtureHtml(S, m)).join('')}</div>
-      <div class="btn-row mt">${rv ? '<button class="btn" data-act="review-open">🧑‍🏫 Repaso del Profe</button>' : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { render(false); celebrate(S); } });
+      <div class="btn-row mt">${rv ? `<button class="btn" data-act="review-open">${profeIc()} Repaso del Profe</button>` : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { render(false); celebrate(S); } });
+    mountFaces(document.querySelector('.sheet'));
     if (my) {
       const res = resultLetter(S, my);
       setTimeout(() => {

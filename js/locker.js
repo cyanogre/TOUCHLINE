@@ -330,6 +330,7 @@
     const dest = loanDest(S, p);
     if (!dest) return { ok: false, msg: 'Ningún club encaja para darle minutos.' };
     const fee = F.roundMoney(W().value(S, p) * U.rand(0.03, 0.08));
+    TL.Market.logMove(S, p, S.user, dest.id, fee, 'loan');
     state(S).loans.push({ pid: p.id, from: S.user, to: dest.id, s: S.season });
     p.club = dest.id; p.listed = false;
     S.clubs[S.user].cash += fee; dest.cash -= fee;
@@ -363,6 +364,7 @@
     const err = M.canAfford(S, fee, p.wage);
     if (err) return { ok: false, msg: err };
     const from = p.club;
+    TL.Market.logMove(S, p, from, S.user, fee, 'loan');
     state(S).loans.push({ pid: p.id, from, to: S.user, s: S.season });
     S.clubs[from].cash += fee; S.clubs[S.user].cash -= fee; S.fin.buys += fee;
     p.club = S.user; p.listed = false;
@@ -676,6 +678,7 @@
         const fee = data.fee || 0;
         if (TL.Commerce.transferBudget(S) < fee) return 'No tienes presupuesto para traerle.';
         const c = S.clubs[S.user];
+        TL.Market.logMove(S, p, -1, S.user, fee);
         p.club = S.user; p.contract = S.season + 4; p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
         c.cash -= fee; S.fin.buys += fee; p.mor = 82;
         W().dirty(S); TL.Commerce.refreshBudget(S);
@@ -685,6 +688,7 @@
       ['pass', 'Dejarlo pasar', (S, p) => {
         const L = TL.World.userLeague(S);
         const rival = S.clubs[U.pick(L.clubs.filter(id => id !== S.user))];
+        TL.Market.logMove(S, p, -1, rival.id, 0);
         p.club = rival.id; p.contract = S.season + 3; p.wage = F.wageFor(p.ovr, p.age, S.leagues[rival.league].wealth, S.econ.wage);
         W().dirty(S);
         TL.News.add(S, 'fichajes', `${rival.name} ficha a la promesa ${p.name}`, `Un rival de tu liga se adelanta y se lleva al chaval del que hablaba tu ojeador.`, rival.id, p.id, 'neu');
