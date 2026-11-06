@@ -578,11 +578,11 @@ details summary { list-style: revert; }
 @keyframes bounce { 0% { transform: scale(0.6) translateY(4px); } 100% { transform: none; } }
 
 /* Entrada de las vistas */
-#view > * { animation: rise 0.35s cubic-bezier(.2, .8, .2, 1) both; }
-.grid > * { animation: rise 0.4s cubic-bezier(.2, .8, .2, 1) both; }
-.grid > *:nth-child(2) { animation-delay: 0.04s; } .grid > *:nth-child(3) { animation-delay: 0.08s; }
-.grid > *:nth-child(4) { animation-delay: 0.12s; } .grid > *:nth-child(5) { animation-delay: 0.16s; }
-.grid > *:nth-child(6) { animation-delay: 0.2s; } .grid > *:nth-child(n+7) { animation-delay: 0.24s; }
+#view.enter > * { animation: rise 0.35s cubic-bezier(.2, .8, .2, 1) both; }
+#view.enter .grid > * { animation: rise 0.4s cubic-bezier(.2, .8, .2, 1) both; }
+#view.enter .grid > *:nth-child(2) { animation-delay: 0.04s; } #view.enter .grid > *:nth-child(3) { animation-delay: 0.08s; }
+#view.enter .grid > *:nth-child(4) { animation-delay: 0.12s; } #view.enter .grid > *:nth-child(5) { animation-delay: 0.16s; }
+#view.enter .grid > *:nth-child(6) { animation-delay: 0.2s; } #view.enter .grid > *:nth-child(n+7) { animation-delay: 0.24s; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 .card { transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 @media (hover: hover) { .card:hover { border-color: #2f4a3c; } }
@@ -683,3 +683,8 @@ details summary { list-style: revert; }
 }
 .match .comp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (min-width: 1024px) { #pitch { max-height: 42vh; } }
+
+.crest.ready > img { transition: none; }
+.nego.flash-in { animation: negoIn 1.2s ease; }
+@keyframes negoIn { 0% { box-shadow: 0 0 0 0 rgb(184 245 61 / 0.7); border-color: var(--accent); } 100% { box-shadow: 0 0 0 14px rgb(184 245 61 / 0); } }
+.offer.job .crest { --s: 40px; }

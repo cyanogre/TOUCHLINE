@@ -6,6 +6,8 @@
   const F = TL.F, U = TL.U, W = TL.World;
 
   // ------------------------------------------------------------ Patrocinadores ficticios
+  // Cada marca tiene un perfil fijo: las sólidas nunca aparecen como "riesgo de impago"
+  // y las arriesgadas nunca como "estables" (listas disjuntas).
   const BRANDS = {
     bank: ['Banco Atlas', 'Nordia Bank', 'Caja Meridiana', 'Fidelis Banca', 'Crédito Austral'],
     telco: ['Voxa', 'Telinka', 'Onda Móvil', 'Fibrix'],
@@ -14,19 +16,22 @@
     auto: ['Kaizen Motors', 'Valdor', 'Rinaldi Auto', 'Torque EV'],
     tech: ['Nexo Tech', 'Quanta', 'Pixelia', 'Orbis Cloud'],
     kit: ['Strider', 'Kaze Sport', 'Volt Athletic', 'Ardent', 'Lince Sportswear'],
+    // Solo como patrocinador arriesgado
     crypto: ['BitNova', 'Coinly', 'HODLX Exchange', 'MoonChain'],
     betting: ['BetMundo', 'ApuestaYa', 'GoalOdds'],
-    fashion: ['Moda Pronto', 'Urban Thread']
+    fashion: ['Moda Pronto', 'Urban Thread'],
+    kitRisky: ['Fénix Sport', 'Zenit Kits']
   };
   const SECTOR_NAME = {
     bank: 'Banca', telco: 'Telecomunicaciones', energy: 'Energía', air: 'Aerolínea', auto: 'Automoción',
-    tech: 'Tecnología', kit: 'Material deportivo', crypto: 'Criptomonedas', betting: 'Casa de apuestas', fashion: 'Moda'
+    tech: 'Tecnología', kit: 'Material deportivo', crypto: 'Criptomonedas', betting: 'Casa de apuestas', fashion: 'Moda rápida',
+    kitRisky: 'Material deportivo (start-up)'
   };
   const SLOTS = {
     shirt: { name: 'Patrocinador principal (camiseta)', share: 0.18, sectors: ['bank', 'telco', 'energy', 'air', 'tech'] },
     kit: { name: 'Proveedor técnico', share: 0.09, sectors: ['kit'] },
     stadium: { name: 'Naming del estadio', share: 0.08, sectors: ['bank', 'telco', 'energy', 'auto', 'tech', 'air'] },
-    sleeve: { name: 'Manga y secundarios', share: 0.05, sectors: ['auto', 'tech', 'fashion', 'energy'] }
+    sleeve: { name: 'Manga y secundarios', share: 0.05, sectors: ['auto', 'tech', 'telco', 'energy'] }
   };
   // Las casas de apuestas no pueden patrocinar camisetas en España (2021) ni en Italia (2018)
   const BETTING_BANNED = ['España', 'Italia'];
@@ -41,9 +46,10 @@
   ];
 
   // ------------------------------------------------------------ Estado
+  /** Ingreso comercial de referencia: depende de la talla del club (estable), no de la media del momento. */
   function base(S) {
     const c = S.clubs[S.user];
-    return c.revScale * W.revenueCurve(c.rep);
+    return c.revScale * W.revenueCurve(c.stature != null ? c.stature : c.rep);
   }
 
   function init(S) {
@@ -69,9 +75,14 @@
     const b = TL.Manager.B(S);
     const def = SLOTS[slot];
     let sectors = def.sectors.slice();
-    if (style === 'risky') sectors = slot === 'kit' ? ['kit'] : (BETTING_BANNED.includes(country(S)) ? ['crypto', 'fashion'] : ['crypto', 'betting']);
-    const sector = U.pick(sectors);
-    const brand = U.pick(BRANDS[sector]);
+    if (style === 'risky') sectors = slot === 'kit' ? ['kitRisky'] : (BETTING_BANNED.includes(country(S)) ? ['crypto', 'fashion'] : ['crypto', 'betting', 'fashion']);
+    // No repetir marcas ya firmadas u ofrecidas
+    const used = new Set((S.com ? S.com.sponsors.map(x => x.brand).concat(Object.values(S.com.offers).flat().map(x => x.brand)) : [])
+      .concat(makeOffer._batch || []));
+    const pool = [];
+    for (const sec of sectors) for (const b of BRANDS[sec]) if (!used.has(b)) pool.push([sec, b]);
+    const [sector, brand] = pool.length ? U.pick(pool) : [sectors[0], U.pick(BRANDS[sectors[0]])];
+    if (makeOffer._batch) makeOffer._batch.push(brand);
     const k = C * def.share * b.sponsor;
     const o = { slot, brand, sector, style, until: until || S.season + U.int(1, 3), weekly: 0, winBonus: 0, risk: 0 };
     if (style === 'safe') { o.weekly = F.roundMoney(k * U.rand(0.92, 1.05)); o.until = until || S.season + 3; }
@@ -81,7 +92,10 @@
   }
 
   function offersFor(S, slot) {
-    return ['safe', 'perf', 'risky'].map(st => makeOffer(S, slot, st));
+    makeOffer._batch = [];
+    const out = ['safe', 'perf', 'risky'].map(st => makeOffer(S, slot, st));
+    makeOffer._batch = null;
+    return out;
   }
 
   function sponsor(S, slot) { return S.com.sponsors.find(s => s.slot === slot) || null; }
@@ -222,6 +236,37 @@
     return { ok: true, msg: 'Obras iniciadas' };
   }
 
+  // ------------------------------------------------------------ Presupuestos
+  // Modelo: el saldo es el dinero del club. La directiva fija un presupuesto salarial
+  // según los ingresos recurrentes y los ahorros; el mánager puede ampliarlo
+  // reservando parte del dinero de fichajes ("ampliación salarial").
+  function weeksLeft(S) { const n = S.fixtures ? S.fixtures.length : 38; return Math.max(1, n - S.week); }
+
+  function boardWageBudget(S) {
+    const c = S.clubs[S.user];
+    const n = S.fixtures ? S.fixtures.length : 38;
+    const e = estimate(S);
+    const recurring = e.tv + e.spons + e.merch + e.tickets - e.loans;
+    const savings = Math.max(0, c.cash) / (n * 3);
+    return Math.round(Math.max(0, (recurring * 1.05 + savings) * TL.Manager.B(S).wageBudget) / 1000) * 1000;
+  }
+  function wageBudget(S) { return boardWageBudget(S) + (S.wageShift || 0); }
+  /** Dinero disponible para traspasos: saldo menos lo reservado para la ampliación salarial. */
+  function transferBudget(S) { return Math.round(S.clubs[S.user].cash - (S.wageShift || 0) * weeksLeft(S)); }
+  function refreshBudget(S) { const c = S.clubs[S.user]; c.wageBudget = wageBudget(S); return c.wageBudget; }
+
+  /** Ampliación salarial semanal a costa del presupuesto de fichajes. */
+  function setWageShift(S, weekly) {
+    weekly = Math.max(0, Math.round((weekly || 0) / 1000) * 1000);
+    if (weekly) {
+      const need = weekly * weeksLeft(S);
+      if (need > S.clubs[S.user].cash) return { ok: false, msg: `Necesitas ${U.money(need)} libres para cubrirla hasta final de temporada.` };
+    }
+    S.wageShift = weekly;
+    refreshBudget(S);
+    return { ok: true, msg: weekly ? `Presupuesto salarial ampliado ${U.money(weekly)}/sem (reservas ${U.money(weekly * weeksLeft(S))} del dinero de fichajes)` : 'Ampliación salarial retirada' };
+  }
+
   // ------------------------------------------------------------ Semana
   /** Ingresos y gastos semanales del club del usuario. */
   function weekly(S, round, result) {
@@ -281,6 +326,9 @@
     }
     // Deuda: la directiva se impacienta si el saldo es negativo
     if (c.cash < 0) S.board.conf = U.clamp(S.board.conf - 0.6 * TL.Manager.B(S).boardLoss, 0, 100);
+    // Si la ampliación salarial ya no se puede cubrir, se reduce
+    if (S.wageShift && S.wageShift * weeksLeft(S) > Math.max(0, c.cash)) S.wageShift = F.roundMoney(Math.max(0, c.cash) / weeksLeft(S));
+    refreshBudget(S);
     return { tv, spons, merch, tickets, wages, loans };
   }
 
@@ -290,7 +338,10 @@
     for (const s of com.sponsors.slice()) {
       if (s.until <= S.season) endSponsor(S, s, `El contrato con ${s.brand} ha terminado.`);
     }
-    for (const sl of Object.keys(SLOTS)) if (!sponsor(S, sl) && !com.offers[sl]) com.offers[sl] = offersFor(S, sl);
+    // Ofertas nuevas cada temporada (las viejas tendrían fechas pasadas)
+    for (const sl of Object.keys(SLOTS)) if (!sponsor(S, sl)) { delete com.offers[sl]; com.offers[sl] = offersFor(S, sl); }
+    if (S.wageShift && S.wageShift * weeksLeft(S) > Math.max(0, S.clubs[S.user].cash)) S.wageShift = F.roundMoney(Math.max(0, S.clubs[S.user].cash) / weeksLeft(S));
+    refreshBudget(S);
     com.campaigns = com.campaigns.filter(k => CAMPAIGNS.find(d => d.id === k.id).weeks !== 99);
     com.fans0 = Math.max(com.fans0, Math.round(com.fans * 0.9));
   }
@@ -308,6 +359,7 @@
 
   TL.Commerce = {
     SLOTS, CAMPAIGNS, SECTOR_NAME, init, base, sponsor, signSponsor, endSponsor, offersFor, campaignCost, launch, fx,
-    maxDebt, debt, loanRate, loanQuote, takeLoan, repayLoan, expansionOptions, expand, weekly, newSeason, estimate
+    maxDebt, debt, loanRate, loanQuote, takeLoan, repayLoan, expansionOptions, expand, weekly, newSeason, estimate,
+    weeksLeft, boardWageBudget, wageBudget, transferBudget, refreshBudget, setWageShift
   };
 })();

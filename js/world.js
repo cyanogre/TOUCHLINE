@@ -292,6 +292,7 @@
       const squadValue = U.sum(sq, p => value(S, p));
       const jitter = 0.8 + F.seeded('cap' + c.name) * 0.4;
       c.rep = rep;
+      c.stature = rep; // talla del club: base de los ingresos comerciales
       c.revScale = (wageBill * 0.72) / revenueCurve(rep);
       let cap = isF
         ? 800 + Math.pow(Math.max(0, rep - 55), 2) * 9
@@ -353,7 +354,8 @@
     return {
       v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager,
       leagues: S.leagues.map(l => l.clubs),
-      clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium]),
+      clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
+      wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone,
       pb, pg,
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
@@ -368,7 +370,7 @@
     S.leagues.forEach((l, i) => { l.clubs = save.leagues[i]; });
     S.clubs.forEach((c, i) => {
       const r = save.clubs[i];
-      [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium] = r;
+      [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature] = r;
     });
     save.pb.forEach((r, i) => {
       const p = S.players[i];
@@ -391,15 +393,18 @@
       neg: save.neg || {}, history: save.history || [], board: save.board, fin: Object.assign(newFin(), save.fin || {}),
       results: save.results || [], mgr: save.mgr, com: save.com, news: save.news || [], newsId: save.newsId || 1,
       settings: save.settings, log: save.log || { crowd: {} }, leader: save.leader,
+      wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone,
       over: save.over, fired: save.fired
     });
-    migrate(S);
     dirty(S);
+    migrate(S);
     return S;
   }
 
   /** Valores por defecto para partidas antiguas o recién creadas. */
   function migrate(S) {
+    for (const c of S.clubs) if (c.stature == null) c.stature = c.rep;
+    S.wageShift = S.wageShift || 0;
     TL.Manager.init(S);
     S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
     S.news = S.news || [];

@@ -22,8 +22,11 @@
   const g = (S, m, f) => (S.gender === 'F' ? f : m);
   const clampMor = p => { p.mor = U.clamp(Math.round(p.mor == null ? 70 : p.mor), 5, 100); };
   function mor(p, d) { p.mor = (p.mor == null ? 70 : p.mor) + d; clampMor(p); }
-  function fans(S, pct) { if (S.com) S.com.fans = Math.round(S.com.fans * (1 + pct)); }
-  function board(S, d) { S.board.conf = U.clamp(Math.round((S.board.conf + d) * 10) / 10, 0, 100); }
+  // Club protagonista del evento en curso: los efectos sobre afición y directiva
+  // solo se aplican si es el club del usuario.
+  let CTX = null;
+  function fans(S, pct) { if (CTX != null && CTX !== S.user) return; if (S.com) S.com.fans = Math.round(S.com.fans * (1 + pct)); }
+  function board(S, d) { if (CTX != null && CTX !== S.user) return; S.board.conf = U.clamp(Math.round((S.board.conf + d) * 10) / 10, 0, 100); }
   function teamMor(S, d) { for (const p of W.squad(S, S.user)) mor(p, d); }
   function fineClub(S, clubId, amount) {
     const c = S.clubs[clubId];
@@ -366,7 +369,9 @@
       if (ev.two) q = U.pick(cands.filter(x => x !== p)) || null;
       if (!p || (ev.two && !q)) return;
     }
-    const nowTxt = ev.now ? ev.now(S, p, ev.two ? q : c) : '';
+    CTX = c.id;
+    let nowTxt = '';
+    try { nowTxt = ev.now ? ev.now(S, p, ev.two ? q : c) : ''; } finally { CTX = null; }
     const fixedNow = typeof nowTxt === 'string' ? nowTxt : '';
     const title = ev.title(S, p, c);
     const body = ev.body(S, p, c, q) + (fixedNow ? ' ' + fixedNow : '');
@@ -390,7 +395,9 @@
     if (!opt) return { ok: false, msg: 'Opción no válida' };
     const p = msg.data.pid != null ? S.players[msg.data.pid] : null;
     const q = msg.data.qid != null ? S.players[msg.data.qid] : null;
-    const res = opt[2](S, p, q, msg.data) || '';
+    CTX = S.user;
+    let res = '';
+    try { res = opt[2](S, p, q, msg.data) || ''; } finally { CTX = null; }
     msg.done = true; msg.res = `${opt[1]} · ${res}`;
     W.dirty(S);
     return { ok: true, msg: res };

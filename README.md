@@ -50,6 +50,14 @@ Después entra en <http://localhost:8000>.
   - **Patrocinios** (camiseta, proveedor técnico, naming del estadio, secundarios). Pueden ser estables, por objetivos o arriesgados; los de criptomonedas y apuestas pueden quebrar, y las apuestas están prohibidas en España e Italia.
   - Merchandising, **precio de entradas**, **campañas de marketing** y **gira de pretemporada**.
   - **Préstamos** con interés según tu deuda y **ampliación del estadio**.
+- **Carrera de mánager:**
+  - Tienes una reputación que sube y baja con tus resultados.
+  - Al acabar cada temporada pueden llegarte **ofertas de otros clubes**: aceptas y cambias de club conservando tu nivel y tus habilidades.
+  - Si te destituyen, la partida no termina: te llaman clubes más modestos. Si es a mitad de temporada, equipos de tu liga que van mal.
+- **Presupuestos con lógica:**
+  - El presupuesto salarial lo fija la directiva con tus **ingresos recurrentes** (TV, patrocinios, merchandising, taquilla) y una parte de tus **ahorros**. Sube si ganas dinero, firmas patrocinios o vendes jugadores, y baja si gastas en fichajes.
+  - Puedes **subir sueldos a costa del dinero de fichajes**: la ampliación salarial reserva ese dinero hasta final de temporada.
+  - Los ingresos dependen de la **talla del club**, que cambia despacio, y no de la media del momento.
 - **Tácticas:** 8 formaciones, once ideal, adaptación por puesto, mentalidad y cambios automáticos.
 - **Mercado:**
   - Buscador con filtros, incluido "lo que puedo pagar".

@@ -89,6 +89,54 @@
     return best;
   }
 
+  /**
+   * Recoloca un once al cambiar de formación sin "desordenarlo": cada jugador
+   * conserva su puesto si existe en el nuevo sistema; si no, su línea y su banda.
+   * Los huecos se cubren con el mejor disponible de la plantilla.
+   */
+  function remapLineup(players, oldF, oldIds, newF) {
+    const oldSlots = FORMATIONS[oldF] || FORMATIONS['4-3-3'], newSlots = FORMATIONS[newF];
+    const byId = new Map(players.map(p => [p.id, p]));
+    const cur = [];
+    (oldIds || []).forEach((id, i) => {
+      if (id >= 0 && byId.has(id) && available(byId.get(id)) && oldSlots[i]) cur.push({ p: byId.get(id), s: oldSlots[i] });
+    });
+    const pairs = [];
+    const inXI = new Set(cur.map(c => c.p.id));
+    newSlots.forEach((s, k) => {
+      for (const c of cur) {
+        const f = fit(c.p, s[0]);
+        let sc = eff(c.p, s[0]) + (f >= 0.9 ? 8 : 0); // continuidad del once (si el puesto le va bien)
+        if (c.s[0] === s[0]) sc += 30;
+        else if (F.LINE[c.s[0]] === F.LINE[s[0]] && f >= 0.9) sc += 12;
+        sc -= Math.abs(c.s[1] - s[1]) * 0.15;
+        pairs.push([sc, k, c.p.id]);
+      }
+      // Un suplente que es especialista del puesto puede entrar si encaja mucho mejor
+      for (const p of players) {
+        if (inXI.has(p.id) || !available(p)) continue;
+        if (p.pos === s[0] || p.alt.includes(s[0])) pairs.push([eff(p, s[0]), k, p.id]);
+      }
+    });
+    pairs.sort((a, b) => b[0] - a[0]);
+    const res = new Array(newSlots.length).fill(-1), used = new Set();
+    for (const [, k, pid] of pairs) {
+      if (res[k] !== -1 || used.has(pid)) continue;
+      res[k] = pid; used.add(pid);
+    }
+    res.forEach((id, k) => {
+      if (id !== -1) return;
+      let best = null, be = -1;
+      for (const p of players) {
+        if (used.has(p.id) || !available(p)) continue;
+        const e = eff(p, newSlots[k][0]);
+        if (e > be) { be = e; best = p; }
+      }
+      if (best) { res[k] = best.id; used.add(best.id); }
+    });
+    return res;
+  }
+
   function pickBench(players, startIds, n) {
     const used = new Set(startIds);
     const rest = players.filter(p => available(p) && !used.has(p.id)).sort((a, b) => b.ovr - a.ovr);
@@ -265,7 +313,7 @@
       const onPitch = [];
       ids.forEach((pid, i) => {
         if (pid < 0) return;
-        onPitch.push({ pid, slot: slots[i][0] });
+        onPitch.push({ pid, slot: slots[i][0], idx: i });
         this.pl[pid] = this._rec(idx, slots[i][0], 0);
       });
       const bench = pickBench(players, ids, 9);
@@ -707,16 +755,28 @@
       if (players.length < slots.length) {
         use = use.sort((a, b) => (slots[a][0] === 'GK' ? -1 : slots[b][0] === 'GK' ? 1 : slots[a][2] - slots[b][2])).slice(0, players.length);
       }
+      const prev = new Map(t.onPitch.map(o => [o.pid, o.slot]));
+      const oldSlots = FORMATIONS[t.formation];
+      const prevX = new Map(t.onPitch.map(o => [o.pid, o.idx != null && oldSlots[o.idx] ? oldSlots[o.idx][1] : 50]));
       const pairs = [];
-      for (const k of use) for (const p of players) pairs.push([eff(p, slots[k][0]), k, p.id]);
+      for (const k of use) {
+        for (const p of players) {
+          let sc = eff(p, slots[k][0]);
+          const was = prev.get(p.id);
+          if (was === slots[k][0]) sc += 30; else if (F.LINE[was] === F.LINE[slots[k][0]]) sc += 12;
+          sc -= Math.abs(prevX.get(p.id) - slots[k][1]) * 0.15;
+          pairs.push([sc, k, p.id]);
+        }
+      }
       pairs.sort((a, b) => b[0] - a[0]);
       const done = new Set(), usedSlots = new Set(), onPitch = [];
       for (const [, k, pid] of pairs) {
         if (done.has(pid) || usedSlots.has(k)) continue;
         done.add(pid); usedSlots.add(k);
-        onPitch.push({ pid, slot: slots[k][0], hurt: hurt.has(pid) });
+        onPitch.push({ pid, slot: slots[k][0], idx: k, hurt: hurt.has(pid) });
         this.pl[pid].slot = slots[k][0];
       }
+      onPitch.sort((a, b) => a.idx - b.idx);
       t.onPitch = onPitch;
       t.formation = formation;
       this._str = null;
@@ -828,6 +888,6 @@
   }
 
   TL.Engine = {
-    FORMATIONS, TALKS, fit, eff, available, autoLineup, bestFormation, pickBench, userLineup, Match, quickScore
+    FORMATIONS, TALKS, fit, eff, available, autoLineup, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore
   };
 })();

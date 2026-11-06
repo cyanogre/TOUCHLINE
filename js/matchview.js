@@ -155,6 +155,7 @@
   function onFinal() {
     clearTimeout(MV.timer);
     MV.finished = true;
+    if (MV.pitch) setTimeout(() => MV.pitch && MV.pitch.end(), 1200);
     MV.prompt = null;
     updateHead();
     renderFoot();

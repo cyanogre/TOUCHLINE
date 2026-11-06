@@ -1,11 +1,11 @@
 /* TOUCHLINE — service worker: juego offline y carga rápida en móvil.
  * La versión la sustituye el workflow de GitHub Pages por el commit. */
-const VERSION = 'touchline-v4-__BUILD__'; // sube el número en cada versión si publicas desde una rama
+const VERSION = 'touchline-v5-__BUILD__'; // sube el número en cada versión si publicas desde una rama
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/world.js', 'js/engine.js',
   'js/season.js', 'js/market.js', 'js/commerce.js', 'js/news.js', 'js/game.js', 'js/ui.js', 'js/matchview.js', 'js/main.js',
-  'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'data/game/crests.js',
+  'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'js/career.js', 'data/game/crests.js',
   'assets/icon.svg', 'assets/icon-192.png', 'assets/icon-512.png'
 ];
 

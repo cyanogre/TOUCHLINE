@@ -123,6 +123,7 @@
     /** Completa la jornada. match: Match del usuario terminado, o null para simularlo. */
     completeRound(match) {
       const S = Game.S;
+      if (S.over || !S.fixtures[S.week]) return [];
       const res = match ? match.finish() : null;
       const results = TL.Season.playRound(S, res);
       Game.save();
