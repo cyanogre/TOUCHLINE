@@ -708,12 +708,17 @@ details summary { list-style: revert; }
 .vn-box.pop { animation: vnPop 0.22s cubic-bezier(.3, 1.5, .5, 1); }
 @keyframes vnPop { from { transform: translateY(8px) scale(0.98); opacity: 0.6; } }
 .vn-portrait {
-  flex: none; width: 72px; height: 72px; display: grid; place-items: center; overflow: hidden;
-  border-radius: 12px; border: 2px solid #4c8a63;
+  flex: none; width: calc(64px / var(--dpr, 1) + 10px); height: calc(64px / var(--dpr, 1) + 10px); display: grid; place-items: center; overflow: visible;
+  border-radius: 10px; border: 2px solid #4c8a63;
   background: radial-gradient(circle at 50% 30%, #2f5a43, #142a1e 70%);
 }
-.vn-portrait.sm { width: 68px; height: 68px; }
-.vn-face { width: 64px; height: 64px; image-rendering: pixelated; image-rendering: crisp-edges; background-repeat: no-repeat; background-size: 512px 128px; }
+.vn-portrait.sm { width: calc(64px / var(--dpr, 1) + 8px); height: calc(64px / var(--dpr, 1) + 8px); }
+/* 1:1 real: 64 píxeles del sprite = 64 píxeles físicos (sin escalar) */
+.vn-face { width: calc(64px / var(--dpr, 1)); height: calc(64px / var(--dpr, 1)); display: block; position: relative; }
+.vn-face canvas.px1 {
+  position: absolute; left: 0; top: 0; width: 66px; height: 66px; transform-origin: 0 0;
+  transform: scale(calc(1 / var(--dpr, 1))); image-rendering: pixelated; image-rendering: crisp-edges;
+}
 .vn-main { flex: 1; min-width: 0; }
 .vn-name { font-family: var(--font-c); font-weight: 800; font-size: 17px; color: var(--accent); letter-spacing: 0.02em; }
 .vn-name span { color: var(--muted); font-weight: 600; font-size: 13px; }

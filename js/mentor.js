@@ -17,7 +17,7 @@
   // Hojas de 512×128: frames de 64×64 en 8 columnas (10 frames usados).
   // Cada emoción tiene una hoja "talk" (hablando) y otra "idle" (en reposo) y un
   // mapa que dice qué frame es cada gesto. Las emociones sin arte usan la neutra.
-  const SIZE = 64, COLS = 8;
+  const SIZE = 64, COLS = 8, PAD = 1;
   const NEUTRAL_TALK = { closed: [0, 5], small: [1, 6, 9], open: [2, 7], turn: [3, 8], blink: [4] };
   const NEUTRAL_IDLE = { base: [0, 1, 5, 6, 7, 9], blink: [2], turn: [3, 8] };
   const EMOTIONS = {
@@ -30,10 +30,33 @@
   const preload = {};
   Object.values(EMOTIONS).forEach(e => [e.talk, e.idle].forEach(src => { const i = new Image(); i.src = src; preload[src] = i; }));
 
+  // Escala 1:1 real: cada píxel del sprite = 1 píxel físico de la pantalla.
+  // El canvas mide 64×64 píxeles y su tamaño CSS es 64 / devicePixelRatio.
+  function syncDpr() {
+    document.documentElement.style.setProperty('--dpr', String(window.devicePixelRatio || 1));
+  }
+  syncDpr();
+  (function watchDpr() {
+    if (!window.matchMedia) return;
+    const mq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    const h = () => { syncDpr(); watchDpr(); };
+    if (mq.addEventListener) mq.addEventListener('change', h, { once: true });
+  })();
+
   /** Cara animada: parpadea y gira la cabeza en reposo; mueve la boca al hablar. */
   class Face {
     constructor(el) {
-      this.el = el;
+      // Lienzo de 64×64 píxeles reales dentro del contenedor, con 1 píxel transparente
+      // de margen: el navegador suaviza los bordes de los elementos transformados y así
+      // ese suavizado cae fuera del dibujo.
+      el.innerHTML = '';
+      const cv = document.createElement('canvas');
+      cv.width = SIZE + 2 * PAD; cv.height = SIZE + 2 * PAD;
+      cv.className = 'px1';
+      el.appendChild(cv);
+      this.el = cv;
+      this.cx = cv.getContext('2d');
+      this.cx.imageSmoothingEnabled = false;
       this.emo = 'neutral';
       this.talking = false;
       this.hold = 0;
@@ -52,9 +75,13 @@
     }
     show(kind, frame) {
       const s = sheetFor(this.emo);
-      const src = kind === 'talk' ? s.talk : s.idle;
-      this.el.style.backgroundImage = `url("${src}")`;
-      this.el.style.backgroundPosition = `-${(frame % COLS) * SIZE}px -${Math.floor(frame / COLS) * SIZE}px`;
+      const img = preload[kind === 'talk' ? s.talk : s.idle];
+      if (!img) return;
+      if (!img.complete || !img.naturalWidth) { img.addEventListener('load', () => this.show(kind, frame), { once: true }); return; }
+      if (this.last === img.src + frame) return;
+      this.last = img.src + frame;
+      this.cx.clearRect(0, 0, SIZE + 2 * PAD, SIZE + 2 * PAD);
+      this.cx.drawImage(img, (frame % COLS) * SIZE, Math.floor(frame / COLS) * SIZE, SIZE, SIZE, PAD, PAD, SIZE, SIZE);
     }
     /** Fotograma para la letra que se está diciendo. */
     say(ch) {
@@ -66,8 +93,19 @@
       this.until = performance.now() + (g === 'turn' ? 260 : 90);
     }
     stop() { this.talking = false; this.show('idle', this.pick('idle', 'base')); }
+    /** Alinea el lienzo con la rejilla de píxeles físicos (1 píxel del sprite = 1 píxel de pantalla). */
+    snap() {
+      const dpr = window.devicePixelRatio || 1;
+      const r = this.el.parentNode.getBoundingClientRect();
+      const dx = (Math.round(r.left * dpr) - r.left * dpr) / dpr, dy = (Math.round(r.top * dpr) - r.top * dpr) / dpr;
+      const key = dpr + ':' + dx.toFixed(4) + ':' + dy.toFixed(4);
+      if (key === this.snapKey) return;
+      this.snapKey = key;
+      this.el.style.transform = `translate(${dx - PAD / dpr}px, ${dy - PAD / dpr}px) scale(${1 / dpr})`;
+    }
     loop(now) {
       if (!this.el.isConnected) return;
+      this.snap();
       if (this.talking) {
         if (now > this.until) this.show('talk', this.pick('talk', 'closed'));
       } else if (now > this.until) {
