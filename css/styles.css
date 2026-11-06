@@ -86,7 +86,9 @@ h1, h2, h3 { font-family: var(--font-c); letter-spacing: 0.01em; margin: 0; line
 .btn.sm { min-height: 36px; font-size: 14px; padding: 0 12px; border-radius: 10px; }
 .btn.block { width: 100%; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn-row > .btn { flex: 1 1 0; }
+.btn-row > .btn { flex: 1 1 0; min-width: min(max-content, 100%); }
+.btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.btn-grid > .btn { min-height: 44px; white-space: normal; line-height: 1.15; }
 .icon-btn {
   width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
   color: var(--muted); background: transparent;

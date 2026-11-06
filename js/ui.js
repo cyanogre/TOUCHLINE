@@ -839,9 +839,9 @@
           <tr><td class="l" style="text-align:left">Agresión al árbitro</td><td>${pct(R.match.refAssault)}</td></tr></tbody></table></details></section>
       <section class="card span2"><div class="card-head"><h2>Historial</h2></div>${hist}</section>
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
-        <div class="btn-row"><button class="btn" data-act="save">Guardar</button><button class="btn" data-act="export">Exportar</button>
-        <button class="btn" data-act="import">Importar</button><button class="btn" data-act="tutorial">Ver tutorial</button>
-        <button class="btn" data-act="school">Escuela del Profe</button>
+        <div class="btn-grid"><button class="btn" data-act="save">💾 Guardar</button><button class="btn" data-act="export">📤 Exportar</button>
+        <button class="btn" data-act="import">📥 Importar</button><button class="btn" data-act="tutorial">🧭 Ver tutorial</button>
+        <button class="btn" data-act="school">🎓 Escuela del Profe</button>
         <button class="btn danger" data-act="quit">Nueva partida</button></div>
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
