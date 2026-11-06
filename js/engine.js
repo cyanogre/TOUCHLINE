@@ -37,6 +37,7 @@
     if (slot === 'GK' || p.pos === 'GK') return 0.25;
     let f = COMPAT[slot][p.pos] || (F.LINE[p.pos] === F.LINE[slot] ? 0.8 : 0.6);
     if (p.alt.includes(slot)) f = Math.max(f, 0.96);
+    if (p.anyPos) f = Math.max(f, 0.97); // ADN «Fútbol total»
     return f;
   }
 
@@ -419,10 +420,23 @@
       const t = this.teams[i];
       const b = this.bonus[i];
       const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1);
-      const st = teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult);
+      const LK = TL.Locker;
+      let tm = 1, extra = { mid: 0, att: 0, def: 0 };
+      if (LK && this.S.lk) {
+        for (const o of t.onPitch) {
+          const e = LK.fx(this.S, o.pid);
+          if (!e) continue;
+          if (e.team) tm *= e.team;
+          extra.mid += e.mid || 0; extra.att += e.att || 0; extra.def += e.def || 0;
+        }
+        if (t.isUser) tm *= LK.matchBoost(this.S);
+      }
+      const st = teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult * tm);
       // Choque de sistemas: puntas contra centrales, bandas, centro del campo
       const c = TL.Coach.clash(t.formation, this.teams[1 - i].formation);
-      st.attack += c.attack; st.mid += c.mid;
+      st.attack += c.attack + extra.att + extra.mid * 0.3; st.mid += c.mid + extra.mid; st.defense += extra.def + extra.mid * 0.3;
+      // Química del vestuario: amigos que juegan juntos rinden más
+      if (t.isUser && LK && this.S.lk) { const ch = LK.chem(this.S, t.onPitch.map(o => o.pid)); st.attack += ch; st.defense += ch; this.chem = ch; }
       return st;
     }
 
@@ -581,12 +595,14 @@
       const t = this.teams[i];
       const outfield = t.onPitch.filter(o => o.slot !== 'GK');
       if (!outfield.length) return;
-      const o = U.weighted(outfield, o => SHOOT_W[o.slot] * Math.pow(Math.max(30, this.P(o.pid).st[1]) / 70, 2));
+      const tfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
+      const o = U.weighted(outfield, o => SHOOT_W[o.slot] * Math.pow(Math.max(30, this.P(o.pid).st[1]) / 70, 2) * (tfx(o.pid).shot || 1));
       const shooter = this.P(o.pid);
       const gk = this._gk(1 - i);
       const gkv = gk ? eff(gk, 'GK') : 30;
       const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
-      const pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8), 0.03, 0.4);
+      // Rasgos: el que remata y el portero rival
+      const pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
       this.stats.shots[i]++;
       // De dónde nace la ocasión (la vista 2D la dibuja así)
       const desp = t.desperate, line = F.LINE[o.slot];
@@ -606,7 +622,7 @@
         if (Math.random() < 0.75) {
           const mates = t.onPitch.filter(x => x.pid !== shooter.id);
           if (mates.length) {
-            const a = U.weighted(mates, x => ASSIST_W[x.slot] * Math.pow(Math.max(30, this.P(x.pid).st[2]) / 70, 2));
+            const a = U.weighted(mates, x => ASSIST_W[x.slot] * Math.pow(Math.max(30, this.P(x.pid).st[2]) / 70, 2) * (tfx(x.pid).assist || 1));
             assister = this.P(a.pid);
           }
         }
@@ -661,7 +677,7 @@
       if (!t.onPitch.length || !ot.onPitch.length) return;
       // Un jugador amonestado se contiene: comete menos faltas
       const fo = U.weighted(t.onPitch, o => FOUL_W[o.slot] * (0.7 + this.P(o.pid).st[4] / 160) * (this.pl[o.pid] && this.pl[o.pid].y ? 0.45 : 1));
-      const vo = U.weighted(ot.onPitch, o => FOULED_W[o.slot] * Math.pow(Math.max(30, this.P(o.pid).st[3]) / 70, 2));
+      const vo = U.weighted(ot.onPitch, o => FOULED_W[o.slot] * Math.pow(Math.max(30, this.P(o.pid).st[3]) / 70, 2) * (((TL.Locker && this.S.lk && TL.Locker.fx(this.S, o.pid)) || {}).fouled || 1));
       const fouler = this.P(fo.pid), victim = this.P(vo.pid);
       this.stats.fouls[i]++;
       this.pl[fouler.id].f++;
@@ -1023,7 +1039,8 @@
       return {
         h: this.teams[0].club, a: this.teams[1].club, hg: this.score[0], ag: this.score[1],
         mom: this.mom, ratings, injuries, reds, yellowBans, scorers, incidents: this.incidents,
-        stats: this.stats, ref: this.ref, review
+        stats: this.stats, ref: this.ref, review,
+        slots: Object.fromEntries(Object.entries(this.pl).map(([id, r]) => [id, r.slot]))
       };
     }
   }

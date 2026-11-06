@@ -6,6 +6,13 @@
 
   const MAX_SQUAD = 34;
 
+  /** Historial de traspasos de la temporada: [jornada, pid, de, a, importe, tipo]. */
+  function logMove(S, p, from, to, fee, kind) {
+    S.tlog = S.tlog || [];
+    S.tlog.push([S.week, p.id, from, to, Math.round(fee || 0), kind || (fee ? 'fee' : 'free')]);
+    if (S.tlog.length > 1500) S.tlog.splice(0, S.tlog.length - 1500);
+  }
+
   function windowOpen(S) {
     const n = S.fixtures ? S.fixtures.length : 38;
     const mid = Math.floor(n / 2);
@@ -53,6 +60,7 @@
   /** Evalúa una oferta por un jugador de otro club. */
   function offer(S, p, amount) {
     if (!windowOpen(S)) return { result: 'closed' };
+    if (TL.Locker.onLoan(S, p.id)) return { result: 'reject', msg: 'Está cedido: su club de origen no negocia ahora.' };
     const ask = askingPrice(S, p, S.user);
     const seller = W.squad(S, p.club);
     if (seller.length <= 18) return { result: 'reject', msg: `${S.clubs[p.club].name} no quiere vender: tiene la plantilla corta.` };
@@ -80,6 +88,7 @@
     if (err) return { ok: false, msg: err };
     if (p.club >= 0 && !windowOpen(S)) return { ok: false, msg: 'El mercado está cerrado.' };
     const fromName = p.club >= 0 ? S.clubs[p.club].name : 'agente libre';
+    logMove(S, p, p.club, S.user, fee);
     if (p.club >= 0) S.clubs[p.club].cash += fee;
     S.clubs[S.user].cash -= fee;
     S.fin.buys += fee;
@@ -97,6 +106,7 @@
   }
 
   function transferOut(S, p, toClub, fee) {
+    logMove(S, p, p.club, toClub, fee);
     S.clubs[toClub].cash -= fee;
     S.clubs[p.club].cash += fee;
     const fromUser = p.club === S.user;
@@ -127,6 +137,7 @@
   /** Venta rápida a un club cualquiera al 70% del valor. */
   function quickSell(S, p) {
     if (!windowOpen(S)) return { ok: false, msg: 'El mercado está cerrado.' };
+    if (TL.Locker.onLoan(S, p.id)) return { ok: false, msg: 'Está cedido: no puedes venderlo.' };
     if (W.squad(S, S.user).length <= 16) return { ok: false, msg: 'No puedes quedarte con menos de 16 jugadores.' };
     const fee = F.roundMoney(W.value(S, p) * 0.7);
     const buyers = buyersFor(S, p, fee);
@@ -144,6 +155,7 @@
   }
 
   function release(S, p) {
+    if (TL.Locker.onLoan(S, p.id)) return { ok: false, msg: 'Está cedido: no puedes rescindir su contrato.' };
     if (W.squad(S, S.user).length <= 16) return { ok: false, msg: 'No puedes quedarte con menos de 16 jugadores.' };
     const cost = releaseCost(S, p);
     if (cost > S.clubs[S.user].cash) return { ok: false, msg: 'No tienes saldo para pagar la rescisión.' };
@@ -199,7 +211,7 @@
     let offers = 0;
     for (const p of U.shuffle(mine.slice())) {
       if (offers >= 3) break;
-      if (pending.has(p.id)) continue;
+      if (pending.has(p.id) || TL.Locker.onLoan(S, p.id)) continue;
       const userRep = S.clubs[S.user].rep;
       const prob = p.listed ? (lastWeek ? 1 : 0.55) : p.ovr >= userRep + 1 ? 0.05 : 0.012;
       if (!U.chance(prob)) continue;
@@ -261,7 +273,7 @@
     let pick = null;
     for (let t = 0; t < 320; t++) {
       const p = S.players[U.int(0, S.players.length - 1)];
-      if (p.club < -1 || p.club === buyer.id || p.club === S.user || F.LINE[p.pos] !== need.line) continue;
+      if (p.club < -1 || p.club === buyer.id || p.club === S.user || F.LINE[p.pos] !== need.line || TL.Locker.onLoan(S, p.id)) continue;
       if (p.age > 32 || p.ovr <= need.weakest + 1 || p.ovr > buyer.rep + 5) continue;
       if (p.club >= 0) {
         const from = S.clubs[p.club];
@@ -317,6 +329,7 @@
       const fromClub = target.club;
       if (fromClub >= 0) transferOut(S, target, buyer.id, fee);
       else {
+        logMove(S, target, -1, buyer.id, 0);
         target.club = buyer.id; target.listed = false; target.fit = Math.max(target.fit, 85);
         target.contract = S.season + 1 + U.int(0, maxYears(target) === 1 ? 0 : 2);
         target.wage = F.wageFor(target.ovr, target.age, wealthOf(S, buyer.id), S.econ.wage);
@@ -344,6 +357,7 @@
       const c = S.clubs[id];
       const p = S.players.filter(x => x.club === -1 && F.LINE[x.pos] === l && x.ovr <= c.rep + 2).sort((a, b) => b.ovr - a.ovr)[0];
       if (!p) continue;
+      logMove(S, p, -1, id, 0);
       p.club = id; p.contract = S.season + 1; p.listed = false;
       p.wage = F.wageFor(p.ovr, p.age, wealthOf(S, id), S.econ.wage);
       W.dirty(S);
@@ -374,7 +388,7 @@
   }
 
   TL.Market = {
-    MAX_SQUAD, windowOpen, yearsLeft, askingPrice, wageDemand, willing, maxYears, offer, canAfford, sign,
+    MAX_SQUAD, windowOpen, logMove, yearsLeft, askingPrice, wageDemand, willing, maxYears, offer, canAfford, sign,
     quickSell, releaseCost, release, renewDemand, renewOptions, renewEnd, renew, weekly, acceptOffer, search
   };
 })();

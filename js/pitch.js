@@ -104,10 +104,12 @@
       this.decide = 0.8;
       this.nextThrow = 14 + Math.random() * 20;
       this.runner = null;
+      this.st = this._stadium();
       this.crowd = this._crowd();
       for (const i of [0, 1]) for (const o of match.teams[i].onPitch) this._spawn(i, o.pid);
       this._placeKickoff(0, true);
       this.ball.owner = this._kickTaker(0);
+      if (this.st.name) this._banner(this.st.name + (this.st.night ? ' · partido nocturno' : ''), '#ffffff', 2.6);
       for (const i of [0, 1]) {
         const club = this.S.clubs[match.teams[i].club];
         if (club.logo) crestColor(club.logo, col => { this.colors[i].main = col; });
@@ -148,14 +150,63 @@
       }
     }
 
+    /** Cada estadio es distinto: colores de la grada, dibujo del césped, de día o de noche. */
+    _stadium() {
+      const home = this.S.clubs[this.m.teams[0].club], away = this.S.clubs[this.m.teams[1].club];
+      let h = 7;
+      for (const ch of String(home.name)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const patterns = ['v', 'h', 'check', 'diag', 'wide', 'v'];
+      const grass = [['#1b5a34', '#1f683b'], ['#1d5f2e', '#24723a'], ['#185338', '#1e6343'], ['#205a2b', '#296d34'], ['#1a5a3d', '#1f6a47']];
+      return {
+        pattern: patterns[h % patterns.length], grass: grass[(h >>> 5) % grass.length],
+        seat: home.c1 || '#2fbf71', seat2: home.c2 || '#ffffff', away: (this.colors && this.colors[1].main) || away.c1 || '#ffffff',
+        code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
+        night: (this.S.week * 7 + home.id) % 3 === 0
+      };
+    }
+
     _crowd() {
       const out = [];
-      const cols = ['#c9d3cf', '#9aa8a2', '#6c7a74', '#e6e0d0', '#54605b'];
-      for (let k = 0; k < 520; k++) {
+      const st = this.st;
+      const neutral = ['#c9d3cf', '#9aa8a2', '#6c7a74', '#e6e0d0'];
+      for (let k = 0; k < 560; k++) {
         const top = k % 2 === 0;
-        out.push({ x: U.rand(VIEW.x0, VIEW.x1), y: top ? U.rand(VIEW.y0, VIEW.y0 + 1.8) : U.rand(Wd + 2.6, VIEW.y1), c: U.pick(cols), p: Math.random() * 6 });
+        const x = U.rand(VIEW.x0, VIEW.x1), y = top ? U.rand(VIEW.y0, VIEW.y0 + 1.8) : U.rand(Wd + 2.6, VIEW.y1);
+        // Esquina de la afición visitante; el resto, camisetas del local
+        const awayZone = !top && x > L * 0.84;
+        const r = Math.random();
+        const c = awayZone ? (r < 0.75 ? st.away : U.pick(neutral)) : r < 0.45 ? st.seat : r < 0.62 ? st.seat2 : U.pick(neutral);
+        out.push({ x, y, c, p: Math.random() * 6 });
       }
       return out;
+    }
+
+    /** Césped del estadio pintado una vez (10 px por metro) y reutilizado en cada fotograma. */
+    _grass() {
+      if (this._grassCv) return this._grassCv;
+      const k = 8, cv = document.createElement('canvas');
+      cv.width = L * k; cv.height = Wd * k;
+      const g = cv.getContext('2d');
+      const [a, b] = this.st.grass;
+      g.fillStyle = a; g.fillRect(0, 0, cv.width, cv.height);
+      g.fillStyle = b;
+      const p = this.st.pattern;
+      if (p === 'v' || p === 'wide') { const n = p === 'wide' ? 8 : 14; for (let i = 1; i < n; i += 2) g.fillRect(i * cv.width / n, 0, cv.width / n + 1, cv.height); }
+      else if (p === 'h') { for (let i = 1; i < 10; i += 2) g.fillRect(0, i * cv.height / 10, cv.width, cv.height / 10 + 1); }
+      else if (p === 'check') { const cw = cv.width / 14, ch = cv.height / 8; for (let i = 0; i < 14; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2) g.fillRect(i * cw, j * ch, cw + 1, ch + 1); }
+      else if (p === 'diag') {
+        g.save(); g.beginPath(); g.rect(0, 0, cv.width, cv.height); g.clip();
+        g.translate(cv.width / 2, cv.height / 2); g.rotate(Math.PI / 4);
+        const w = 7 * k;
+        for (let x = -cv.width; x < cv.width; x += w * 2) g.fillRect(x, -cv.width, w, cv.width * 2);
+        g.restore();
+      }
+      // Un poco de textura
+      g.globalAlpha = 0.05;
+      for (let i = 0; i < 1400; i++) { g.fillStyle = Math.random() < 0.5 ? '#000' : '#fff'; g.fillRect(Math.random() * cv.width, Math.random() * cv.height, 2, 2); }
+      g.globalAlpha = 1;
+      this._grassCv = cv;
+      return cv;
     }
 
     resize() {
@@ -290,9 +341,13 @@
         }
         // Conductor, apoyos y desmarques del que ataca
         const car = b.owner != null ? this.A[b.owner] : null;
-        if (car && car.team === att && !this.isGK(car)) {
+        if (car && this.hold) { car.tx = car.x; car.ty = car.y; car.run = 0.2; }
+        else if (car && car.team === att && !this.isGK(car)) {
           const dx = this.dir[att];
-          car.tx = car.x + dx * 5; car.ty = car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2;
+          // Conduce hacia delante, pero sin pasarse del borde del área rival
+          const [mx] = this.world(att, 90, 0);
+          car.tx = dx > 0 ? Math.min(car.x + dx * 5, mx) : Math.max(car.x + dx * 5, mx);
+          car.ty = clamp(car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2, 3, Wd - 3);
           car.run = 0.55;
           // Dos compañeros se ofrecen cerca
           const mates = atts.filter(a => a !== car).sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2);
@@ -307,6 +362,7 @@
           r.tx = b.path.tx; r.ty = b.path.ty; r.run = 0.95;
         }
       }
+      for (const id in this.A) { const a = this.A[id]; a.tx = clamp(a.tx, 0.6, L - 0.6); a.ty = clamp(a.ty, 0.6, Wd - 0.6); }
       // Guion: posiciones forzadas (balón parado, celebraciones…)
       if (this.ov) {
         for (const id in this.ov.p || {}) {
@@ -415,8 +471,9 @@
           const sp = Math.hypot(a.vx, a.vy);
           const fx = sp > 0.3 ? a.vx / sp : this.dir[a.team], fy = sp > 0.3 ? a.vy / sp : 0;
           const hold = a.held;
-          b.x = lerp(b.x, a.x + fx * (hold ? 0 : 0.75), Math.min(1, dt * 12));
-          b.y = lerp(b.y, a.y + fy * (hold ? 0 : 0.75), Math.min(1, dt * 12));
+          const tx = a.x + fx * (hold ? 0 : 0.75), ty = a.y + fy * (hold ? 0 : 0.75);
+          const ddx = tx - b.x, ddy = ty - b.y, dd = Math.hypot(ddx, ddy), mx = 22 * dt;
+          if (dd > mx) { b.x += ddx / dd * mx; b.y += ddy / dd * mx; } else { b.x = tx; b.y = ty; }
           b.z = hold ? 1.6 : Math.max(0, b.z - dt * 6);
         }
       } else if (b.roll) {
@@ -430,11 +487,20 @@
       if (b.trail.length > 7) b.trail.shift();
     }
 
-    _receive(pid) {
+    _receive(pid, force) {
       const a = this.A[pid];
       if (!a) return;
-      this.ball.owner = pid;
-      this.ball.z = 0;
+      const b = this.ball;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (!force && d > 2.2 && b.owner !== pid) {
+        // Lejos del balón: el balón le llega rodando (nada de teletransportes)
+        b.owner = null; b.roll = null;
+        b.path = { fx: b.x, fy: b.y, fz: b.z, tx: a.x + a.vx * 0.3, ty: a.y + a.vy * 0.3, tz: 0, h: d > 20 ? Math.min(6, d * 0.12) : 0, T: clamp(d / 18, 0.15, 1.2), t: 0, to: null, curve: 0, nx: 0, ny: 0, done: () => this._receive(pid, true) };
+        this.poss = a.team;
+        return;
+      }
+      b.owner = pid;
+      b.z = 0;
       this.poss = a.team;
     }
 
@@ -597,7 +663,8 @@
     _kickoffSeq(i) {
       let taker = null;
       return [
-        { d: 1.6, start: () => { const k = this._placeKickoff(i, false); taker = k.taker; this.ov = { p: k.p }; this.refOv = { x: L / 2 - 6, y: Wd / 2 + 10, run: 0.5 }; this._clearStates(); this._cut(0.8); } },
+        { d: 1.6, start: () => { const k = this._placeKickoff(i, false); taker = k.taker; this.ov = { p: k.p }; this.refOv = { x: L / 2 - 6, y: Wd / 2 + 10, run: 0.5 }; this._clearStates(); this._cut(0.85); } },
+        { d: 0.05, waitHold: true },
         { d: 0.4, start: () => { this.ov = null; this.refOv = null; TL.SFX && !this.instant && TL.SFX.whistle(false); if (taker != null && this.A[taker]) this._receive(taker); } }
       ];
     }
@@ -630,6 +697,7 @@
         if (this.beat.slow) this.slowT = this.beat.slow;
       }
       const bt = this.beat;
+      if (bt.waitHold && this.hold) return true;
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
       const waitBall = bt.ball && this.ball.path;
@@ -668,7 +736,7 @@
       while (this.queue.length) {
         const e = this.queue.shift();
         if (e.type === 'goal' || e.type === 'disallowed') { this._placeKickoff(1 - e.team, true); this.ball.owner = this._kickTaker(1 - e.team); }
-        if (e.type === 'ht') { this.dir = [-this.dir[0], -this.dir[1]]; this._placeKickoff(1, true); this.ball.owner = this._kickTaker(1); }
+        if (e.type === 'ht') { this.dir = [-this.dir[0], -this.dir[1]]; this._placeKickoff(1, true); this.htKick = true; }
         if (e.type === 'ft') this._finalWhistle(true);
       }
       this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1;
@@ -676,6 +744,8 @@
       this._clearStates();
       this._unfocus();
       this._sync();
+      // Segunda parte: todos colocados y el saque espera a que reanudes
+      if (this.htKick) { this.htKick = false; this._seq(this._kickoffSeq(1)); }
       this.instant = false;
     }
 
@@ -1271,9 +1341,9 @@
           this.poss = i;
           this.ov = { p: { [e.pid]: { x: tx, y: ty, run: 1 } } };
           const carrier = this.nearest(this.team(i).filter(a => a !== runner && !this.isGK(a)), { x: tx - dir * 22, y: ty });
-          if (carrier && this.ball.owner !== carrier.pid) { this.ball.owner = null; this.ball.path = null; this.ball.x = carrier.x; this.ball.y = carrier.y; this._receive(carrier.pid); }
+          if (carrier && this.ball.owner !== carrier.pid) this._receive(carrier.pid);
         } },
-        { d: 0.5, start: () => { this._kick(tx, ty, { h: 0.1, to: e.pid }); } },
+        { d: 0.5, ball: true, start: () => { this._kick(tx, ty, { h: 0.1, to: e.pid }); } },
         { d: 1.3, start: () => {
           ar.flag = this.t + 1.6;
           if (!this.instant && TL.SFX) TL.SFX.whistle(false);
@@ -1295,7 +1365,7 @@
           this._banner('DESCANSO', '#ffffff', 1.8, true);
           if (!this.instant && TL.SFX) TL.SFX.whistle(true);
           const p = {};
-          for (const id in this.A) p[id] = { x: TUNNEL.x + U.rand(-3, 3), y: -0.5, run: 0.3 };
+          for (const id in this.A) p[id] = { x: TUNNEL.x + U.rand(-4, 4), y: -0.5, run: 0.55 };
           this.ov = { p };
           this.ball.owner = null; this.ball.roll = null;
           this.refOv = { x: TUNNEL.x, y: -0.8, run: 0.3 };
@@ -1378,8 +1448,21 @@
       const Y = y => this.h / 2 + (y - cyw) * s;
       this.X = X; this.Y = Y; this.s = s;
       // Grada y pista
-      c.fillStyle = '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
-      c.fillStyle = '#14351f'; c.fillRect(X(VIEW.x0), Y(-10), (VIEW.x1 - VIEW.x0) * s, (Wd + 12.5) * s);
+      const night = this.st.night;
+      c.fillStyle = night ? '#060b12' : '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
+      // Gradas con los colores del club local y tifo con sus siglas
+      c.globalAlpha = night ? 0.28 : 0.38;
+      c.fillStyle = this.st.seat; c.fillRect(X(VIEW.x0), Y(VIEW.y0), (VIEW.x1 - VIEW.x0) * s, 2.1 * s);
+      c.fillRect(X(VIEW.x0), Y(Wd + 2.4), (VIEW.x1 - VIEW.x0) * s, (VIEW.y1 - Wd - 2.4) * s);
+      c.globalAlpha = 1;
+      c.save();
+      c.globalAlpha = 0.35;
+      c.fillStyle = this.st.seat2;
+      c.font = `900 ${Math.max(8, 2.2 * s)}px Barlow Condensed, sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (const tx of [L * 0.18, L * 0.82]) c.fillText(this.st.code, X(tx), Y(VIEW.y0 + 1));
+      c.restore();
+      c.fillStyle = night ? '#0f2a1b' : '#14351f'; c.fillRect(X(VIEW.x0), Y(-10), (VIEW.x1 - VIEW.x0) * s, (Wd + 12.5) * s);
       for (const p of this.crowd) {
         const jump = this.sparkUntil && this.sparkUntil > this.t ? Math.abs(Math.sin(this.t * 9 + p.p)) * 0.3 : 0;
         c.fillStyle = p.c;
@@ -1399,18 +1482,15 @@
         }
       }
       // Vallas publicitarias
-      const boards = ['#b8f53d', '#ffffff', '#2fbf71', '#f2c94c'];
+      const boards = [this.st.seat, '#ffffff', this.st.seat2, '#b8f53d'];
       for (let k = 0; k < 14; k++) {
         c.fillStyle = boards[k % boards.length]; c.globalAlpha = 0.28;
         c.fillRect(X(k * L / 14 + 0.5), Y(Wd + 1.7), (L / 14 - 1) * s, 0.6 * s);
       }
       for (const gx of [-2.6, L + 2]) { c.fillStyle = '#ffffff'; c.globalAlpha = 0.18; c.fillRect(X(gx), Y(6), 0.6 * s, (Wd - 12) * s); }
       c.globalAlpha = 1;
-      // Césped a franjas
-      for (let k = 0; k < 14; k++) {
-        c.fillStyle = k % 2 ? '#1b5a34' : '#1f653a';
-        c.fillRect(X(k * L / 14), Y(0), L / 14 * s + 1, Wd * s);
-      }
+      // Césped con el dibujo de este estadio
+      c.drawImage(this._grass(), X(0), Y(0), L * s, Wd * s);
       // Líneas
       c.strokeStyle = 'rgb(255 255 255 / 0.6)';
       c.lineWidth = Math.max(1, s * 0.12);
@@ -1509,6 +1589,17 @@
         c.font = `800 ${Math.round(R * 1.2)}px Barlow Condensed, sans-serif`;
         c.fillStyle = '#ff5050'; c.fillText(String(this.board.outN || ''), x - R, y);
         c.fillStyle = '#5dff7a'; c.fillText(String(this.board.inN || ''), x + R, y);
+      }
+      // Focos en los partidos nocturnos
+      if (night) {
+        c.save(); c.globalCompositeOperation = 'lighter';
+        for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) {
+          const g = c.createRadialGradient(X(fx), Y(fy), 0, X(fx), Y(fy), 55 * s);
+          g.addColorStop(0, 'rgb(255 248 220 / 0.16)'); g.addColorStop(1, 'rgb(255 248 220 / 0)');
+          c.fillStyle = g; c.fillRect(0, 0, this.w, this.h);
+        }
+        c.restore();
+        for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) { c.fillStyle = '#fffbe6'; c.fillRect(X(fx) - 3, Y(fy) - 2, 6, 4); }
       }
       // Rótulo
       if (this.banner && this.banner.until > this.t) {

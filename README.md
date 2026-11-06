@@ -30,6 +30,9 @@ Después entra en <http://localhost:8000>.
 - **Nueva partida:** fútbol masculino (34 ligas jugables) o femenino (5 ligas), elige liga y club.
 - **Partido en directo con vista 2D creíble:** cada jugador tiene un papel (bloque que sube y baja con el balón, presión, coberturas, marcajes, desmarques al espacio) y se cansa (más lento, con gotas de sudor). El balón tiene altura y sombra: pases rasos, globos, centros, cabezazos, voleas, vaselinas y disparos lejanos. En el campo están el árbitro (en diagonal), los jueces de línea con banderín, el cuarto árbitro con la tablilla, los banquillos con suplentes que calientan, las asistencias y los dos entrenadores (tú, «TÚ»). Las jugadas a balón parado se colocan como en la tele: córners con el área llena (el portero sube si vas a la desesperada), faltas con barrera a 9,15 m, penaltis con todos fuera del área, saques de banda, de puerta y de centro. Hay segadas, tarjetas mostradas por el árbitro, protestas, tanganas, VAR, fueras de juego, celebraciones en el banderín y cámara lenta con zoom en los momentos épicos. El reloj espera mientras se ve la jugada.
 - **Rivales con su propio entrenador** (`js/coach.js`): estilo, sistema favorito, capacidad de adaptarse y de preparar partidos. Su plan no se conoce hasta que empieza el partido; reacciona al marcador y a las expulsiones, y puede ser destituido. Los sistemas chocan entre sí (puntas contra centrales, bandas, centro del campo).
+- **Competiciones continentales** (`js/cups.js`): Copa de Campeones de Europa y Copa Continental (32 clubes), y copas de campeones de América y Asia (16). Se clasifican los mejores de cada liga; eliminatorias a ida y vuelta entre semana, final a partido único, premios, títulos e historial.
+- **Vestuario** (`js/locker.js`): rasgos de jugador (con guiños al fútbol del manga), joyas de la cantera con ADN de leyenda cada 5-10 temporadas, padrinos veteranos que pasan al cuerpo técnico, reuniones de despacho, barbacoas, días libres y concentraciones, relaciones entre compañeros y con el míster, y cesiones.
+- **Historial de traspasos** de la temporada (Mercado → Historial) y **campo minimizable** durante el partido para leer la narración.
 - **Repaso del Profe, siempre después del partido:** qué hizo el rival, el choque de sistemas, cómo llegó cada equipo, si hubo suerte (goles esperados) y qué habría funcionado mejor sabiéndolo ya. No hay pronósticos previos.
 - **Controles del partido:**
   - Velocidades **x1, x2, x4, x8 y x16**.
@@ -98,6 +101,8 @@ js/engine.js             Motor de partido: faltas, tarjetas, árbitro, VAR, pena
 js/season.js             Calendario, clasificación, jornada, fin de temporada, evolución
 js/market.js             Fichajes, ventas, contratos e IA de mercado (fichan según su línea más floja)
 js/coach.js              Entrenadores de la IA, choque de sistemas y repaso del partido
+js/locker.js             Vestuario: rasgos, joyas, padrinos, despacho, actividades, relaciones, cesiones
+js/cups.js               Copas continentales
 js/commerce.js           Afición, patrocinios, marketing, entradas, préstamos, estadio
 js/news.js               Noticias, polémicas, moral y decisiones
 js/game.js               Orquestación: carga de datos, partida, buzón, guardado
