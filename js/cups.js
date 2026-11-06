@@ -133,9 +133,14 @@
     for (const cup of S.cups || []) {
       const md = cup.mds.find(m => !m.done && m.week === S.week);
       if (!md || md.r !== cup.cur) continue;
+      const r = cup.rounds[md.r];
+      if (r.group) {
+        const t = r.ties.find(x => (x.h === S.user || x.a === S.user) && x.md === md.leg);
+        if (!t || t.s.length) continue;
+        return { cup, md, tie: t, home: t.h, away: t.a, round: r.name, leg: 0, legs: 1, group: true, label: `${cup.name} · Grupo ${'ABCDEFGH'[t.g]} · jornada ${md.leg + 1}` };
+      }
       const t = tieOf(cup, S.user);
       if (!t || t.s.length > md.leg) continue;
-      const r = cup.rounds[md.r];
       const home = md.leg === 0 ? t.h : t.a, away = md.leg === 0 ? t.a : t.h;
       return { cup, md, tie: t, home, away, round: r.name, leg: md.leg, legs: r.legs, label: `${cup.name} · ${r.name}${r.legs > 1 ? (md.leg ? ' (vuelta)' : ' (ida)') : ''}` };
     }
@@ -162,18 +167,57 @@
   function completeUser(S, res, p) {
     const t = p.tie;
     const hg = res.h === t.h ? res.hg : res.ag, ag = res.h === t.h ? res.ag : res.hg;
-    t.s[p.leg] = [hg, ag];
+    t.s[p.group ? 0 : p.leg] = [hg, ag];
     if (res.review) TL.Coach.store(S, Object.assign(res.review, { comp: p.cup.short }));
     return playMatchday(S, p.cup, p.md);
   }
 
   function playMatchday(S, cup, md) {
     const r = cup.rounds[md.r];
+    if (r.group) {
+      for (const t of r.ties) if (t.md === md.leg && !t.s.length) simTie(S, t, 0);
+      md.done = true;
+      if (md.leg === 2) resolveGroups(S, cup, md.r);
+      return { cup, md, round: r.name };
+    }
     for (const t of r.ties) if (t.s.length <= md.leg) simTie(S, t, md.leg);
     md.done = true;
     const out = { cup, md, round: r.name };
     if (md.leg === r.legs - 1) resolveRound(S, cup, md.r);
     return out;
+  }
+
+  /** Clasificación de un grupo: puntos, diferencia de goles, goles a favor. */
+  function groupTable(S, r, g) {
+    const rows = r.groups[g].map(id => ({ id, pj: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }));
+    const row = id => rows.find(x => x.id === id);
+    for (const t of r.ties) {
+      if (t.g !== g || !t.s.length) continue;
+      const [a, b] = t.s[0], h = row(t.h), aw = row(t.a);
+      h.pj++; aw.pj++; h.gf += a; h.ga += b; aw.gf += b; aw.ga += a;
+      if (a > b) { h.w++; h.pts += 3; aw.l++; } else if (a < b) { aw.w++; aw.pts += 3; h.l++; } else { h.d++; aw.d++; h.pts++; aw.pts++; }
+    }
+    return rows.sort((x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf || S.clubs[y.id].rep - S.clubs[x.id].rep);
+  }
+
+  /** Fin de la fase de grupos: pasan los dos primeros y se cruzan con el grupo vecino. */
+  function resolveGroups(S, cup, ri) {
+    const r = cup.rounds[ri];
+    const tabs = r.groups.map((_, g) => groupTable(S, r, g));
+    const ties = [];
+    for (let g = 0; g < tabs.length; g += 2) {
+      ties.push({ h: tabs[g][0].id, a: tabs[g + 1][1].id, s: [] });
+      ties.push({ h: tabs[g + 1][0].id, a: tabs[g][1].id, s: [] });
+    }
+    cup.cur = ri + 1;
+    cup.rounds[ri + 1].ties = ties;
+    const g = tabs.findIndex(t => t.some(x => x.id === S.user));
+    if (g >= 0) {
+      const pos = tabs[g].findIndex(x => x.id === S.user) + 1;
+      const t = ties.find(x => x.h === S.user || x.a === S.user);
+      if (t) TL.Game.mail(S, `¡Clasificados para ${cup.rounds[ri + 1].name.toLowerCase()}!`, `Terminamos ${pos}º del grupo ${'ABCDEFGH'[g]}. Rival: ${S.clubs[t.h === S.user ? t.a : t.h].name}.`, 'good');
+      else TL.Game.mail(S, `Eliminados en la fase de grupos`, `Terminamos ${pos}º del grupo ${'ABCDEFGH'[g]}. No ha podido ser.`, 'med');
+    }
   }
 
   function aggregate(t) {
@@ -230,12 +274,15 @@
     const [a, b] = aggregate(t);
     const mineFirst = t.h === S.user ? `${a}-${b}` : `${b}-${a}`;
     const final = r.legs === 1 && r.name === 'Final';
+    const tour = S.mode === 'tour';
     if (won) {
-      const amount = prize(S, cup, final ? 'title' : 'win');
-      const paid = pay(S, amount, final ? 'Premio de campeón' : 'Premio por pasar de ronda');
-      S.board.conf = U.clamp(S.board.conf + (final ? 15 : 3), 0, 100);
-      TL.Manager.addXp(S, final ? 400 : 60);
-      if (S.com) S.com.fans = Math.round(S.com.fans * (final ? 1.06 : 1.01));
+      const amount = tour ? 0 : prize(S, cup, final ? 'title' : 'win');
+      const paid = tour ? '¡A por la siguiente!' : pay(S, amount, final ? 'Premio de campeón' : 'Premio por pasar de ronda');
+      if (!tour) {
+        S.board.conf = U.clamp(S.board.conf + (final ? 15 : 3), 0, 100);
+        TL.Manager.addXp(S, final ? 400 : 60);
+        if (S.com) S.com.fans = Math.round(S.com.fans * (final ? 1.06 : 1.01));
+      }
       if (final) {
         (S.titles || (S.titles = [])).push({ s: S.season, name: cup.name });
         TL.Game.mail(S, `🏆 ¡CAMPEONES DE LA ${cup.name.toUpperCase()}!`, `¡Lo has conseguido! ${S.clubs[S.user].name} gana la final ante el ${S.clubs[other].name}${t.pens ? ' en los penaltis' : ''}. ${paid}. La afición está en las nubes.`, 'good');
@@ -245,7 +292,7 @@
       }
     } else {
       TL.Game.mail(S, final ? `Subcampeones de la ${cup.name}` : `Eliminados de la ${cup.name}`, `${final ? 'Perdemos la final' : 'Caemos'} ante el ${S.clubs[other].name} (${mineFirst}${t.pens ? ', penaltis' : ''}). ${final ? 'Un subcampeonato que sabe a poco, pero que da prestigio.' : 'Toca centrarse en la liga.'}`, final ? 'board' : 'med');
-      if (final) { pay(S, prize(S, cup, 'win') * 2, 'Premio de finalista'); TL.Manager.addXp(S, 150); }
+      if (final && !tour) { pay(S, prize(S, cup, 'win') * 2, 'Premio de finalista'); TL.Manager.addXp(S, 150); }
     }
   }
 
@@ -296,5 +343,5 @@
 
   function myCup(S) { return (S.cups || []).find(c => c.clubs.includes(S.user)) || null; }
 
-  TL.Cups = { DEFS, build, newSeason, pendingUser, completeUser, playMatchday, catchUp, seasonEnd, aggregate, tieOf, myCup, qualify, topLeagues };
+  TL.Cups = { groupTable, DEFS, build, newSeason, pendingUser, completeUser, playMatchday, catchUp, seasonEnd, aggregate, tieOf, myCup, qualify, topLeagues };
 })();

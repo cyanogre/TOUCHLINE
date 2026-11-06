@@ -299,7 +299,9 @@
       l.balance -= pay; l.weeksLeft--; loans += pay;
     }
     com.loans = com.loans.filter(l => l.balance > 0 && l.weeksLeft > 0);
-    c.cash += tv + spons + merch + tickets - wages - loans;
+    const staff = TL.Staff ? TL.Staff.weeklyCost(S) : 0;
+    c.cash += tv + spons + merch + tickets - wages - loans - staff;
+    S.fin.staff = (S.fin.staff || 0) + staff;
     Object.assign(S.fin, {
       tv: (S.fin.tv || 0) + tv, sponsors: (S.fin.sponsors || 0) + spons, merch: (S.fin.merch || 0) + merch,
       tickets: (S.fin.tickets || 0) + tickets, wages: (S.fin.wages || 0) + wages, loans: (S.fin.loans || 0) + loans

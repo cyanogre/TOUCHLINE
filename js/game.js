@@ -75,6 +75,7 @@
     },
 
     save() {
+      if (Game.S && Game.S.mode === 'tour') return; // el torneo no pisa la partida de carrera
       const S = Game.S;
       if (!S) return true;
       try {
@@ -132,6 +133,7 @@
       const m = new E.Match(S, cp.home, cp.away);
       m.cup = cp; m._applied = true;
       const out = TL.Cups.completeUser(S, m.simulate().finish(), cp);
+      if (S.mode === 'tour') TL.Tour.round(S);
       Game.save();
       return Object.assign(out, { m, p: cp });
     },
@@ -139,10 +141,16 @@
     /** Completa la jornada. match: Match del usuario terminado, o null para simularlo. */
     completeRound(match) {
       const S = Game.S;
+      if (S.mode === 'tour') { TL.Tour.round(S); return []; }
       if (S.over || !S.fixtures[S.week]) return [];
       if (match && match._applied) return []; // un partido solo cuenta una vez
       if (match) match._applied = true;
-      if (match && match.cup) { const out = TL.Cups.completeUser(S, match.finish(), match.cup); Game.save(); return out; }
+      if (match && match.cup) {
+        const out = TL.Cups.completeUser(S, match.finish(), match.cup);
+        if (S.mode === 'tour') TL.Tour.round(S);
+        Game.save();
+        return out;
+      }
       const res = match ? match.finish() : null;
       const results = TL.Season.playRound(S, res);
       Game.save();

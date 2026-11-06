@@ -37,6 +37,7 @@
     active = { id, onEnd: null };
     TL.Mentor.say(TOURS[id], {
       dim: true,
+      voice: id === 'main' ? 'hola' : 'escucha',
       onEnd: () => {
         mark(id);
         const cb = active && active.onEnd;
