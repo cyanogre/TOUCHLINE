@@ -25,8 +25,48 @@
   const KEY_EVENTS = ['goal', 'save', 'miss', 'pen', 'penmiss', 'fk', 'foul', 'yellow', 'red', 'inj', 'sub', 'ht', 'ft', 'var',
     'disallowed', 'crowd', 'heated', 'refmiss', 'tactic', 'corner', 'offside', 'late', 'controversy'];
 
-  function hueOf(c) { const m = /hsl\((\d+)/.exec(c || ''); return m ? +m[1] : null; }
-  function hueDist(a, b) { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); }
+  // ---- Colores de las equipaciones
+  const RGB = {};
+  function hsl2rgb(h, s, l) {
+    const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return [f(0), f(8), f(4)].map(v => Math.round(v * 255));
+  }
+  function rgbOf(c) {
+    c = String(c || '#808080');
+    if (RGB[c]) return RGB[c];
+    let m, out = [128, 128, 128];
+    if ((m = /^#([0-9a-f]{3})$/i.exec(c))) out = m[1].split('').map(h => parseInt(h + h, 16));
+    else if ((m = /^#([0-9a-f]{6})$/i.exec(c))) out = [0, 2, 4].map(k => parseInt(m[1].substr(k, 2), 16));
+    else if ((m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c))) out = [+m[1], +m[2], +m[3]];
+    else if ((m = /hsl\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/i.exec(c))) out = hsl2rgb(+m[1], +m[2] / 100, +m[3] / 100);
+    return (RGB[c] = out);
+  }
+  /** Distancia de color aproximada a la percepción («redmean»): 0 iguales · ~765 blanco/negro. */
+  function cdist(a, b) {
+    const A = Array.isArray(a) ? a : rgbOf(a), B = Array.isArray(b) ? b : rgbOf(b);
+    const rm = (A[0] + B[0]) / 2, dr = A[0] - B[0], dg = A[1] - B[1], db = A[2] - B[2];
+    return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
+  }
+  function lum(c) { const [r, g, b] = rgbOf(c); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+  // Cuánto se ve el color secundario según el dibujo de la camiseta
+  const SHARE = { '': 0, h: 0.3, x: 0.25, c: 0.2, s: 0.45, v: 0.5, k: 0.5 };
+  /** Color «de lejos» de una camiseta (mezcla de sus dos colores). */
+  function look(k) {
+    const a = rgbOf(k.c1), b = rgbOf(k.c2), w = SHARE[k.p] || 0;
+    return a.map((v, i) => v * (1 - w) + b[i] * w);
+  }
+  /** ¿Se distinguen dos camisetas? (más alto, mejor) */
+  function contrast(k1, k2) { return 0.6 * cdist(look(k1), look(k2)) + 0.4 * cdist(k1.c1, k2.c1); }
+  const CLASH = 165;
+  const kit = (a, p) => ({ c1: a[0], c2: a[1] || a[0], p: a[2] || p || '' });
+  /** Primera y segunda equipación de un club (oficial si la conocemos; si no, sus colores). */
+  function kitsOf(club) {
+    const K = club.kit || (window.TL_KITS && window.TL_KITS[club.name]);
+    if (K) return { known: true, home: kit(K[0]), away: kit(K[1] || [K[0][1], K[0][0]]) };
+    const c2 = club.c2 && club.c2 !== '#111' ? club.c2 : '#f4f4f0';
+    return { known: false, home: kit([club.c1, club.c1]), away: kit([c2, club.c1]) };
+  }
 
   /** Color dominante de un escudo (si el CDN permite leer los píxeles). */
   const kitCache = {};
@@ -82,6 +122,7 @@
       this.leaving = [];           // los que se van (cambios, expulsiones)
       this.keep = new Set();       // pids que el guion retiene aunque el motor ya los haya quitado
       this.num = {};
+      this.kitSrc = match.teams.map(t => kitsOf(this.S.clubs[t.club]));
       this.colors = this._colors();
       this._numbers();
       this.ball = { x: L / 2, y: Wd / 2, z: 0, owner: null, path: null, roll: null, trail: [] };
@@ -112,7 +153,8 @@
       if (this.st.name) this._banner(this.st.name + (this.st.night ? ' · partido nocturno' : ''), '#ffffff', 2.6);
       for (const i of [0, 1]) {
         const club = this.S.clubs[match.teams[i].club];
-        if (club.logo) crestColor(club.logo, col => { this.colors[i].main = col; });
+        // Sin equipación conocida: el color dominante del escudo
+        if (club.logo && !this.kitSrc[i].known) crestColor(club.logo, col => { this.kitSrc[i].home = kit([col, col]); this.colors = this._colors(); });
       }
       this._resize = () => this.resize();
       window.addEventListener('resize', this._resize);
@@ -127,12 +169,48 @@
     /** El reloj del partido espera mientras se escenifica una jugada. */
     busy() { return !this.over && !!(this.beat || this.script.length || this.queue.length); }
 
+    /** El local viste la primera; el visitante, la que no se confunda (como manda el árbitro). */
     _colors() {
-      const [a, b] = this.m.teams.map(t => this.S.clubs[t.club]);
-      const away = { main: b.c1 };
-      const ha = hueOf(a.c1), hb = hueOf(b.c1);
-      if (ha != null && hb != null && hueDist(ha, hb) < 45) away.main = b.c2 && b.c2 !== '#111' ? b.c2 : '#f4f4f0';
-      return [{ main: a.c1, gk: '#f2c94c' }, { main: away.main, gk: '#4ad7d1' }];
+      const [A, B] = this.kitSrc;
+      const home = A.home;
+      const opts = [B.home, B.away, kit(['#f4f4f0', '#1b2235']), kit(['#1b2235', '#f4f4f0'])];
+      let away = opts.find(k => contrast(home, k) >= CLASH);
+      if (!away) away = opts.slice().sort((x, y) => contrast(home, y) - contrast(home, x))[0];
+      // Porteros: un color que no se parezca a ninguna camiseta (ni al otro portero)
+      const GK = ['#f2c94c', '#4ad7d1', '#ff7ab6', '#9b5de5', '#7cff6b', '#ff8c42', '#e8e8e8', '#222222'];
+      const shirts = [home, away].flatMap(k => [look(k), rgbOf(k.c1)]);
+      const pickGk = (pref, also) => {
+        const score = c => Math.min(...shirts.concat(also).map(x => cdist(c, x)));
+        const order = GK.slice(pref).concat(GK.slice(0, pref));
+        return order.find(c => score(c) >= 220) || order.slice().sort((x, y) => score(y) - score(x))[0];
+      };
+      const gk0 = pickGk(0, []), gk1 = pickGk(1, [rgbOf(gk0)]);
+      // El árbitro también se cambia de camiseta si coincide con algún equipo
+      const refs = ['#121212', '#f2e94e', '#e5397a', '#2f80ed', '#16c79a'];
+      const seen = shirts.concat([rgbOf(gk0), rgbOf(gk1)]);
+      this.refCol = refs.find(c => Math.min(...seen.map(x => cdist(c, x))) >= 140) || '#121212';
+      const ink = c => (lum(c) > 0.62 ? '#111' : '#fff');
+      const out = (k, gk) => ({ main: k.c1, c1: k.c1, c2: k.c2, p: k.p, gk, gkInk: ink(gk), ink: ink(k.p === 's' || k.p === 'c' ? k.c2 : k.c1) });
+      return [out(home, gk0), out(away, gk1)];
+    }
+
+    /** Dibujo de la camiseta (rayas, aros, banda…) dentro de la silueta ya trazada. */
+    _kitPattern(k, x, y, r) {
+      if (!k.p || k.c2 === k.c1) return;
+      const c = this.cx, R2 = r * 2;
+      c.fillStyle = k.c2;
+      switch (k.p) {
+        case 's': for (const o of [-0.72, 0, 0.72]) c.fillRect(x + (o - 0.18) * r, y - R2, 0.36 * r, 2 * R2); break;
+        case 'h': for (const o of [-0.62, 0.12]) c.fillRect(x - R2, y + o * r, 2 * R2, 0.34 * r); break;
+        case 'c': c.fillRect(x - 0.22 * r, y - R2, 0.44 * r, 2 * R2); break;
+        case 'v': c.fillRect(x, y - R2, R2, 2 * R2); break;
+        case 'x': c.save(); c.translate(x, y); c.rotate(-Math.PI / 4); c.fillRect(-R2, -0.24 * r, 2 * R2, 0.48 * r); c.restore(); break;
+        case 'k': {
+          const q = r * 0.5;
+          for (let i = -4; i < 4; i++) for (let j = -4; j < 4; j++) if ((i + j) & 1) c.fillRect(x + i * q, y + j * q, q, q);
+          break;
+        }
+      }
     }
 
     _numbers() {
@@ -1658,20 +1736,22 @@
         c.globalAlpha = a.leave ? 0.7 : sad ? 0.8 : 1;
         // Sombra
         c.beginPath(); c.ellipse(x + 1, y0 + r * 0.85, r * 0.95, r * 0.35, 0, 0, 6.283); c.fillStyle = 'rgb(0 0 0 / 0.28)'; c.fill();
-        c.beginPath();
-        if (a.state === 'down' || a.state === 'sit') c.ellipse(x, y + r * 0.3, r * 1.35, r * 0.62, a.fall || 0.3, 0, 6.283);
-        else if (a.state === 'slide') { const ang = Math.atan2(a.vy, a.vx); c.ellipse(x, y, r * 1.6, r * 0.7, ang, 0, 6.283); }
-        else if (a.state === 'dive') c.ellipse(x, y, r * 0.7, r * 1.7, 0, 0, 6.283);
-        else c.arc(x, y, sad ? r * 0.9 : r, 0, 6.283);
-        c.fillStyle = col; c.fill();
+        const sh = new Path2D();
+        if (a.state === 'down' || a.state === 'sit') sh.ellipse(x, y + r * 0.3, r * 1.35, r * 0.62, a.fall || 0.3, 0, 6.283);
+        else if (a.state === 'slide') { const ang = Math.atan2(a.vy, a.vx); sh.ellipse(x, y, r * 1.6, r * 0.7, ang, 0, 6.283); }
+        else if (a.state === 'dive') sh.ellipse(x, y, r * 0.7, r * 1.7, 0, 0, 6.283);
+        else sh.arc(x, y, sad ? r * 0.9 : r, 0, 6.283);
+        c.fillStyle = col; c.fill(sh);
+        if (!gk) { c.save(); c.clip(sh); this._kitPattern(this.colors[i], x, y, r); c.restore(); }
         const carrier = this.ball.owner === a.pid;
         c.lineWidth = carrier ? 2.4 : 1.4;
         c.strokeStyle = carrier ? '#b8f53d' : a.state === 'celebrate' ? '#ffffff' : (i === this.me ? '#ffffff' : 'rgb(0 0 0 / 0.55)');
-        c.stroke();
+        c.stroke(sh);
         if (a.state !== 'down' && a.state !== 'sit' && a.state !== 'slide' && a.state !== 'dive') {
-          c.fillStyle = '#fff';
+          const inkCol = gk ? this.colors[i].gkInk : this.colors[i].ink, dark = inkCol === '#111';
+          c.fillStyle = inkCol;
           c.font = `700 ${Math.round(r * 1.05)}px Barlow Condensed, sans-serif`;
-          c.shadowColor = 'rgb(0 0 0 / 0.7)'; c.shadowBlur = 2;
+          c.shadowColor = dark ? 'rgb(255 255 255 / 0.55)' : 'rgb(0 0 0 / 0.7)'; c.shadowBlur = 2;
           c.fillText(String(this.num[a.pid] || ''), x, y + 0.5);
           c.shadowBlur = 0;
         }
@@ -1690,7 +1770,7 @@
       if (a.kind === 'ref' || a.kind === 'ar' || a.kind === '4th') {
         const r = a.kind === 'ref' ? R * 0.82 : R * 0.7;
         c.beginPath(); c.ellipse(x + 1, y0 + r * 0.85, r * 0.9, r * 0.33, 0, 0, 6.283); c.fillStyle = 'rgb(0 0 0 / 0.25)'; c.fill();
-        c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fillStyle = '#121212'; c.fill();
+        c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fillStyle = this.refCol || '#121212'; c.fill();
         c.lineWidth = 1.6; c.strokeStyle = '#e8ff3a'; c.stroke();
         if (a.kind === 'ar') {
           const up = a.flag && a.flag > this.t;

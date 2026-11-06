@@ -77,6 +77,9 @@
       return path ? C.base + path : null;
     },
     clubColors(name) {
+      // Si conocemos la equipación oficial, mandan sus colores
+      const kit = window.TL_KITS && window.TL_KITS[name];
+      if (kit) return [kit[0][0], kit[0][1]];
       const h = F.hash(name);
       const hue = h % 360;
       const sat = 55 + (h >> 9) % 25;

@@ -29,6 +29,17 @@
     'Australia': ['AUS', '#ffcd00', '#00843d'], 'Canadá': ['CAN', '#d80621', '#ffffff'], 'Paraguay': ['PAR', '#d52b1e', '#ffffff'],
     'Chile': ['CHI', '#d52b1e', '#0039a6'], 'Hungría': ['HUN', '#ce2939', '#477050'], 'Grecia': ['GRE', '#0d5eaf', '#ffffff']
   };
+  // Camisetas con dibujo o segunda equipación conocida (el resto: color principal y, fuera, el secundario)
+  const NKIT = {
+    'Argentina': [['#75aadb', '#ffffff', 's'], ['#1b2235', '#75aadb', '']],
+    'Brasil': [['#ffdf00', '#009c3b', ''], ['#1c3f94', '#ffffff', '']],
+    'Croacia': [['#ff0000', '#ffffff', 'k'], ['#1b2a5c', '#ffffff', '']],
+    'Paraguay': [['#d52b1e', '#ffffff', 's'], ['#ffffff', '#d52b1e', '']],
+    'Países Bajos': [['#ff7f00', '#ffffff', ''], ['#1b2235', '#ff7f00', '']],
+    'Portugal': [['#c8102e', '#006600', ''], ['#f4f4f0', '#c8102e', '']],
+    'Bélgica': [['#e30613', '#111111', ''], ['#ffffff', '#e30613', '']],
+    'Chile': [['#d52b1e', '#0039a6', ''], ['#ffffff', '#d52b1e', '']]
+  };
   const KINDS = {
     wc: { name: 'Mundial', icon: '🌍', color: '#f2c94c', desc: 'Selecciones con los mejores jugadores de cada país.' },
     cl: { name: 'Copa de Campeones de Europa', icon: '⭐', color: '#5db8ff', desc: 'Los 32 mejores clubes de Europa.' }
@@ -59,7 +70,7 @@
         const meta = NATION[name] || [name.normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3).toUpperCase(), ...U.clubColors(name)];
         const id = S.clubs.length;
         S.clubs.push({ id, name, league: lid, code: meta[0], c1: meta[1], c2: meta[2], logo: flag ? `assets/flags/${flag}.svg` : null, nation: true,
-          rep: Math.round(n.str * 10) / 10, stature: n.str, cash: 0, wageBudget: 1e12, revScale: 0, capacity: 70000, price: 60, stadium: `Estadio Mundialista de ${name}` });
+          kit: NKIT[name] || [[meta[1], meta[2], ''], [meta[2], meta[1], '']], rep: Math.round(n.str * 10) / 10, stature: n.str, cash: 0, wageBudget: 1e12, revScale: 0, capacity: 70000, price: 60, stadium: `Estadio Mundialista de ${name}` });
         S.leagues[lid].clubs.push(id);
         for (const p of n.squad) { p.club = id; p.fit = 100; p.inj = 0; p.sus = 0; p.listed = false; }
         S.tourCands.push(id);

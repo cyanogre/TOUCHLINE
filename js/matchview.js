@@ -58,6 +58,8 @@
     document.body.style.overflow = 'hidden';
     for (const e of m.events) addEvent(e);
     MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
+    clearInterval(MV.ballTimer);
+    MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
     setupPip();
     if (settings().mini) setMini(true);
@@ -254,18 +256,42 @@
         return `<div class="mstat"><span>${a}</span><div><div class="lbl">${k}</div><div class="vs"><i style="width:${va / tot * 100}%"></i><i style="width:${vb / tot * 100}%"></i></div></div><span style="text-align:right">${b}</span></div>`;
       }).join('') + scorersHtml() + `<p class="note mt center">Árbitro: ${esc(m.ref.name)} · ${m.ref.label}${m.ref.var ? ' · con VAR' : ' · sin VAR'}</p>`;
     } else {
-      body.innerHTML = `<div class="grid two">${m.teams.map(t => {
+      body.innerHTML = `<div class="grid two">${m.teams.map((t, ti) => {
         const c = S.clubs[t.club];
         const on = t.onPitch.map(o => {
           const p = S.players[o.pid], r = m.pl[o.pid];
-          return `<div class="row" style="padding:5px 0;font-size:14px">${UI.posB(o.slot)}<span class="grow ellipsis">${esc(p.short)}</span>
-            ${r.g ? '⚽'.repeat(r.g) : ''}${r.a ? '<span class="faint">A</span>' : ''}${r.y ? '🟨' : ''}${o.hurt ? '🚑' : ''}<b class="num">${p.ovr}</b></div>`;
+          return `<div class="row lu-row" data-pid="${o.pid}">${UI.posB(o.slot)}<span class="grow ellipsis">${esc(p.short)}</span>
+            ${r.g ? `<span title="${r.g} gol${r.g > 1 ? 'es' : ''}">${'⚽'.repeat(r.g)}</span>` : ''}${r.a ? `<span class="faint" title="Asistencia">A</span>` : ''}${r.y ? '<span title="Amarilla">🟨</span>' : ''}${o.hurt ? '<span title="Tocado">🚑</span>' : ''}<b class="num">${p.ovr}</b></div>`;
         }).join('');
         const bench = t.bench.map(id => `<span class="faint">${esc(S.players[id].short)}</span>`).join(', ');
-        return `<div class="card"><div class="row" style="margin-bottom:6px">${UI.crest(c, 'sm')}<b class="grow ellipsis">${esc(c.name)}</b><span class="note">${t.formation} · ${UI.MENT[t.mentality]}</span></div>
+        return `<div class="card"><div class="row" style="margin-bottom:6px">${UI.crest(c, 'sm')}<b class="grow ellipsis">${esc(c.name)}</b>${kitSwatch(ti)}<span class="note">${t.formation} · ${UI.MENT[t.mentality]}</span></div>
           ${on}<p class="note mt">Banquillo: ${bench || '—'}</p></div>`;
-      }).join('')}</div>`;
+      }).join('')}</div>
+      <p class="note center lu-key">⚽ goles en el partido · A asistencia · 🟨 amarilla · 🚑 tocado · <i class="lu-ball"></i> lleva el balón ahora</p>`;
+      markBall();
     }
+  }
+
+  /** Muestra de la camiseta que lleva cada equipo en el campo (para reconocer los puntitos). */
+  function kitSwatch(i) {
+    const k = MV.pitch && MV.pitch.colors && MV.pitch.colors[i];
+    if (!k) return '';
+    const a = k.c1, b = k.c2;
+    const bg = {
+      s: `repeating-linear-gradient(90deg, ${a} 0 3px, ${b} 3px 6px)`, h: `repeating-linear-gradient(0deg, ${a} 0 3px, ${b} 3px 6px)`,
+      v: `linear-gradient(90deg, ${a} 50%, ${b} 50%)`, c: `linear-gradient(90deg, ${a} 38%, ${b} 38% 62%, ${a} 62%)`,
+      x: `linear-gradient(45deg, ${a} 38%, ${b} 38% 62%, ${a} 62%)`, k: `repeating-conic-gradient(${a} 0 25%, ${b} 0 50%) 0 0 / 7px 7px`
+    }[k.p] || a;
+    return `<i class="kit-sw" style="background:${bg}" title="Camiseta de hoy"></i>`;
+  }
+  /** Resalta en la alineación al jugador que lleva el balón en el campo. */
+  function markBall() {
+    const body = el('mv-body');
+    if (!body || MV.tab !== 'lineups') return;
+    const own = MV.pitch && MV.pitch.ball ? MV.pitch.ball.owner : null;
+    if (own === MV.lastOwner && body.querySelector('.lu-row.onball')) return;
+    MV.lastOwner = own;
+    body.querySelectorAll('.lu-row').forEach(r => r.classList.toggle('onball', own != null && +r.dataset.pid === own));
   }
 
   function scorersHtml() {
@@ -546,6 +572,7 @@
   };
   A['mv-close'] = () => {
     clearTimeout(MV.timer);
+    clearInterval(MV.ballTimer);
     if (MV.pitch) { MV.pitch.destroy(); MV.pitch = null; }
     TL.SFX.stopCrowd();
     UI.Music.duck(false);
