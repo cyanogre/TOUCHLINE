@@ -641,10 +641,10 @@ details summary { list-style: revert; }
 .match .score .t b { font-size: 15px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match .score .t:last-child b { text-align: right; }
 .pitch-box { background: #10301e; padding: 6px 10px; display: flex; justify-content: center; }
-#pitch { width: 100%; max-width: 760px; aspect-ratio: 105 / 68; max-height: 34vh; display: block; border-radius: 10px; }
+#pitch { width: min(100%, 800px, 42vh * 117 / 85); aspect-ratio: 117 / 85; height: auto; display: block; border-radius: 10px; }
 .mtabs { padding: 8px 14px 0; width: 100%; max-width: 788px; margin: 0 auto; }
 .mtabs .seg button { padding: 6px; font-size: 13px; }
-@media (max-height: 700px) { #pitch { max-height: 28vh; } }
+@media (max-height: 700px) { #pitch { width: min(100%, 800px, 30vh * 117 / 85); } }
 
 /* Tutorial */
 #tut { position: fixed; inset: 0; z-index: 120; }
@@ -682,7 +682,7 @@ details summary { list-style: revert; }
   .btn.primary::after, .next-match::before, .nm-vs, .title-ball, .logo h1, .tut-hole { animation: none !important; }
 }
 .match .comp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 1024px) { #pitch { max-height: 42vh; } }
+@media (min-width: 1024px) { #pitch { width: min(100%, 860px, 44vh * 117 / 85); } }
 
 .crest.ready > img { transition: none; }
 .nego.flash-in { animation: negoIn 1.2s ease; }

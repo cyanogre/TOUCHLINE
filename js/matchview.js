@@ -14,7 +14,7 @@
   const EV_ICON = {
     goal: '⚽', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
     foul: '⚠️', pen: '🎯', penmiss: '❌', fk: '🎯', var: '📺', disallowed: '🚫', refmiss: '😡', controversy: '⚖️',
-    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋'
+    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥'
   };
   const PAUSE_LABEL = { goal: 'Goles', red: 'Expulsiones', inj: 'Lesiones (tuyas)', pen: 'Penaltis', var: 'VAR y polémicas', crowd: 'Incidentes en la grada', ht: 'Descanso (charla)' };
 
@@ -103,9 +103,11 @@
   function tick() {
     const m = MV.m;
     if (!m || MV.paused || m.done) return;
+    // El reloj espera a que el campo termine de escenificar la jugada en curso
+    if (MV.pitch && !MV.skip && MV.pitch.busy()) { schedule(70); return; }
     const evs = m.step();
     evs.forEach(addEvent);
-    if (MV.pitch) MV.pitch.push(evs);
+    if (MV.pitch) MV.pitch.push(evs, !!MV.skip);
     if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
     if (MV.tab !== 'feed') renderTab();
@@ -290,7 +292,7 @@
     if (m.min === 45 && !m.teams[MV.me].talk) m.teamTalk(MV.me, 'calm');
     resume();
   };
-  A['mv-speed'] = b => { settings().speed = +b.dataset.v; if (MV.pitch) MV.pitch.speed = +b.dataset.v; TL.SFX.click(); renderFoot(); schedule(); };
+  A['mv-speed'] = b => { settings().speed = +b.dataset.v; if (MV.pitch) MV.pitch.speed = +b.dataset.v; renderFoot(); schedule(); };
   A['mv-talk'] = b => {
     const r = MV.m.teamTalk(MV.me, b.dataset.k);
     const last = MV.m.events[MV.m.events.length - 1];
@@ -321,7 +323,7 @@
       while (!m.done) {
         const evs = m.step();
         evs.forEach(addEvent);
-        if (MV.pitch) MV.pitch.push(evs);
+        if (MV.pitch) MV.pitch.push(evs, true);
         if (m.min === 45 && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
       }
       MV.htDone = true;

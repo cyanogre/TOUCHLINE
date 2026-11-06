@@ -191,6 +191,25 @@
       '¡Gol de {p}! Aparece en el segundo palo y empuja a la red.', '¡{p}! Disparo seco desde la frontal. ¡Gol!'
     ],
     assist: ['Gran pase de {a}.', 'Asistencia de {a}.', 'Centro medido de {a}.', '{a} la puso en bandeja.', 'Jugada iniciada por {a}.'],
+    // Goles según el tipo de remate (la vista 2D dibuja exactamente esto)
+    g_header: ['¡Gol de cabeza de {p}! Se eleva por encima de todos.', '¡{p} cabecea a la red! Testarazo imparable.'],
+    g_volley: ['¡Volea de {p}! ¡Golazo!', '¡{p} la engancha de volea y la clava!'],
+    g_long: ['¡GOLAZO de {p} desde fuera del área! Misil a la escuadra.', '¡{p} se saca un zapatazo desde 30 metros! ¡Golazo!'],
+    g_chip: ['¡Vaselina de {p}! Le pica el balón al portero.', '¡Qué clase! {p} la levanta por encima del portero.'],
+    g_tapin: ['¡{p} empuja el rechace a la red!', '¡Gol de {p}, que llega antes que nadie al segundo palo!'],
+    g_solo: ['¡Jugadón de {p}! Se va de dos y define.', '¡{p} se inventa el gol él solo!'],
+    g_placed: ['¡Gol de {p}! Disparo cruzado, raso, junto al palo.', '¡{p} la coloca lejos del portero! Gol.'],
+    g_power: ['¡Gol de {p}! Disparo seco que revienta la red.', '¡{p} la manda al fondo a bocajarro!'],
+    s_header: ['{k} atrapa el cabezazo de {p}.', '¡Paradón de {k} a un cabezazo de {p}!'],
+    s_long: ['{k} desvía el disparo lejano de {p}.', '{p} lo intenta desde lejos; {k} bien colocado.'],
+    s_1v1: ['¡{k} gana el mano a mano a {p}!', '¡Qué parada de {k}! {p} se quedó solo.'],
+    m_post: ['¡AL PALO! {p} estuvo a centímetros.', '¡Larguero! El disparo de {p} se estrella en la madera.'],
+    m_header: ['{p} remata de cabeza, desviado.', 'Cabezazo de {p} que se marcha alto.'],
+    m_long: ['Disparo lejano de {p} que se va por encima del larguero.', '{p} lo prueba desde lejos, fuera.'],
+    m_blocked: ['¡Bloqueado! Un defensa se tira al suelo y frena el disparo de {p}.'],
+    corner: ['Córner para {t}.', 'Saque de esquina a favor de {t}.'],
+    offside: ['Fuera de juego de {p}. Bandera arriba.', '{p} cae en fuera de juego.'],
+    late: ['¡Asedio final! {t} se vuelca en busca del gol.'],
     save: ['¡Paradón de {k}! Desvía el disparo de {p}.', '{p} prueba suerte, pero {k} atrapa el balón.',
       '{k} saca una mano salvadora ante {p}.', '¡Qué reflejos de {k}! Evita el gol de {p}.'],
     miss: ['{p} dispara... ¡fuera por poco!', 'Ocasión clarísima para {p}, que la manda arriba.',
@@ -503,7 +522,18 @@
         const possI = i === 0 ? poss : 1 - poss;
         const fr = M.foulsPerTeam / 90 * (0.55 + 0.9 * (1 - possI)) * MENT_FOULS[t.mentality] * (m > 75 ? 1.12 : 1);
         if (Math.random() < fr) this._foul(i);
-        if (Math.random() < M.offsidePerTeam / 90) this.stats.offsides[i]++;
+        if (Math.random() < M.offsidePerTeam / 90) {
+          this.stats.offsides[i]++;
+          if (this.detail) {
+            const fw = t.onPitch.filter(o => F.LINE[o.slot] === 3);
+            const o = fw.length ? U.pick(fw) : null;
+            if (o) this._ev('offside', i, o.pid, null, Math.random() < 0.3 ? say('offside', { p: this.P(o.pid).short }) : '');
+          }
+        }
+        if (this.detail && t.desperate && !t.lateCall) {
+          t.lateCall = true;
+          this._ev('late', i, null, null, say('late', { t: this.S.clubs[t.club].name }));
+        }
         if (Math.random() < 0.22 / 90 * this.bonus[i].injury) this._injury(i);
         if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 3 && Math.random() < 0.09) this._fatigueSub(i);
       }
@@ -515,7 +545,20 @@
       return this.events.slice(start);
     }
 
-    _scoreGoal(i, shooter, assister, kind) {
+    _shotType(origin, goal, line) {
+      const w = {
+        corner: { header: 0.62, volley: 0.2, tapin: 0.18 },
+        cross: { header: 0.5, volley: 0.2, placed: 0.18, tapin: 0.12 },
+        counter: { placed: 0.5, chip: 0.16, solo: 0.2, power: 0.14 },
+        long: { long: 1 },
+        open: { placed: 0.38, power: 0.3, solo: 0.1, tapin: 0.12, volley: 0.1 }
+      }[origin];
+      const keys = Object.keys(w);
+      // Los goles son más a menudo remates cercanos; los fallos, disparos de lejos o de cabeza
+      return U.weighted(keys, k => w[k] * (goal ? ({ tapin: 1.8, placed: 1.2, chip: 1.4, long: 0.6, header: 0.9 }[k] || 1) : ({ tapin: 0.6, header: 1.15 }[k] || 1)) * (k === 'header' && line < 1 ? 0.2 : 1));
+    }
+
+    _scoreGoal(i, shooter, assister, kind, sx) {
       this.score[i]++;
       this.stats.onT[i]++;
       this.pl[shooter.id].g++;
@@ -525,11 +568,12 @@
         if (kind === 'pen') txt = say('penGoal', { p: shooter.short });
         else if (kind === 'fk') txt = say('fkGoal', { p: shooter.short });
         else {
-          txt = say('goal', { p: shooter.short });
+          const k = sx && TXT['g_' + sx.shotType] ? 'g_' + sx.shotType : 'goal';
+          txt = say(k, { p: shooter.short });
           if (assister) txt += ' ' + say('assist', { a: assister.short });
         }
       }
-      this._ev('goal', i, shooter.id, assister && assister.id, txt, { kind });
+      this._ev('goal', i, shooter.id, assister && assister.id, txt, Object.assign({ kind, late: this.min >= 88 }, sx || {}));
     }
 
     _shot(i) {
@@ -544,8 +588,20 @@
       const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
       const pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8), 0.03, 0.4);
       this.stats.shots[i]++;
-      if (Math.random() < 0.25) this.stats.corners[i]++;
-      if (Math.random() < pGoal) {
+      // De dónde nace la ocasión (la vista 2D la dibuja así)
+      const desp = t.desperate, line = F.LINE[o.slot];
+      const origin = U.weighted(['corner', 'cross', 'counter', 'long', 'open'], k => ({
+        corner: desp ? 0.3 : 0.2, cross: desp ? 0.32 : 0.24, counter: this.teams[1 - i].desperate || this.teams[1 - i].mentality === 2 ? 0.2 : 0.1,
+        long: line <= 2 ? 0.34 : desp ? 0.16 : 0.08, open: 0.4
+      })[k]);
+      if (origin === 'corner') {
+        this.stats.corners[i]++;
+        if (this.detail) this._ev('corner', i, null, null, Math.random() < 0.35 ? say('corner', { t: this.S.clubs[t.club].name }) : '');
+      } else if (Math.random() < 0.08) this.stats.corners[i]++;
+      const goal = Math.random() < pGoal;
+      const shotType = this._shotType(origin, goal, line);
+      const sx = { origin, shotType };
+      if (goal) {
         let assister = null;
         if (Math.random() < 0.75) {
           const mates = t.onPitch.filter(x => x.pid !== shooter.id);
@@ -560,30 +616,39 @@
         if (r < M.varOffsideGoal) {
           this.stats.offsides[i]++;
           if (this.detail) { this._ev('var', i, shooter.id, null, say('var', {})); }
-          this._ev('disallowed', i, shooter.id, null, this.detail ? say('varOff', { p: shooter.short }) : '');
+          this._ev('disallowed', i, shooter.id, null, this.detail ? say('varOff', { p: shooter.short }) : '', sx);
           return;
         }
         if (r < M.varOffsideGoal + err * 0.12) {
-          this._ev('disallowed', i, shooter.id, null, this.detail ? say('varWrong', { p: shooter.short }) : '', { controversy: true });
+          this._ev('disallowed', i, shooter.id, null, this.detail ? say('varWrong', { p: shooter.short }) : '', Object.assign({ controversy: true }, sx));
           this.incidents.push({ type: 'wrongDisallowed', team: i, pid: shooter.id, min: this.min });
           return;
         }
         if (r > 1 - err * 0.08) {
           this.incidents.push({ type: 'illegalGoal', team: 1 - i, pid: shooter.id, min: this.min });
-          this._scoreGoal(i, shooter, assister, 'open');
+          this._scoreGoal(i, shooter, assister, 'open', sx);
           if (this.detail) this._ev('controversy', 1 - i, null, null, say('offStand', {}), { controversy: true });
           return;
         }
-        this._scoreGoal(i, shooter, assister, 'open');
+        this._scoreGoal(i, shooter, assister, 'open', sx);
       } else {
         const onTarget = Math.random() < 0.42;
         if (onTarget) {
           this.stats.onT[i]++;
           if (gk) this.pl[gk.id].sv++;
         }
-        if (this.detail && Math.random() < 0.4) {
-          if (onTarget && gk) this._ev('save', i, shooter.id, gk.id, say('save', { p: shooter.short, k: gk.short }));
-          else this._ev('miss', i, shooter.id, null, say('miss', { p: shooter.short }));
+        if (this.detail) {
+          // Todas las ocasiones se ven en el campo; solo algunas se narran
+          const talk = Math.random() < 0.4;
+          if (onTarget && gk) {
+            const k = shotType === 'header' ? 's_header' : shotType === 'long' ? 's_long' : origin === 'counter' ? 's_1v1' : 'save';
+            this._ev('save', i, shooter.id, gk.id, talk || origin === 'counter' ? say(k, { p: shooter.short, k: gk.short }) : '', Object.assign({ big: origin === 'counter' || shotType === 'tapin' }, sx));
+          } else {
+            const r2 = Math.random();
+            const miss = r2 < 0.1 ? 'post' : r2 < 0.28 && shotType !== 'header' ? 'blocked' : shotType === 'header' ? 'header' : shotType === 'long' ? 'long' : 'wide';
+            const k = miss === 'post' ? 'm_post' : miss === 'blocked' ? 'm_blocked' : miss === 'header' ? 'm_header' : miss === 'long' ? 'm_long' : 'miss';
+            this._ev('miss', i, shooter.id, null, talk || miss === 'post' ? say(k, { p: shooter.short }) : '', Object.assign({ miss }, sx));
+          }
         }
       }
     }
@@ -629,7 +694,7 @@
       const booked = this.pl[fouler.id] && this.pl[fouler.id].y ? 0.5 : 1; // el árbitro perdona más la segunda
       if (cr < M.redPerFoul * strict) this._red(i, fouler, true);
       else if (cr < (M.redPerFoul + M.yellowPerFoul * late * booked) * strict) this._yellow(i, fouler);
-      else if (this.detail && !shown && Math.random() < 0.12) this._ev('foul', i, fouler.id, victim.id, say('foul', { p: fouler.short, v: victim.short }));
+      else if (this.detail && !shown) this._ev('foul', i, fouler.id, victim.id, Math.random() < 0.12 ? say('foul', { p: fouler.short, v: victim.short }) : '', { hard: Math.random() < 0.3 });
       if (Math.random() < M.heatedPerFoul) this._heated();
     }
 

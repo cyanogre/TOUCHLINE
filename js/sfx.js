@@ -62,11 +62,32 @@
     return { f, g, t };
   }
 
+  /** Desbloqueo del audio: en móvil solo vale un gesto "de verdad" (touchend/click). */
+  let unlocked = false;
+  function unlock() {
+    const c = ac();
+    if (!c) return;
+    if (!unlocked) {
+      // iOS: un búfer en silencio dentro del gesto deja el audio abierto
+      try { const b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); } catch (e) { /* nada */ }
+    }
+    if (c.state === 'running') unlocked = true;
+  }
+  ['touchend', 'pointerup', 'mousedown', 'keydown', 'click'].forEach(ev =>
+    document.addEventListener(ev, () => { if (!unlocked) unlock(); }, { capture: true, passive: true }));
+
+  /** Chasquido corto (el "clic" físico del botón). */
+  function tick(vol, delay) { burst(0.014, 'highpass', 3800, vol || 0.16, 0.7, delay); }
+
   const S = {
-    on, setOn,
-    unlock() { ac(); },
-    click() { tone(720, 0.05, 'triangle', 0.08, 380); },
-    tab() { tone(520, 0.06, 'sine', 0.07, 760); },
+    on, setOn, unlock,
+    // Botones: cada tipo suena distinto, agudos y cortos para que se oigan en el altavoz del móvil
+    click() { tone(1180, 0.05, 'triangle', 0.2, 640); tick(0.14); },
+    press() { tone(560, 0.09, 'sine', 0.3, 280); tone(1480, 0.07, 'triangle', 0.09, 1960, 0.03); tick(0.18); },
+    select() { tone(1560, 0.035, 'square', 0.06, 1320); tick(0.1); },
+    back() { tone(820, 0.07, 'triangle', 0.17, 420); },
+    toggle(onState) { tone(onState ? 900 : 640, 0.04, 'square', 0.06, onState ? 1300 : 420); tick(0.12); },
+    tab() { tone(640, 0.07, 'sine', 0.16, 1180); tick(0.08); },
     error() { tone(150, 0.16, 'square', 0.06); tone(120, 0.18, 'square', 0.05, null, 0.09); },
     success() { tone(660, 0.1, 'triangle', 0.12); tone(990, 0.16, 'triangle', 0.12, null, 0.09); },
     coin() { tone(988, 0.08, 'square', 0.07); tone(1319, 0.22, 'square', 0.07, null, 0.07); },
@@ -116,6 +137,7 @@
     },
     kick() { burst(0.07, 'lowpass', 260, 0.35, 0.7); tone(110, 0.08, 'sine', 0.2, 60); },
     net() { burst(0.25, 'bandpass', 1800, 0.12, 0.6); },
+    post() { tone(1850, 0.35, 'triangle', 0.16, 1700); tone(2770, 0.25, 'sine', 0.08); burst(0.03, 'highpass', 5000, 0.2); },
     card() { burst(0.05, 'highpass', 3000, 0.2); S.whistle(false); },
     goal(mine) {
       const c = ac(); if (!c || !on()) return;

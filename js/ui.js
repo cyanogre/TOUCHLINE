@@ -173,7 +173,7 @@
   };
   A.music = () => Music.toggle();
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
-  A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); UI.refresh(); };
+  A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); UI.refresh(); };
   A['opt-mentor'] = () => { TL.Mentor.setOn(!TL.Mentor.on()); UI.refresh(); };
   UI.Music = Music;
 
@@ -1325,7 +1325,7 @@
     </div>`;
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
-  A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); renderTitle(); };
+  A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); renderTitle(); };
   UI.renderTitle = renderTitle;
 
   A.continue = async () => {
@@ -1495,11 +1495,19 @@
   UI.showRoundResults = showRoundResults;
 
   // ------------------------------------------------------------ Eventos globales
-  document.addEventListener('pointerdown', () => TL.SFX && TL.SFX.unlock(), { once: true });
+  /** Sonido de cada botón según su tipo (los diálogos del Profe ya tienen su voz). */
+  function buttonSound(el) {
+    const S_ = TL.SFX, act = el.dataset.act;
+    if (!S_ || /^(tab|vn-|tut-)/.test(act)) return;
+    if (act === 'close-sheet' || el.classList.contains('icon-btn') && /close|back/.test(act + el.getAttribute('aria-label'))) S_.back();
+    else if (el.classList.contains('primary')) { S_.press(); if (navigator.vibrate && S_.on()) try { navigator.vibrate(8); } catch (e) { /* nada */ } }
+    else if (el.matches('.chip, .seg button, [role="tab"]')) S_.select();
+    else S_.click();
+  }
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
-    if (TL.SFX && !/^(tab|mv-|tut-|vn-)/.test(el.dataset.act)) TL.SFX.click();
+    buttonSound(el);
     const f = A[el.dataset.act];
     if (f) { ev.preventDefault(); f(el, ev); }
   });
@@ -1510,7 +1518,10 @@
     if (f) f(el, ev);
   };
   document.addEventListener('input', ev => { if (ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev); });
-  document.addEventListener('change', ev => { if (!ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev); });
+  document.addEventListener('change', ev => {
+    if (ev.target.matches('input[type="checkbox"]') && TL.SFX) TL.SFX.toggle(ev.target.checked);
+    if (!ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev);
+  });
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && document.querySelector('.sheet-back')) closeSheet();
   });
