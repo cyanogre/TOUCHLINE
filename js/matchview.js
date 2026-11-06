@@ -26,7 +26,7 @@
     UI.lineupWarning(S);
     const m = G.startMatch();
     if (!m) { A['play-quick'](); return; }
-    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, subOut: null, skip: null, prompt: null });
+    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null });
     MV.me = m.teams[0].isUser ? 0 : 1;
     const [h, a] = m.teams.map(t => S.clubs[t.club]);
     const L = W.userLeague(S);
@@ -204,7 +204,9 @@
     if (!foot) return;
     if (MV.finished) {
       pr.innerHTML = '';
-      foot.innerHTML = `<button class="btn primary block" data-act="mv-done">Ver resumen</button>`;
+      // Una vez visto el resumen, solo queda salir (la jornada ya se ha jugado)
+      foot.innerHTML = MV.summary ? `<button class="btn primary block" data-act="mv-close">Continuar</button>`
+        : `<button class="btn primary block" data-act="mv-done">Ver resumen</button>`;
       return;
     }
     pr.innerHTML = promptHtml();
@@ -422,6 +424,8 @@
   // ------------------------------------------------------------ Final
   A['mv-done'] = () => {
     const m = MV.m, S = G.S;
+    if (!m || MV.summary) return;
+    MV.summary = true;
     G.completeRound(m);
     const res = S.fixtures[S.week - 1].find(x => x[0] === S.user || x[1] === S.user);
     const t = m.teams[MV.me];

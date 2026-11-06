@@ -124,6 +124,8 @@
     completeRound(match) {
       const S = Game.S;
       if (S.over || !S.fixtures[S.week]) return [];
+      if (match && match._applied) return []; // un partido solo cuenta una vez
+      if (match) match._applied = true;
       const res = match ? match.finish() : null;
       const results = TL.Season.playRound(S, res);
       Game.save();
