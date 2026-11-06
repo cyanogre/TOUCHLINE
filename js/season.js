@@ -89,6 +89,8 @@
    * usuario (Match.finish()) o null para simularlo aquí.
    */
   function playRound(S, userResult) {
+    // Las jornadas de copa de esta semana van antes (entre semana)
+    TL.Cups.catchUp(S);
     const round = S.fixtures[S.week];
     const results = [];
     for (const m of round) {
@@ -227,6 +229,9 @@
     // Ascensos / descensos
     const moves = [], orders = {};
     const orderOf = id => orders[id] || (orders[id] = id === L.id ? tab.map(r => r.id) : quickSeasonOrder(S, S.leagues[id]));
+    // Orden final de cada liga: decide quién juega las copas continentales
+    S.lastOrder = {};
+    for (const l of S.leagues) if (l.playable && l.clubs.length) S.lastOrder[l.id] = orderOf(l.id);
     for (const [up, down, k] of S.promotion) {
       const orderUp = orderOf(up), orderDown = orderOf(down);
       const relegated = orderUp.slice(-k), promoted = orderDown.slice(0, k);
@@ -271,6 +276,7 @@
       season: S.season, club: S.clubs[S.user].name, league: L.name, pos, n,
       top: sum.myTop ? sum.myTop[0] + ' (' + sum.myTop[1] + ')' : '—', moved: sum.moved || ''
     });
+    TL.Cups.seasonEnd(S, sum);
 
     if (S.board.conf < 15) { S.fired = true; sum.fired = true; }
     // Reputación del mánager y ofertas de trabajo de otros clubes
@@ -394,6 +400,7 @@
     W.dirty(S);
     makeFixtures(S);
     setObjective(S);
+    TL.Cups.newSeason(S);
     S.tactics.slots = E.autoLineup(W.squad(S, S.user), S.tactics.formation, false);
     TL.Commerce.newSeason(S);
     for (const p of W.squad(S, S.user)) if (p.mor == null) p.mor = 70;

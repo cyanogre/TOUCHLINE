@@ -287,6 +287,16 @@
       next = `<section class="card next-match span2"><div class="nm-meta"><span>${esc(L.name)} · Jornada ${S.week + 1}</span><span>${U.fmtDate(U.dateOf(S.season, S.week))}</span></div>
         <div class="center" style="margin:22px 0 18px"><h2 style="font-size:26px">Jornada de descanso</h2><p class="muted">Tu equipo no juega esta semana.</p></div>
         <div class="nm-actions" style="grid-template-columns:1fr"><button class="btn primary" data-act="play-quick">Avanzar jornada</button></div></section>`;
+    } else if (TL.Cups.pendingUser(S)) {
+      const cp = TL.Cups.pendingUser(S);
+      const h = S.clubs[cp.home], a = S.clubs[cp.away];
+      const agg = cp.leg === 1 && cp.tie.s[0] ? (() => { const [x, y] = cp.tie.s[0]; return cp.tie.h === S.user ? `${x}-${y}` : `${y}-${x}`; })() : null;
+      next = `<section class="card next-match cup span2" style="--cup:${cp.cup.color}">
+        <div class="nm-meta"><span class="cup-badge">${cp.cup.icon} ${esc(cp.cup.name)}</span><span>Entre semana · J${S.week + 1}</span></div>
+        <div class="cup-round">${esc(cp.round)}${cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
+        <div class="nm-teams">${[h, a].map(cl => `<div class="nm-team">${crest(cl, 'lg')}<span class="nm-name">${esc(cl.name)}</span><span class="nm-info">${esc(S.leagues[cl.league].country)}</span></div>`).join('<div class="nm-vs">VS</div>')}</div>
+        <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
+        <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     } else {
       const h = S.clubs[fx[0]], a = S.clubs[fx[1]];
       const team = (cl) => {
@@ -768,9 +778,12 @@
   VIEWS.league = S => {
     const L = W.userLeague(S);
     const t = UI.league.tab;
-    const seg = `<div class="seg" style="margin-bottom:12px">${[['table', 'Clasificación'], ['rounds', 'Jornadas'], ['scorers', 'Goleadores']]
+    const seg = `<div class="seg" style="margin-bottom:12px">${[['table', 'Clasificación'], ['rounds', 'Jornadas'], ['scorers', 'Goleadores'], ['cups', 'Copas']]
       .map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-act="lg-tab" data-k="${k}">${l}</button>`).join('')}</div>`;
     let body = '';
+    if (t === 'cups') {
+      return pageTitle(esc(L.name), `${flagImg(L.flag, L.country)} ${esc(L.country)} · ${U.seasonLabel(S.season)}`) + seg + cupsView(S);
+    }
     if (t === 'table') {
       const { promote, relegate } = SE.promoInfo(S);
       const legend = [promote ? `<span><span class="zone up">↑</span> Ascenso</span>` : '', relegate ? `<span><span class="zone down">↓</span> Descenso</span>` : '']
@@ -1418,6 +1431,7 @@
         <div><div class="k">Experiencia</div><div class="v">+${sum.xp || 0} XP · nivel ${S.mgr.level}</div></div>
         <div><div class="k">Pichichi</div><div class="v">${sum.topScorer ? esc(sum.topScorer[0]) + ' (' + sum.topScorer[1] + ')' : '—'}</div></div>
         <div><div class="k">Tu goleador</div><div class="v">${sum.myTop ? esc(sum.myTop[0]) + ' (' + sum.myTop[1] + ')' : '—'}</div></div>
+        ${sum.cup ? `<div><div class="k">${esc(sum.cup.name)}</div><div class="v ${sum.cup.reached === 'Campeón' ? 'pos-ok' : ''}">${sum.cup.reached === 'Campeón' ? '🏆 Campeón' : esc(sum.cup.reached)}</div></div>` : ''}
       </div>
       ${sum.left.length ? `<p class="note mt">Se van libres (fin de contrato): ${esc(sum.left.join(', '))}.</p>` : ''}
       ${sum.retired.length ? `<p class="note mt">Se retiran: ${esc(sum.retired.join(', '))}.</p>` : ''}
@@ -1601,11 +1615,66 @@
     const S = G.S;
     if (S.over) return;
     lineupWarning(S);
+    if (TL.Cups.pendingUser(S)) {
+      TL.SFX.whistle(false);
+      const r = G.quickCup();
+      showCupResult(S, r);
+      return;
+    }
     TL.SFX.whistle(false);
     G.completeRound(null);
     const m = S.fixtures[S.week - 1].find(m => m[0] === S.user || m[1] === S.user) || null;
     showRoundResults(S, S.week - 1, m);
   };
+
+  // ------------------------------------------------------------ Copas continentales
+  function tieHtml(S, cup, t, r) {
+    const [a, b] = TL.Cups.aggregate(t);
+    const legs = t.s.map(x => (x ? `${x[0]}-${x[1]}` : '')).filter(Boolean).join(' · ');
+    const cls = id => (t.w === id ? 'win' : t.w != null ? 'out' : '') + (id === S.user ? ' me' : '');
+    return `<div class="cup-tie ${t.h === S.user || t.a === S.user ? 'mine' : ''}">
+      <div class="ct-team ${cls(t.h)}">${crest(S.clubs[t.h], 'xs')}<span>${esc(S.clubs[t.h].short || S.clubs[t.h].name)}</span></div>
+      <div class="ct-score num">${t.s.length ? `${a}-${b}` : 'vs'}${t.pens ? '<small>pen.</small>' : ''}${r.legs > 1 && t.s.length ? `<small>${legs}</small>` : ''}</div>
+      <div class="ct-team r ${cls(t.a)}"><span>${esc(S.clubs[t.a].short || S.clubs[t.a].name)}</span>${crest(S.clubs[t.a], 'xs')}</div></div>`;
+  }
+
+  function cupsView(S) {
+    const cups = S.cups || [];
+    if (!cups.length) return '<div class="card"><div class="empty">Esta temporada no hay competiciones continentales.</div></div>';
+    const mine = TL.Cups.myCup(S);
+    const sel = UI.cupSel && cups.find(c => c.id === UI.cupSel) ? UI.cupSel : (mine || cups[0]).id;
+    const cup = cups.find(c => c.id === sel);
+    const chips = cups.map(c => `<button class="chip ${c.id === sel ? 'on' : ''}" data-act="cup-sel" data-k="${c.id}">${c.icon} ${esc(c.short)}${c.clubs.includes(S.user) ? ' · tú' : ''}</button>`).join('');
+    const next = cup.mds.find(m => !m.done);
+    const head = cup.champ != null ? `<div class="cup-champ">🏆 Campeón: ${crest(S.clubs[cup.champ], 'sm')} <b>${esc(S.clubs[cup.champ].name)}</b></div>`
+      : `<p class="note" style="margin:0">${cup.clubs.length} clubes · ${next ? `Próximo partido: ${esc(cup.rounds[next.r].name)}${cup.rounds[next.r].legs > 1 ? (next.leg ? ' (vuelta)' : ' (ida)') : ''}, jornada ${next.week + 1}` : ''}</p>`;
+    const rounds = cup.rounds.map((r, ri) => r.ties.length ? `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div>${r.ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>` : '').reverse().join('');
+    return `<div class="chips" style="margin-bottom:10px">${chips}</div>
+      <div class="card cup-card" style="--cup:${cup.color}"><div class="card-head"><h2>${cup.icon} ${esc(cup.name)}</h2></div>${head}
+      ${mine ? '' : '<p class="note">Clasifícate terminando arriba en tu liga para jugarla la próxima temporada.</p>'}
+      <div class="cup-rounds">${rounds}</div></div>`;
+  }
+  A['cup-sel'] = el => { UI.cupSel = el.dataset.k; UI.refresh(); };
+  UI.tieHtml = tieHtml;
+
+  function showCupResult(S, r) {
+    const m = r.m, p = r.p;
+    const me = m.teams[0].club === S.user ? 0 : 1;
+    const gf = m.score[me], ga = m.score[1 - me];
+    const res = gf > ga ? 'V' : gf < ga ? 'D' : 'E';
+    const t = p.tie, round = p.cup.rounds[p.md.r];
+    const decided = t.w != null;
+    const through = decided && t.w === S.user;
+    sheet(sheetHead(`${p.cup.icon} ${esc(p.cup.short)} · ${esc(round.name)}`) + `<div class="card next-match cup" style="--cup:${p.cup.color};margin-bottom:12px"><div class="nm-teams" style="margin:6px 0">
+        <div class="nm-team">${crest(S.clubs[m.teams[0].club], 'lg')}<span class="nm-name">${esc(S.clubs[m.teams[0].club].name)}</span></div>
+        <div class="num" style="font-size:40px;font-weight:800">${m.score[0]} - ${m.score[1]}</div>
+        <div class="nm-team">${crest(S.clubs[m.teams[1].club], 'lg')}<span class="nm-name">${esc(S.clubs[m.teams[1].club].name)}</span></div></div>
+        <p class="center" style="margin:0;font-weight:700;color:${res === 'V' ? 'var(--accent2)' : res === 'D' ? 'var(--danger)' : 'var(--muted)'}">${res === 'V' ? 'Victoria' : res === 'D' ? 'Derrota' : 'Empate'}${decided ? (through ? ' · ¡Pasamos de ronda!' : ' · Eliminados') : ''}</p></div>
+      <div class="card" style="padding:6px 10px">${round.ties.map(x => tieHtml(S, p.cup, x, round)).join('')}</div>
+      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { render(false); celebrate(S); } });
+    setTimeout(() => { if (res === 'V' || through) { TL.FX.confetti({ palette: through && p.cup.champ === S.user ? 'gold' : 'green' }); TL.SFX.goal(true); } else if (res === 'D') TL.SFX.groan(); }, 150);
+  }
+  UI.showCupResult = showCupResult;
 
   /** Celebraciones pendientes (subida de nivel del mánager). */
   function celebrate(S) {

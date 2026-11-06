@@ -56,6 +56,7 @@
       TL.News.add(S, 'club', `${S.manager}, nuevo entrenador de ${c.name}`,
         `El club presenta a su nuevo técnico con un objetivo claro: ${S.board.text.toLowerCase()}.`, S.user, null, 'pos');
       Game.S = S;
+      TL.Cups.newSeason(S);
       Game.save();
       return S;
     },
@@ -115,9 +116,24 @@
     /** Partido del usuario de la jornada actual (con narración). */
     startMatch() {
       const S = Game.S;
+      // Primero, el partido de copa de esta semana (si lo hay)
+      const cp = TL.Cups.pendingUser(S);
+      if (cp) { const m = new E.Match(S, cp.home, cp.away, { detail: true }); m.cup = cp; return m; }
       const fx = TL.Season.nextFixture(S);
       if (!fx) return null;
       return new E.Match(S, fx[0], fx[1], { detail: true });
+    },
+
+    /** Partido de copa en resultado rápido. */
+    quickCup() {
+      const S = Game.S;
+      const cp = TL.Cups.pendingUser(S);
+      if (!cp) return null;
+      const m = new E.Match(S, cp.home, cp.away);
+      m.cup = cp; m._applied = true;
+      const out = TL.Cups.completeUser(S, m.simulate().finish(), cp);
+      Game.save();
+      return Object.assign(out, { m, p: cp });
     },
 
     /** Completa la jornada. match: Match del usuario terminado, o null para simularlo. */
@@ -126,6 +142,7 @@
       if (S.over || !S.fixtures[S.week]) return [];
       if (match && match._applied) return []; // un partido solo cuenta una vez
       if (match) match._applied = true;
+      if (match && match.cup) { const out = TL.Cups.completeUser(S, match.finish(), match.cup); Game.save(); return out; }
       const res = match ? match.finish() : null;
       const results = TL.Season.playRound(S, res);
       Game.save();

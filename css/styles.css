@@ -910,3 +910,21 @@ details summary { list-style: revert; }
   .match.mini .mbody::before { display: none; }
   .nav { --nav-h: 52px; }
 }
+/* Copas continentales */
+.next-match.cup { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cup) 45%, transparent), var(--shadow); background: radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--cup) 22%, transparent), transparent 60%), var(--surface); }
+.cup-badge { color: var(--cup); font-weight: 800; letter-spacing: 0.04em; }
+.cup-round { text-align: center; font-family: var(--font-c); font-weight: 700; font-size: 15px; color: var(--text); margin: 4px 0 2px; }
+.cup-card { box-shadow: inset 3px 0 0 var(--cup); }
+.cup-champ { display: flex; align-items: center; gap: 8px; font-size: 16px; padding: 8px 10px; border-radius: 10px; background: rgb(242 201 76 / 0.12); border: 1px solid rgb(242 201 76 / 0.4); }
+.cup-rounds { display: grid; gap: 4px; margin-top: 8px; }
+.cup-round-box.cur .group-title { color: var(--cup); }
+.cup-tie { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid rgb(255 255 255 / 0.05); font-size: 13.5px; }
+.cup-tie.mine { background: rgb(184 245 61 / 0.07); border-radius: 8px; }
+.ct-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ct-team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-team.r { justify-content: flex-end; text-align: right; }
+.ct-team.win { font-weight: 800; color: var(--text); }
+.ct-team.out { color: var(--muted); opacity: 0.75; }
+.ct-team.me span { color: var(--accent); }
+.ct-score { display: flex; flex-direction: column; align-items: center; font-weight: 800; min-width: 54px; }
+.ct-score small { font-size: 10.5px; color: var(--muted); font-weight: 600; }

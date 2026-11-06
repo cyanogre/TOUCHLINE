@@ -35,7 +35,7 @@
     root.id = 'match';
     root.innerHTML = `
       <div class="mh">
-        <div class="comp">${esc(L.name)} · J${S.week + 1} · Árbitro: ${esc(m.ref.name)} (${m.ref.label})</div>
+        <div class="comp">${m.cup ? `${m.cup.cup.icon} ${esc(m.cup.label)}` : `${esc(L.name)} · J${S.week + 1}`} · Árbitro: ${esc(m.ref.name)} (${m.ref.label})</div>
         <div class="score">
           <div class="t">${UI.crest(h)}<b>${esc(h.name)}</b></div>
           <div><div class="res num" id="mv-score">0-0</div><div class="min" id="mv-min">0'</div></div>
@@ -440,7 +440,8 @@
     if (!m || MV.summary) return;
     MV.summary = true;
     G.completeRound(m);
-    const res = S.fixtures[S.week - 1].find(x => x[0] === S.user || x[1] === S.user);
+    const cp = m.cup;
+    const res = cp ? [m.teams[0].club, m.teams[1].club, m.score[0], m.score[1]] : S.fixtures[S.week - 1].find(x => x[0] === S.user || x[1] === S.user);
     const t = m.teams[MV.me];
     const rated = Object.keys(m.pl).map(Number).filter(id => m.pl[id].team === MV.me);
     const notes = m.lastRatings || {};
@@ -465,8 +466,10 @@
             ${rec.g ? '⚽'.repeat(rec.g) : ''}${rec.a ? '🅰️' : ''}${rec.y ? '🟨' : ''}${rec.r ? '🟥' : ''}${p.inj > 0 ? '🚑' : ''}
             <span class="rating ${r >= 7.5 ? 'hi' : r < 6 ? 'lo' : ''}">${r != null ? r.toFixed(1) : '—'}</span></div>`;
         }).join('')}</div>
-      <div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
-        ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`;
+      ${cp ? `<div class="card mt" style="padding:6px 10px"><div class="group-title">${cp.cup.icon} ${esc(cp.cup.name)} · ${esc(cp.round)}</div>
+        ${cp.cup.rounds[cp.md.r].ties.map(x => UI.tieHtml(S, cp.cup, x, cp.cup.rounds[cp.md.r])).join('')}</div>`
+        : `<div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
+        ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`}`;
     UI.mountFaces(body);
     el('mv-prompt').innerHTML = '';
     el('mv-foot').innerHTML = `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
