@@ -161,8 +161,8 @@
     return { ok: true, msg: `${m.short} será el padrino de ${p.short}.` };
   }
   function staffBonus(S) {
-    const st = (S.lk && S.lk.staff) || [];
-    return { youth: st.some(s => s.role === 'youth') ? 1.12 : 1, gk: st.some(s => s.role === 'gk') ? 1.2 : 1, assistant: st.some(s => s.role === 'assistant') };
+    const q = r => (TL.Staff ? TL.Staff.lv(S, r) : 0);
+    return { youth: 1 + 0.05 * q('youth'), gk: 1 + 0.08 * q('gk'), assistant: q('assistant') > 0 };
   }
 
   /** Multiplicador de crecimiento para develop(): padrino, entrenamiento, cuerpo técnico, ADN. */
@@ -172,9 +172,7 @@
     const m = S.lk.mentor[p.id];
     if (m != null && S.players[m] && S.players[m].club === S.user) g *= F.LINE[S.players[m].pos] === F.LINE[p.pos] ? 1.3 : 1.18;
     if (S.lk.focus[p.id]) g *= 1.1;
-    const sb = staffBonus(S);
-    if (p.age <= 23) g *= sb.youth;
-    if (p.pos === 'GK') g *= sb.gk;
+    if (TL.Staff) g *= TL.Staff.growth(S, p);
     if (hasTrait(S, p.id, 'vision') && ['RB', 'LB', 'CDM'].includes(p.pos)) g *= 1.25; // reconvertido, como debe ser
     return g;
   }
@@ -213,7 +211,7 @@
     const L = state(S);
     const had = pupilsOf(S, p.id).length > 0 || hasTrait(S, p.id, 'leader') || p.ovr >= S.clubs[S.user].rep;
     for (const k of pupilsOf(S, p.id)) delete L.mentor[k];
-    if (!had || L.staff.length >= 3) return;
+    if (!had) return;
     const opts = [['youth', 'Entrenador de juveniles'], ['assistant', 'Segundo entrenador']];
     if (p.pos === 'GK') opts.unshift(['gk', 'Entrenador de porteros']);
     opts.push(['farewell', 'Homenaje y despedida']);
@@ -292,7 +290,7 @@
     const L = state(S);
     if (S.season < L.nextScout || S.week !== 2) return;
     L.nextScout = S.season + 1;
-    if (Math.random() > 0.45) return;
+    if (Math.random() > 0.45 + 0.08 * (TL.Staff ? TL.Staff.lv(S, 'scout') : 0)) return;
     const k = U.int(0, SCOUT.length - 1), sc = SCOUT[k];
     const jp = S.nations.findIndex(n => n[0] === 'Japón');
     const nat = sc.from === 'Japón' && jp >= 0 ? jp : U.pick(W().squad(S, S.user).map(p => p.nat));
@@ -460,10 +458,77 @@
   // ------------------------------------------------------------ Despacho y semana a semana
   function appsOf(S, pid) { return (S.stats[pid] || [0])[0]; }
 
+  // ------------------------------------------------------------ Desarrollo semana a semana
+  // Estadísticas que más trabaja cada puesto [rit, tir, pas, reg, def, fis]
+  const POS_ST = { GK: [4, 5], CB: [4, 5], RB: [0, 4], LB: [0, 4], CDM: [4, 2], CM: [2, 5], CAM: [2, 3], RM: [0, 2], LM: [0, 2], RW: [0, 3], LW: [0, 3], ST: [1, 3] };
+  /** ¿Este jugador progresa semana a semana? (los tuyos y tus cedidos) */
+  function grows(S, p) {
+    if (p.club === S.user) return true;
+    const l = loanOf(S, p.id);
+    return !!(l && l.from === S.user);
+  }
+  function pushHist(S, p) {
+    const L = state(S);
+    L.ph = L.ph || {};
+    const h = L.ph[p.id] || (L.ph[p.id] = []);
+    const last = h[h.length - 1];
+    if (last && last[0] === S.season && last[1] === S.week) last[2] = p.ovr; else h.push([S.season, S.week, p.ovr]);
+    if (h.length > 60) h.splice(0, h.length - 60);
+  }
+  function raise(S, p, d) {
+    const L = state(S);
+    if (!L.ph || !L.ph[p.id]) pushHist(S, p);
+    p.ovr = U.clamp(p.ovr + d, 30, 95);
+    const f = L.focus[p.id] && FOCUS[L.focus[p.id]];
+    const idx = f && f.st.length ? f.st : POS_ST[p.pos] || [2, 5];
+    idx.forEach(i => { p.st[i] = U.clamp(p.st[i] + d, 15, 99); });
+    const other = U.int(0, 5);
+    if (!idx.includes(other) && Math.random() < 0.5) p.st[other] = U.clamp(p.st[other] + d, 15, 99);
+    pushHist(S, p);
+  }
+
+  /** Cada jornada: minutos, nota, moral, entrenamiento, padrino y cuerpo técnico hacen crecer (o estancarse) a los jóvenes. */
+  function growWeek(S, mine) {
+    const L = state(S);
+    L.dp = L.dp || {}; L.rh = L.rh || {}; L.month = L.month || [];
+    const slots = (mine && mine.slots) || {}, ratings = (mine && mine.ratings) || {};
+    const youthSkill = TL.Manager.B(S).youthGrowth;
+    const out = W().squad(S, S.user).concat(L.loans.filter(l => l.from === S.user).map(l => S.players[l.pid]).filter(Boolean));
+    for (const p of out) {
+      const r = ratings[p.id];
+      if (r != null) { const a = L.rh[p.id] || (L.rh[p.id] = []); a.push(r); if (a.length > 12) a.shift(); }
+      if (p.age > 27) continue;
+      const away = p.club !== S.user;
+      const on = slots[p.id] != null;
+      const room = Math.max(0, p.pot - p.ovr);
+      const ageF = p.age <= 19 ? 1 : p.age <= 21 ? 0.85 : p.age <= 23 ? 0.65 : p.age <= 25 ? 0.4 : 0.22;
+      const minF = away ? 0.75 : on ? 1 : p.inj > 0 ? 0.08 : 0.35;
+      const rateF = r == null ? 1 : r >= 7.5 ? 1.45 : r >= 7 ? 1.2 : r >= 6.4 ? 1 : r >= 6 ? 0.75 : 0.5;
+      const m = p.mor == null ? 70 : p.mor;
+      const morF = m >= 75 ? 1.15 : m >= 55 ? 1 : m >= 40 ? 0.8 : 0.6;
+      const gain = room * 0.016 * ageF * minF * rateF * morF * growth(S, p) * (p.age <= 23 ? youthSkill : 1);
+      L.dp[p.id] = (L.dp[p.id] || 0) + gain;
+      while (L.dp[p.id] >= 1 && p.ovr < p.pot) { L.dp[p.id] -= 1; const b = p.ovr; raise(S, p, 1); L.month.push([p.id, b, p.ovr]); }
+      // Para mal: sin minutos y triste, el techo baja; para bien, partidazos que lo suben
+      if (!away && !on && p.age <= 23 && m < 50 && S.week > 6 && Math.random() < 0.05) { p.pot = Math.max(p.ovr, p.pot - 1); L.month.push([p.id, -1, -1]); }
+      if (r != null && r >= 8 && p.age <= 23 && Math.random() < 0.3) p.pot = Math.min(95, p.pot + 1);
+    }
+    // Resumen cada 4 jornadas
+    if (S.week % 4 === 3 && L.month.length) {
+      const up = {}, down = new Set();
+      for (const [id, b, a] of L.month) { if (b === -1) down.add(id); else up[id] = up[id] ? [up[id][0], a] : [b, a]; }
+      const lines = Object.entries(up).map(([id, [b, a]]) => `${S.players[id] ? S.players[id].short : '?'} ${b}→${a}`);
+      const st = [...down].map(id => S.players[id] && S.players[id].short).filter(Boolean);
+      if (lines.length || st.length) TL.Game.mail(S, '📈 Progresión del mes', (lines.length ? `Mejoran: ${lines.join(', ')}.` : '') + (st.length ? ` Se están estancando por falta de minutos y moral: ${st.join(', ')}.` : ''), lines.length ? 'good' : 'med');
+      L.month = [];
+    }
+  }
+
   /** Tras cada jornada: minutos, promesas, química, padrinos, egos y joyas. */
   function afterRound(S, results) {
     const L = state(S);
     const mine = results.find(r => r.h === S.user || r.a === S.user);
+    growWeek(S, mine);
     const played = new Set();
     if (mine && mine.slots) {
       for (const id in mine.slots) {
@@ -489,7 +554,6 @@
     // Ganar juntos une
     const won = mine && ((mine.h === S.user && mine.hg > mine.ag) || (mine.a === S.user && mine.ag > mine.hg));
     if (won) { const pl = [...played]; for (let i = 0; i < 3; i++) { const [x, y] = U.shuffle(pl.slice()).slice(0, 2); bond(S, x, y, 3); } }
-    if (staffBonus(S).assistant) sq.forEach(p => { p.mor = Math.min(100, (p.mor || 70) + 0.4); });
     // Promesas de minutos
     for (const pr of L.promises.slice()) {
       const p = S.players[pr.pid];
@@ -703,10 +767,8 @@
     ] }
   };
   function hire(S, p, role) {
-    const L = state(S);
-    L.staff = L.staff.filter(s => s.role !== role);
-    L.staff.push({ name: p.name, role, from: p.id, s: S.season });
-    return `${p.name} se incorpora como ${STAFF[role].name.toLowerCase()}: ${STAFF[role].desc}.`;
+    const q = TL.Staff.fromPlayer(S, p, role);
+    return `${p.name} se incorpora como ${TL.Staff.ROLES[role].name.toLowerCase()} (${'★'.repeat(q)}): ${TL.Staff.ROLES[role].desc(q)}`;
   }
 
   // Con el mercado abierto, los que pidieron cesión se ceden
@@ -725,6 +787,7 @@
     const id = v => (map.has(+v) ? map.get(+v) : null);
     const byKey = obj => { const out = {}; for (const k in obj) { const n = id(k); if (n != null) out[n] = obj[k]; } return out; };
     L.tr = byKey(L.tr); L.gems = byKey(L.gems); L.focus = byKey(L.focus); L.boss = byKey(L.boss); L.asked = byKey(L.asked || {});
+    L.ph = byKey(L.ph || {}); L.rh = byKey(L.rh || {}); L.dp = byKey(L.dp || {}); L.month = [];
     const men = {};
     for (const k in L.mentor) { const a = id(k), b = id(L.mentor[k]); if (a != null && b != null) men[a] = b; }
     L.mentor = men;
@@ -749,7 +812,7 @@
     TRAITS, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
     canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem,
     onLoan, loanOf, loanOut, loanIn, loanable, recall, endLoans, activity, actCost, actReady, matchBoost,
-    afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet
+    afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet, grows, pushHist
   };
   if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);
 })();

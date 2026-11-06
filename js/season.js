@@ -144,6 +144,13 @@
     // Repaso del Profe (solo a posteriori) y la vida de los banquillos rivales
     for (const r of results) if (r.review) TL.Coach.store(S, r.review);
     TL.Locker.afterRound(S, results);
+    TL.Staff.weekly(S);
+    // Historial para las gráficas: saldo y posición jornada a jornada
+    S.hist = S.hist || { cash: [], pos: [] };
+    const tabNow = table(S);
+    S.hist.cash.push([S.season, S.week, Math.round(S.clubs[S.user].cash)]);
+    S.hist.pos.push([S.season, S.week, tabNow.findIndex(r => r.id === S.user) + 1, tabNow.length]);
+    for (const k of ['cash', 'pos']) if (S.hist[k].length > 160) S.hist[k].splice(0, S.hist[k].length - 160);
     S.week++;
     TL.Coach.weekly(S);
     TL.Locker.weekly(S);
@@ -368,8 +375,10 @@
     const apps = (S.stats[p.id] || [0])[0];
     const playBonus = apps >= 20 ? 1.15 : apps >= 8 ? 1 : 0.85;
     const grow = (p.club === S.user ? TL.Manager.B(S).youthGrowth : 1) * TL.Locker.growth(S, p);
-    if (p.age <= 23) d = Math.round((p.pot - p.ovr) * U.rand(0.18, 0.45) * playBonus * grow);
-    else if (p.age <= 27) d = p.pot > p.ovr ? Math.round((p.pot - p.ovr) * U.rand(0.2, 0.6)) : U.int(-1, 1);
+    // Tus jugadores (y tus cedidos) ya han crecido semana a semana durante la temporada
+    const weekly = TL.Locker.grows(S, p);
+    if (p.age <= 23) d = weekly ? 0 : Math.round((p.pot - p.ovr) * U.rand(0.18, 0.45) * playBonus * grow);
+    else if (p.age <= 27) d = weekly ? 0 : p.pot > p.ovr ? Math.round((p.pot - p.ovr) * U.rand(0.2, 0.6)) : U.int(-1, 1);
     else if (p.age <= 30) d = U.int(-2, 1);
     else if (p.age <= 32) d = U.int(-3, 0);
     else d = U.int(-5, -1);
@@ -380,6 +389,7 @@
     const delta = p.ovr - before;
     if (delta) p.st = p.st.map(v => U.clamp(v + delta, 15, 99));
     p.fit = 100; p.inj = 0; p.sus = 0;
+    if (TL.Locker.grows(S, p)) TL.Locker.pushHist(S, p);
     TL.Locker.afterDevelop(S, p);
   }
 

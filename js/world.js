@@ -358,7 +358,7 @@
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
       coaches: TL.Coach.serialize(S), lastForm: S.lastForm || {}, reviews: S.reviews || [],
       lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [],
-      cups: S.cups || [], lastOrder: S.lastOrder || null, titles: S.titles || [],
+      cups: S.cups || [], lastOrder: S.lastOrder || null, titles: S.titles || [], staff: S.staff || [], staffMarket: S.staffMarket || null, hist: S.hist || null,
       pb, pg,
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
@@ -398,7 +398,7 @@
       settings: save.settings, log: save.log || { crowd: {} }, leader: save.leader,
       wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone, mentor: save.mentor || null,
       lastForm: save.lastForm || {}, reviews: save.reviews || [], lk: save.lk || null, tlog: save.tlog || [],
-      cups: save.cups || null, lastOrder: save.lastOrder || null, titles: save.titles || [],
+      cups: save.cups || null, lastOrder: save.lastOrder || null, titles: save.titles || [], staff: save.staff || [], staffMarket: save.staffMarket || null, hist: save.hist || null,
       over: save.over, fired: save.fired
     });
     TL.Coach.restore(S, save.coaches);
@@ -412,7 +412,7 @@
     for (const c of S.clubs) if (c.stature == null) c.stature = c.rep;
     S.wageShift = S.wageShift || 0;
     if (!S.mentor) S.mentor = { seen: {}, trust: 50, cool: {}, chapter: 1, lessons: {} };
-    if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); }
+    if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); TL.Staff.migrate(S); }
     if (S.user != null && !S.cups && S.fixtures && TL.Cups) TL.Cups.build(S);
     TL.Manager.init(S);
     S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
