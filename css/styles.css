@@ -979,3 +979,17 @@ details summary { list-style: revert; }
 .stars-q i { color: rgb(255 255 255 / 0.18); font-style: normal; }
 .staff-cand { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid rgb(255 255 255 / 0.05); flex-wrap: wrap; }
 .sc-buy { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+/* Fase de grupos y modo torneo */
+.cup-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.cup-groups.one { grid-template-columns: 1fr; }
+.cup-group { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: rgb(255 255 255 / 0.02); }
+.cup-group.mine { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.cg-head { font-family: var(--font-c); font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.cg-table td, .cg-table th { padding: 5px 4px; font-size: 13px; }
+.cg-table tr.q td:first-child { color: var(--accent2); font-weight: 800; }
+.cg-table tr.me td { color: var(--accent); }
+.cg-team { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 170px; }
+.cg-games { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--muted); margin-top: 4px; font-family: var(--font-c); }
+.tour-mail { padding: 8px 0; border-bottom: 1px solid rgb(255 255 255 / 0.05); }
+.tour-mail p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.tour-end h2 { font-family: var(--font-c); }

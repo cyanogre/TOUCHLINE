@@ -89,6 +89,7 @@
    * usuario (Match.finish()) o null para simularlo aquí.
    */
   function playRound(S, userResult) {
+    if (S.mode === 'tour') return TL.Tour.round(S);
     // Las jornadas de copa de esta semana van antes (entre semana)
     TL.Cups.catchUp(S);
     const round = S.fixtures[S.week];

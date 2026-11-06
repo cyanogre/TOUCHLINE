@@ -197,6 +197,13 @@
 
   function renderTop(S) {
     const c = S.clubs[S.user];
+    if (S.mode === 'tour') {
+      const cup = S.cups[0];
+      document.getElementById('topbar').innerHTML = `${crest(c)}
+        <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${cup.icon} ${esc(cup.name)} · ${esc(TL.Tour.stage(S))}</div></div>
+        <button class="icon-btn help-btn" data-act="help" aria-label="Ayuda del Profe" title="Ayuda del Profe">?</button>
+        <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
+    } else {
     const L = W.userLeague(S);
     const d = U.dateOf(S.season, S.week).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
     const wk = S.over ? 'Fin de temporada' : `J${Math.min(S.week + 1, S.fixtures.length)} · ${d}`;
@@ -208,9 +215,12 @@
       <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
     UI.lastCash = Math.round(c.cash);
     TL.Commerce.refreshBudget(S);
+    }
     const unread = S.inbox.filter(m => !m.read).length;
     const offers = S.inbox.filter(m => m.kind === 'offer' && !m.done).length;
-    document.getElementById('nav').innerHTML = TABS.map(([k, label]) =>
+    const tabs = S.mode === 'tour' ? [['home', 'Inicio'], ['squad', 'Plantilla'], ['tactics', 'Tácticas'], ['league', 'Torneo']] : TABS;
+    if (S.mode === 'tour' && !tabs.some(t => t[0] === UI.tab)) UI.tab = 'home';
+    document.getElementById('nav').innerHTML = tabs.map(([k, label]) =>
       `<button class="${UI.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" aria-current="${UI.tab === k ? 'page' : 'false'}">
         ${icon(k)}<span>${label}</span>${k === 'home' && unread ? `<span class="badge">${unread > 9 ? '9+' : unread}</span>` : ''}${k === 'market' && offers ? `<span class="badge">${offers}</span>` : ''}</button>`).join('');
   }
@@ -271,6 +281,7 @@
   }
 
   VIEWS.home = S => {
+    if (S.mode === 'tour') return tourHome(S);
     const c = S.clubs[S.user];
     const L = W.userLeague(S);
     const tab = SE.table(S);
@@ -597,7 +608,7 @@
         if (g.length) list += `<div class="group-title">${names[l]} · ${g.length}</div>` + g.map(row).join('');
       }
     } else list = sorted.map(row).join('');
-    return pageTitle('Plantilla', `${sq.length}/${M.MAX_SQUAD} jugadores`) + lockerCard(S) + devCard(S) +
+    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + (S.mode === 'tour' ? '' : lockerCard(S) + devCard(S)) +
       `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
         <div class="kpi"><div class="k">Nivel club</div><div class="v">${S.clubs[S.user].rep.toFixed(1)}</div></div>
@@ -794,6 +805,7 @@
   }
 
   VIEWS.league = S => {
+    if (S.mode === 'tour') return pageTitle(`${S.cups[0].icon} ${esc(S.cups[0].name)}`, esc(TL.Tour.stage(S))) + cupsView(S);
     const L = W.userLeague(S);
     const t = UI.league.tab;
     const seg = `<div class="seg" style="margin-bottom:12px">${[['table', 'Clasificación'], ['rounds', 'Jornadas'], ['scorers', 'Goleadores'], ['cups', 'Copas']]
@@ -1562,6 +1574,7 @@
         ${meta ? `<button class="btn primary continue-card" data-act="continue"><div class="t">▶ Continuar</div>
           <div class="s">${esc(meta.club)} · ${U.seasonLabel(meta.season)} · Jornada ${meta.week + 1} · ${esc(meta.manager)}</div></button>` : ''}
         <button class="btn ${meta ? '' : 'primary'}" data-act="new-game">Nueva partida</button>
+        <button class="btn" data-act="tour-new">🏆 Modo torneo · Mundial y Champions</button>
         <button class="btn ghost" data-act="import">Importar partida</button>
       </div>
       <div class="title-toggles">
@@ -1728,13 +1741,123 @@
     const next = cup.mds.find(m => !m.done);
     const head = cup.champ != null ? `<div class="cup-champ">🏆 Campeón: ${crest(S.clubs[cup.champ], 'sm')} <b>${esc(S.clubs[cup.champ].name)}</b></div>`
       : `<p class="note" style="margin:0">${cup.clubs.length} clubes · ${next ? `Próximo partido: ${esc(cup.rounds[next.r].name)}${cup.rounds[next.r].legs > 1 ? (next.leg ? ' (vuelta)' : ' (ida)') : ''}, jornada ${next.week + 1}` : ''}</p>`;
-    const rounds = cup.rounds.map((r, ri) => r.ties.length ? `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div>${r.ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>` : '').reverse().join('');
+    const rounds = cup.rounds.map((r, ri) => {
+      if (r.group) return `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div><div class="cup-groups">${groupsHtml(S, r)}</div></div>`;
+      return r.ties.length ? `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div>${r.ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>` : '';
+    }).reverse().join('');
     return `<div class="chips" style="margin-bottom:10px">${chips}</div>
       <div class="card cup-card" style="--cup:${cup.color}"><div class="card-head"><h2>${cup.icon} ${esc(cup.name)}</h2></div>${head}
       ${mine ? '' : '<p class="note">Clasifícate terminando arriba en tu liga para jugarla la próxima temporada.</p>'}
       <div class="cup-rounds">${rounds}</div></div>`;
   }
   A['cup-sel'] = el => { UI.cupSel = el.dataset.k; UI.refresh(); };
+
+  /** Tablas de la fase de grupos (el tuyo primero). */
+  function groupsHtml(S, r, only) {
+    const order = r.groups.map((g, i) => i).sort((a, b) => (r.groups[b].includes(S.user) ? 1 : 0) - (r.groups[a].includes(S.user) ? 1 : 0));
+    return order.filter(g => only == null || g === only).map(g => {
+      const tab = TL.Cups.groupTable(S, r, g);
+      return `<div class="cup-group ${r.groups[g].includes(S.user) ? 'mine' : ''}"><div class="cg-head">Grupo ${'ABCDEFGH'[g]}</div>
+        <table class="table cg-table"><thead><tr><th></th><th class="l" style="text-align:left">Equipo</th><th>PJ</th><th>DG</th><th>Pts</th></tr></thead><tbody>
+        ${tab.map((x, k) => `<tr class="${x.id === S.user ? 'me' : ''} ${k < 2 ? 'q' : ''}"><td>${k + 1}</td><td class="l"><span class="cg-team">${crest(S.clubs[x.id], 'xs')}<span class="ellipsis">${esc(S.clubs[x.id].name)}</span></span></td>
+          <td>${x.pj}</td><td>${x.gf - x.ga > 0 ? '+' : ''}${x.gf - x.ga}</td><td><b>${x.pts}</b></td></tr>`).join('')}</tbody></table>
+        <div class="cg-games">${r.ties.filter(t => t.g === g && t.s.length).map(t => `<span>${esc(S.clubs[t.h].code)} ${t.s[0][0]}-${t.s[0][1]} ${esc(S.clubs[t.a].code)}</span>`).join('')}</div></div>`;
+    }).join('');
+  }
+
+  // ------------------------------------------------------------ Modo Torneo
+  function tourHome(S) {
+    const cup = S.cups[0];
+    const cp = TL.Cups.pendingUser(S);
+    let main;
+    if (S.over || cup.champ != null) {
+      const won = cup.champ === S.user;
+      main = `<section class="card next-match cup span2 tour-end" style="--cup:${cup.color}"><div class="center" style="padding:10px 0">
+        <div style="font-size:56px">${won ? '🏆' : cup.icon}</div>
+        <h2 style="font-size:26px;margin:6px 0">${won ? `¡${esc(S.clubs[S.user].name)}, campeón!` : `Campeón: ${esc(S.clubs[cup.champ].name)}`}</h2>
+        <p class="muted">${won ? `Has ganado el ${esc(cup.name)}. Leyenda.` : 'El torneo ha terminado. ¿Otra vez?'}</p></div>
+        <div class="nm-actions"><button class="btn primary" data-act="tour-new">🏆 Nuevo torneo</button><button class="btn" data-act="tour-exit">Menú principal</button></div></section>`;
+      if (won && !UI.tourParty) { UI.tourParty = true; setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); }, 300); }
+    } else if (cp) {
+      const h = S.clubs[cp.home], a = S.clubs[cp.away];
+      main = `<section class="card next-match cup span2" style="--cup:${cup.color}">
+        <div class="nm-meta"><span class="cup-badge">${cup.icon} ${esc(cup.name)}</span><span>${esc(TL.Tour.stage(S))}</span></div>
+        <div class="cup-round">${cp.group ? esc(cp.label.split(' · ').slice(1).join(' · ')) : esc(cp.round) + ' · partido único'}</div>
+        <div class="nm-teams">${[h, a].map(cl => `<div class="nm-team">${crest(cl, 'lg')}<span class="nm-name">${esc(cl.name)}</span><span class="nm-info">${stars(cl.rep)}</span></div>`).join('<div class="nm-vs">VS</div>')}</div>
+        <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button><button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
+    } else {
+      const out = !TL.Tour.alive(S);
+      main = `<section class="card next-match cup span2" style="--cup:${cup.color}"><div class="center" style="padding:14px 0">
+        <h2>${out ? 'Eliminados' : 'Esperando rival'}</h2><p class="muted">${out ? 'Puedes seguir el torneo hasta la final.' : 'Se juegan los demás partidos de la ronda.'}</p></div>
+        <div class="nm-actions" style="grid-template-columns:1fr"><button class="btn primary" data-act="tour-next">⏭ Simular ${esc(TL.Tour.stage(S).toLowerCase())}</button></div></section>`;
+    }
+    const r0 = cup.rounds[0];
+    const g = r0.groups.findIndex(gr => gr.includes(S.user));
+    const group = cup.cur === 0 || !TL.Tour.alive(S) ? `<section class="card"><div class="card-head"><h2>Tu grupo</h2><button class="link" data-act="tab" data-tab="league">Ver torneo</button></div><div class="cup-groups one">${groupsHtml(S, r0, g)}</div></section>` : '';
+    const cur = cup.rounds[cup.cur];
+    const bracket = cup.cur > 0 && cur ? `<section class="card"><div class="card-head"><h2>${esc(cur.name)}</h2><button class="link" data-act="tab" data-tab="league">Cuadro</button></div>${cur.ties.map(t => tieHtml(S, cup, t, cur)).join('')}</section>` : '';
+    const mails = S.inbox.slice(0, 3).map(m => `<div class="tour-mail"><b>${esc(m.title)}</b><p>${esc(m.body)}</p></div>`).join('');
+    return `<div class="grid two">${main}${group}${bracket}${mails ? `<section class="card span2"><div class="card-head"><h2>Últimas noticias</h2></div>${mails}</section>` : ''}
+      <section class="card span2 center"><button class="btn ghost" data-act="tour-exit">Salir del torneo</button><p class="note">El modo torneo no se guarda: es una partida rápida aparte de tu carrera.</p></section></div>`;
+  }
+
+  A['tour-next'] = () => {
+    const S = G.S;
+    const before = S.cups[0].mds.filter(m => m.done).length;
+    TL.Tour.round(S);
+    const cup = S.cups[0], md = cup.mds.filter(m => m.done)[before];
+    if (md) {
+      const r = cup.rounds[md.r];
+      const ties = r.group ? r.ties.filter(t => t.md === md.leg) : r.ties;
+      sheet(sheetHead(`${cup.icon} ${esc(r.group ? `${r.name} · jornada ${md.leg + 1}` : r.name)}`) + `<div class="card" style="padding:6px 10px">${ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>
+        <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => render(false) });
+    } else render(false);
+  };
+  A['tour-exit'] = () => {
+    G.S = null; UI.tourParty = false; UI.tab = 'home';
+    renderTitle();
+  };
+
+  /** Asistente del modo Torneo: tipo, fútbol masculino o femenino, y equipo. */
+  function renderTourWizard() {
+    const z = UI.tz;
+    let html;
+    const head = t => `<div class="wizard-head"><button class="icon-btn" data-act="tz-back" aria-label="Atrás">${icon('back')}</button><h1>${t}</h1></div>`;
+    if (z.step === 0) {
+      html = head('Modo torneo') + `<div class="pick-list">${Object.entries(TL.Tour.KINDS).map(([k, K]) => ['M', 'F'].map(g =>
+        `<button class="pick big-pick" data-act="tz-kind" data-k="${k}" data-g="${g}"><span class="flag">${K.icon}</span><span class="grow"><div class="t">${esc(K.name)} ${g === 'F' ? 'femenino' : ''}</div><div class="s">${esc(K.desc)} Grupos y eliminatorias.</div></span>${icon('next')}</button>`).join('')).join('')}</div>`;
+    } else if (!z.S) {
+      html = head(TL.Tour.KINDS[z.kind].name) + '<div class="spinner"></div><p class="center muted">Formando los equipos…</p>';
+    } else {
+      const S = z.S;
+      html = head('Elige equipo') + `<div class="pick-list two">${S.tourCands.slice(0, z.kind === 'wc' ? 48 : 64).map(id => {
+        const c = S.clubs[id];
+        const best = W.squad(S, id).sort((a, b) => b.ovr - a.ovr)[0];
+        return `<button class="pick" data-act="tz-team" data-id="${id}"><span class="flag">${crest(c)}</span><span class="grow"><div class="t ellipsis">${esc(c.name)}</div><div class="s">${stars(c.rep)}${best ? ' · ' + esc(best.short) + ' ' + best.ovr : ''}</div></span></button>`;
+      }).join('')}</div>`;
+    }
+    app().innerHTML = `<div class="wizard">${html}</div>`;
+  }
+  A['tour-new'] = () => { Music.start(); G.S = null; UI.tourParty = false; UI.tz = { step: 0 }; renderTourWizard(); };
+  A['tz-back'] = () => { const z = UI.tz; if (!z || z.step === 0) { UI.tz = null; renderTitle(); } else { z.step = 0; z.S = null; renderTourWizard(); } };
+  A['tz-kind'] = async el => {
+    const z = UI.tz;
+    z.kind = el.dataset.k; z.gender = el.dataset.g; z.step = 1; z.S = null;
+    renderTourWizard();
+    try {
+      const data = await G.loadData(z.gender);
+      await new Promise(r => setTimeout(r, 30));
+      z.S = TL.Tour.prepare(data, z.kind);
+      if (UI.tz === z) renderTourWizard();
+    } catch (e) { console.error(e); toast('No se pudo preparar el torneo', true); z.step = 0; renderTourWizard(); }
+  };
+  A['tz-team'] = el => {
+    const z = UI.tz;
+    TL.Tour.begin(z.S, +el.dataset.id, 'Míster');
+    UI.tz = null; UI.tab = 'home';
+    renderShell(); render();
+    TL.FX.confetti(); TL.SFX.success();
+  };
   UI.tieHtml = tieHtml;
 
   function showCupResult(S, r) {
