@@ -729,12 +729,12 @@ details summary { list-style: revert; }
 .vn-box::before, .vn-box::after { content: ''; position: absolute; width: 11px; height: 11px; border: 2px solid var(--accent); opacity: 0.5; pointer-events: none; }
 .vn-box::before { left: 7px; bottom: 7px; border-right: 0; border-top: 0; border-radius: 0 0 0 7px; }
 .vn-box::after { right: 7px; top: 7px; border-left: 0; border-bottom: 0; border-radius: 0 7px 0 0; }
-.vn.top .vn-box { top: calc(22px + 64px / var(--dpr, 1) + env(safe-area-inset-top, 0px)); bottom: auto; }
+.vn.top .vn-box { top: calc(22px + 64px * var(--pk, 1) / var(--dpr, 1) + env(safe-area-inset-top, 0px)); bottom: auto; }
 .vn-box.pop { animation: vnPop 0.24s cubic-bezier(.3, 1.4, .5, 1); }
 @keyframes vnPop { from { transform: translateY(10px); opacity: 0.55; } }
 /* El Profe asoma por encima de la caja, sin marco: 64 píxeles del sprite = 64 píxeles físicos.
    Se apoya en una repisa del color del borde, con remates y barritas, para que no flote sin más. */
-.vn-stage { position: absolute; z-index: 2; left: 24px; bottom: calc(100% + 2px); width: calc(64px / var(--dpr, 1)); height: calc(64px / var(--dpr, 1)); pointer-events: none; }
+.vn-stage { position: absolute; z-index: 2; left: 24px; bottom: calc(100% + 2px); width: calc(64px * var(--pk, 1) / var(--dpr, 1)); height: calc(64px * var(--pk, 1) / var(--dpr, 1)); pointer-events: none; }
 .vn-ledge { position: absolute; left: -9px; right: -9px; bottom: -6px; height: 3px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px rgb(184 245 61 / 0.45); }
 .vn-ledge::before, .vn-ledge::after { content: ''; position: absolute; bottom: 0; width: 3px; height: 9px; border-radius: 2px; background: var(--accent); }
 .vn-ledge::before { left: 0; }
@@ -749,7 +749,7 @@ details summary { list-style: revert; }
   background: radial-gradient(closest-side, rgb(184 245 61 / 0.3), rgb(184 245 61 / 0.08) 60%, transparent); pointer-events: none; }
 .vn-stage .vn-face { position: relative; }
 .vn-tag {
-  position: absolute; z-index: 1; top: 0; left: calc(64px + 64px / var(--dpr, 1)); transform: translateY(-55%);
+  position: absolute; z-index: 1; top: 0; left: calc(64px + 64px * var(--pk, 1) / var(--dpr, 1)); transform: translateY(-55%);
   display: flex; align-items: baseline; gap: 7px; padding: 4px 13px 5px; border-radius: 99px; white-space: nowrap;
   background: linear-gradient(180deg, #dcff7d, var(--accent)); color: #0b1a10; font-family: var(--font-c);
   box-shadow: 0 3px 0 #5c8c1b, 0 7px 16px rgb(0 0 0 / 0.45);
@@ -762,7 +762,7 @@ details summary { list-style: revert; }
 .vn-portrait::after { content: ''; position: absolute; left: -6px; right: -6px; bottom: -5px; height: 2px; border-radius: 2px; pointer-events: none;
   background: linear-gradient(90deg, transparent, var(--accent) 22%, var(--accent) 78%, transparent); opacity: 0.85; }
 /* 1:1 real: 64 píxeles del sprite = 64 píxeles físicos (sin escalar) */
-.vn-face { width: calc(64px / var(--dpr, 1)); height: calc(64px / var(--dpr, 1)); display: block; position: relative; }
+.vn-face { width: calc(64px * var(--pk, 1) / var(--dpr, 1)); height: calc(64px * var(--pk, 1) / var(--dpr, 1)); display: block; position: relative; }
 .vn-face canvas.px1 {
   position: absolute; left: 0; top: 0; width: 66px; height: 66px; transform-origin: 0 0;
   transform: scale(calc(1 / var(--dpr, 1))); image-rendering: pixelated; image-rendering: crisp-edges;

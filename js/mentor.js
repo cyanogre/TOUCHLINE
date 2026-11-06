@@ -43,6 +43,12 @@
     if (mq.addEventListener) mq.addEventListener('change', h, { once: true });
   })();
 
+  /** Escala de píxel del diálogo: ×2 en móvil y tablet (pantalla táctil o estrecha), 1:1 en el PC. Siempre entera. */
+  function dialogScale() {
+    const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+    return coarse || window.innerWidth < 600 ? 2 : 1;
+  }
+
   /** Cara animada: parpadea y gira la cabeza en reposo; mueve la boca al hablar. */
   class Face {
     constructor(el, opts) {
@@ -50,6 +56,7 @@
       // de margen: el navegador suaviza los bordes de los elementos transformados y así
       // ese suavizado cae fuera del dibujo. Con head: solo la cabeza (34×34), también 1:1.
       opts = opts || {};
+      this.kf = typeof opts.scale === 'function' ? opts.scale : () => opts.scale || 1;
       this.crop = opts.head ? { x: 14, y: 2, w: 36, h: 36 } : { x: 0, y: 0, w: SIZE, h: SIZE };
       el.innerHTML = '';
       const cv = document.createElement('canvas');
@@ -88,41 +95,64 @@
       this.cx.drawImage(img, (frame % COLS) * SIZE + cr.x, Math.floor(frame / COLS) * SIZE + cr.y, cr.w, cr.h, PAD, PAD, cr.w, cr.h);
     }
     /** Fotograma para la letra que se está diciendo. */
+    /** Primer fotograma de un gesto (para los estados estables). */
+    first(kind, gesture) {
+      const s = sheetFor(this.emo), map = kind === 'talk' ? s.talkMap : s.idleMap;
+      return (map[gesture] || map.closed || map.base || [0])[0];
+    }
+    /** La letra que se dice marca la forma de la boca; el dibujo cambia a ritmo de animación (8 fps). */
     say(ch) {
       this.talking = true;
       const l = (ch || ' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       let g = /[aeiou]/.test(l) ? 'open' : /[a-z0-9ñ]/.test(l) ? 'small' : 'closed';
-      if (g !== 'closed' && Math.random() < 0.015) g = 'turn';
-      this.show('talk', this.pick('talk', g));
-      this.until = performance.now() + (g === 'turn' ? 260 : 90);
+      if (g !== 'closed' && Math.random() < 0.012) g = 'turn';
+      if (this.want !== 'turn' || performance.now() > this.turnUntil) this.want = g;
+      if (g === 'turn') this.turnUntil = performance.now() + 320;
+      this.lastSay = performance.now();
     }
-    stop() { this.talking = false; this.show('idle', this.pick('idle', 'base')); }
+    stop() { this.talking = false; this.want = null; this.show('idle', this.first('idle', 'base')); this.baseF = null; this.until = performance.now() + 300; }
     /** Alinea el lienzo con la rejilla de píxeles físicos (1 píxel del sprite = 1 píxel de pantalla). */
     snap() {
       const dpr = window.devicePixelRatio || 1;
       const r = this.el.parentNode.getBoundingClientRect();
       const dx = (Math.round(r.left * dpr) - r.left * dpr) / dpr, dy = (Math.round(r.top * dpr) - r.top * dpr) / dpr;
-      const key = dpr + ':' + dx.toFixed(4) + ':' + dy.toFixed(4);
+      const k = this.kf();
+      const key = dpr + ':' + k + ':' + dx.toFixed(4) + ':' + dy.toFixed(4);
       if (key === this.snapKey) return;
       this.snapKey = key;
-      this.el.style.transform = `translate(${dx - PAD / dpr}px, ${dy - PAD / dpr}px) scale(${1 / dpr})`;
+      // Escala entera (k píxeles reales por píxel del sprite): nítido, sin suavizado
+      const box = this.el.closest('.vn');
+      if (box && box.style.getPropertyValue('--pk') !== String(k)) box.style.setProperty('--pk', String(k));
+      this.el.style.transform = `translate(${dx - PAD * k / dpr}px, ${dy - PAD * k / dpr}px) scale(${k / dpr})`;
     }
     loop(now) {
       if (!this.el.isConnected) return;
       this.snap();
       if (this.talking) {
-        if (now > this.until) this.show('talk', this.pick('talk', 'closed'));
+        if (now - (this.lastSay || 0) > 180) this.want = 'closed';
+        if (!(now < this.nextFrame)) {
+          const g = this.want || 'closed';
+          // Cerrada: siempre el mismo dibujo (nada de parpadeos); abierta/entreabierta alternan a 8 fps
+          if (g === 'closed') this.show('talk', this.first('talk', 'closed'));
+          else if (g !== this.curG || g !== 'turn') this.show('talk', this.pick('talk', g));
+          this.curG = g;
+          this.nextFrame = now + (g === 'turn' ? 320 : 125);
+        }
       } else if (now > this.until) {
         if (now > this.nextBlink) {
-          this.show('idle', this.pick('idle', 'blink'));
-          this.until = now + 120;
-          this.nextBlink = now + 2200 + Math.random() * 2600;
+          this.show('idle', this.first('idle', 'blink'));
+          this.until = now + 150;
+          this.nextBlink = now + 2500 + Math.random() * 3000;
         } else if (now > this.nextTurn) {
           this.show('idle', this.pick('idle', 'turn'));
-          this.until = now + 700;
-          this.nextTurn = now + 6000 + Math.random() * 6000;
-        } else this.show('idle', this.pick('idle', 'base'));
-        if (now <= this.until) { /* gesto en curso */ } else this.until = now + 400;
+          this.until = now + 900;
+          this.nextTurn = now + 7000 + Math.random() * 6000;
+        } else {
+          // Reposo: una pose estable que cambia muy de vez en cuando (respiración)
+          if (this.baseF == null || now > (this.nextBase || 0)) { this.baseF = this.baseF == null ? this.first('idle', 'base') : this.pick('idle', 'base'); this.nextBase = now + 1200 + Math.random() * 1400; }
+          this.show('idle', this.baseF);
+          this.until = now + 100;
+        }
       }
       this.raf = requestAnimationFrame(this.loop);
     }
@@ -189,7 +219,8 @@
 
   function begin(job) {
     const r = root();
-    cur = { ...job, i: -1, face: cur && cur.face ? cur.face : new Face(r.querySelector('.vn-face')) };
+    r.style.setProperty('--pk', String(dialogScale()));
+    cur = { ...job, i: -1, face: cur && cur.face ? cur.face : new Face(r.querySelector('.vn-face'), { scale: dialogScale }) };
     r.classList.toggle('dim', cur.opts.dim !== false);
     r.querySelector('.vn-skip').style.display = cur.opts.skippable === false ? 'none' : '';
     r.classList.add('show');
@@ -242,11 +273,9 @@
     r.querySelector('.vn-text').innerHTML = renderTokens(cur.tk, cur.n);
     cur.face.say(t.ch);
     if (TL.SFX && TL.SFX.voice && cur.n % 1 === 0) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
-    // Ritmo de lectura cómodo: ~22 letras por segundo, con pausas en la puntuación
-    let ms = 46;
-    if ('.!?…'.includes(t.ch)) ms = 420;
-    else if (',;:'.includes(t.ch)) ms = 220;
-    else if (t.ch === ' ') ms = 30;
+    let ms = 28;
+    if ('.!?…'.includes(t.ch)) ms = 230;
+    else if (',;:'.includes(t.ch)) ms = 120;
     cur.timer = setTimeout(type, ms);
   }
 
