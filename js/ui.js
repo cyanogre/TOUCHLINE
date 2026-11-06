@@ -289,6 +289,10 @@
       next = `<section class="card next-match span2">
         <div class="nm-meta"><span>${esc(L.name)} · J${S.week + 1}/${S.fixtures.length}</span><span>${U.fmtDate(U.dateOf(S.season, S.week))}</span></div>
         <div class="nm-teams">${team(h)}<div class="nm-vs">VS</div>${team(a)}</div>
+        ${(() => {
+          const oid = fx[0] === S.user ? fx[1] : fx[0], co = TL.Coach.of(S, oid);
+          return co ? `<p class="nm-coach">Banquillo rival: <b>${esc(co.name)}</b> · fama de técnico ${TL.Coach.STYLES[co.style].name}. <span>Su once y su sistema, al empezar.</span></p>` : '';
+        })()}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
         <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     }
@@ -498,7 +502,7 @@
           <p class="note center" style="margin-top:8px">Toca una posición para cambiar el jugador. El número es su rendimiento en ese puesto.</p>
         </div>
         <div class="col">
-          ${analysisCard(S)}
+          ${reviewCard(S, 0)}
           <div class="card"><h2 style="margin-bottom:10px">Mentalidad</h2>
             <div class="seg">${MENT.map((m, i) => `<button class="${T.mentality === i ? 'on' : ''}" data-act="tac-ment" data-m="${i}">${m}</button>`).join('')}</div>
             <label class="row between mt" style="font-size:14px"><span>Cambios automáticos (cansancio y lesiones)</span>
@@ -510,53 +514,64 @@
       </div>`;
   };
 
-  /** Análisis del Profe: qué formación y mentalidad te dan más puntos contra el próximo rival. */
-  function analysisCard(S) {
-    const fx = SE.nextFixture(S);
-    if (!fx) return '';
-    const home = fx[0] === S.user, oppId = home ? fx[1] : fx[0];
-    const opp = S.clubs[oppId];
-    const A_ = E.analyse(S, oppId, home);
-    const best = {};
-    for (const r of A_.rows) if (!best[r.formation] || r.pts > best[r.formation].pts) best[r.formation] = r;
-    const rows = Object.values(best).sort((a, b) => b.pts - a.pts);
-    const top = rows[0];
-    const cur = A_.rows.find(r => r.formation === S.tactics.formation && r.mentality === S.tactics.mentality) || rows.find(r => r.formation === S.tactics.formation);
-    const pct = v => Math.round(v * 100) + '%';
-    const me = top.st, op = A_.opp.st;
-    // Explicación en lenguaje llano
-    const ln = me.lines, why = [];
-    const strongest = ['def', 'mid', 'att'].sort((a, b) => ln[b] - ln[a])[0];
-    why.push({ def: 'Tu punto fuerte es la **defensa**', mid: 'Tu punto fuerte es el **centro del campo**', att: 'Tu punto fuerte es el **ataque**' }[strongest]);
-    why.push(op.attack + op.defense > me.attack + me.defense + 4 ? `${opp.name} es mejor que tú: toca ser prudente` : op.attack + op.defense < me.attack + me.defense - 4 ? `eres mejor que ${opp.name}: a por ellos` : `${opp.name} es de tu nivel`);
-    const advice = `${why[0]}; ${why[1]}. Con **${top.formation}** y mentalidad **${MENT[top.mentality].toLowerCase()}** ganarías un ${pct(top.w)} de las veces` +
-      (cur && cur.formation !== top.formation ? ` (ahora, un ${pct(cur.w)}).` : '.');
-    const bar = (v, max) => `<div class="bar" style="height:6px"><i style="width:${Math.max(4, Math.min(100, v / max * 100))}%"></i></div>`;
-    const mx = Math.max(me.attack, me.defense, op.attack, op.defense, me.mid, op.mid);
-    return `<div class="card analysis"><div class="card-head"><h2>Análisis del Profe</h2><span class="muted">vs ${esc(opp.name)} · ${home ? 'en casa' : 'fuera'}</span></div>
-      <div class="row" style="align-items:flex-start;gap:10px"><div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>
-        <p class="note" style="margin:0;color:var(--text)">${esc(advice).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p></div>
-      <div class="cmp mt"><div></div><div class="note">Tú</div><div class="note">Rival (${A_.opp.formation})</div>
-        <div class="note">Ataque</div><div>${bar(me.attack, mx)}</div><div>${bar(op.attack, mx)}</div>
-        <div class="note">Defensa</div><div>${bar(me.defense, mx)}</div><div>${bar(op.defense, mx)}</div>
-        <div class="note">Medio</div><div>${bar(me.mid, mx)}</div><div>${bar(op.mid, mx)}</div></div>
-      <table class="table mt"><thead><tr><th class="l" style="text-align:left">Sistema</th><th>Gana</th><th>Empata</th><th>Pierde</th><th></th></tr></thead><tbody>
-      ${rows.map((r, k) => `<tr class="${r.formation === S.tactics.formation ? 'me' : ''}"><td class="l" style="text-align:left"><b>${r.formation}</b>
-          <div class="note">${MENT[r.mentality]}${r.outOfPos ? ` · ${r.outOfPos} fuera de sitio` : ''}</div></td>
-        <td class="pos-ok">${pct(r.w)}</td><td>${pct(r.d)}</td><td class="neg">${pct(r.l)}</td>
-        <td><button class="btn sm ${k === 0 ? 'primary' : ''}" data-act="tac-apply" data-f="${r.formation}" data-m="${r.mentality}">${k === 0 ? '★ Usar' : 'Usar'}</button></td></tr>`).join('')}
-      </tbody></table>
-      <p class="note">Probabilidades calculadas con el mismo modelo que el partido, con el mejor once disponible en cada sistema. El azar existe: úsalo como guía.</p></div>`;
+  // ------------------------------------------------------------ Repaso del Profe (siempre a posteriori)
+  const REV_IC = { sys: '📋', chg: '🔁', edge: '⚔️', day: '🔋', luck: '🎲', hind: '🔍' };
+  const bold = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+  /** Tarjeta con el repaso de un partido ya jugado: qué hizo el rival y qué nos habría ido mejor. */
+  function reviewCard(S, k) {
+    const all = S.reviews || [];
+    k = Math.min(k || 0, Math.max(0, all.length - 1));
+    const r = all[k];
+    const face = '<div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>';
+    if (!r) {
+      return `<div class="card review"><div class="card-head"><h2>Repaso del Profe</h2></div>
+        <div class="rv-intro">${face}<p>Antes del partido nadie sabe qué va a plantear el rival, <b>ni yo</b>. Su entrenador decide según su estilo, cómo llega su plantilla y lo que le viste hacer la última vez. Juega y aquí te cuento qué pasó.</p></div></div>`;
+    }
+    const opp = S.clubs[r.opp];
+    const lines = TL.Coach.lines(S, r);
+    const [g, a] = r.score;
+    const res = g > a ? 'V' : g < a ? 'D' : 'E';
+    const MENT_S = ['Def.', 'Equil.', 'Ofens.'];
+    const maxP = Math.max(3, ...r.best.map(b => b[2]), r.actual);
+    const bar = (v, me) => `<div class="rv-bar ${me ? 'me' : ''}"><i style="width:${Math.max(4, v / maxP * 100)}%"></i></div>`;
+    const picker = all.length > 1 ? `<div class="chips rv-pick">${all.map((x, i) => `<button class="chip ${i === k ? 'on' : ''}" data-act="review-pick" data-k="${i}">J${x.w + 1} · ${esc(S.clubs[x.opp].name)}</button>`).join('')}</div>` : '';
+    return `<div class="card review" data-k="${k}"><div class="card-head"><h2>Repaso del Profe</h2>
+        <span class="rv-score ${res}">J${r.w + 1} · ${r.home ? 'en casa' : 'fuera'} · <b class="num">${g}-${a}</b></span></div>
+      ${picker}
+      <div class="rv-intro">${face}<p>${bold(lines[0].t)}</p></div>
+      <div class="rv-stats">
+        <div><span class="k">Goles esperados</span><b class="num">${r.xg[0].toFixed(1).replace(".", ",")} <i>·</i> ${r.xg[1].toFixed(1).replace(".", ",")}</b></div>
+        <div><span class="k">Tiros</span><b class="num">${r.shots[0]} <i>·</i> ${r.shots[1]}</b></div>
+        <div><span class="k">Posesión</span><b class="num">${r.poss}%</b></div>
+        <div class="wide"><span class="k">Sistemas · tú y ${esc(opp.name)}</span><b class="num">${r.me.f} <i>·</i> ${r.them.f}</b></div></div>
+      <ul class="rv-list">${lines.slice(1).map(l => `<li><span class="ic">${REV_IC[l.k] || '•'}</span><span>${bold(l.t)}</span></li>`).join('')}</ul>
+      <div class="rv-hind"><div class="group-title">Con lo que sabemos ahora · puntos esperados</div>
+        ${r.best.map(b => `<div class="rv-row"><b>${b[0]}</b><span class="note">${MENT_S[b[1]]}</span>${bar(b[2])}<span class="num">${b[2].toFixed(2).replace(".", ",")}</span></div>`).join('')}
+        <div class="rv-row"><b>${r.me.f}</b><span class="note">Tu plan</span>${bar(r.actual, true)}<span class="num">${r.actual.toFixed(2).replace(".", ",")}</span></div>
+        <p class="note" style="margin:6px 0 0">Calculado después del partido, sabiendo ya cómo jugó el rival. Si hubieras cambiado, su entrenador también habría cambiado.</p></div>
+      <button class="btn sm block mt" data-act="review-talk" data-k="${k}">🎙️ Que me lo cuente el Profe</button></div>`;
   }
-  A['tac-apply'] = el => {
-    const S = G.S, f = el.dataset.f;
-    S.tactics.formation = f;
-    S.tactics.slots = E.autoLineup(W.squad(S, S.user), f, true);
-    S.tactics.mentality = +el.dataset.m;
-    G.save();
-    toast(`Sistema ${f} · mentalidad ${MENT[+el.dataset.m].toLowerCase()}`);
-    TL.FX.sparkle(el);
-    UI.refresh();
+  UI.reviewCard = reviewCard;
+  A['review-pick'] = el => {
+    const card = el.closest('.review');
+    const html = reviewCard(G.S, +el.dataset.k);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const nu = tmp.firstElementChild;
+    card.replaceWith(nu);
+    if (TL.Mentor) nu.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
+  };
+  A['review-talk'] = el => {
+    const S = G.S, r = (S.reviews || [])[+el.dataset.k || 0];
+    if (!r || !TL.Mentor) return;
+    const emo = { sys: 'thinking', chg: 'thinking', edge: 'thinking', day: 'neutral', luck: r.score[0] < r.score[1] ? 'worried' : 'neutral', hind: 'thinking' };
+    TL.Mentor.say(TL.Coach.lines(S, r).map(l => ({ text: l.t, emo: emo[l.k] || 'neutral' })));
+  };
+  A['review-open'] = () => {
+    const S = G.S;
+    const sh = sheet(sheetHead('Repaso del partido') + reviewCard(S, 0) + '<button class="btn primary block mt" data-act="close-sheet">Cerrar</button>', { onClose: UI.onSheetClose });
+    if (TL.Mentor) sh.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
   };
 
   A['tac-form'] = el => {
@@ -1465,8 +1480,9 @@
         <div class="nm-team">${crest(a, 'lg')}<span class="nm-name">${esc(a.name)}</span></div></div>
         <p class="center" style="margin:0;font-weight:700;color:${res === 'V' ? 'var(--accent2)' : res === 'D' ? 'var(--danger)' : 'var(--muted)'}">${res === 'V' ? 'Victoria' : res === 'D' ? 'Derrota' : 'Empate'}</p></div>`;
     }
+    const rv = my && S.reviews && S.reviews[0] && S.reviews[0].w === r && S.reviews[0].s === S.season;
     sheet(sheetHead(`Jornada ${r + 1}`) + head + `<div class="card" style="padding:6px 10px">${S.fixtures[r].map(m => fixtureHtml(S, m)).join('')}</div>
-      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { render(false); celebrate(S); } });
+      <div class="btn-row mt">${rv ? '<button class="btn" data-act="review-open">🧑‍🏫 Repaso del Profe</button>' : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { render(false); celebrate(S); } });
     if (my) {
       const res = resultLetter(S, my);
       setTimeout(() => {

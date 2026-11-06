@@ -15,7 +15,7 @@
       { sel: '.next-match', tab: 'home', text: 'Lo más importante: el **próximo partido**. Juégalo en **directo** para ver a los chavales y decidir en los momentos clave, o dale a **Resultado rápido** si vas con prisa.' },
       { sel: '.mgr-line', tab: 'home', text: S => `La **directiva** te pide: ${S.board.text.toLowerCase()}. Si su confianza llega a cero, te echan. Créeme, me ha pasado.`, emo: 'worried' },
       { sel: '.nav [data-tab="squad"]', text: 'En **Plantilla** ves la moral, la forma física, los contratos y las tarjetas. Ojo con los contratos que acaban: si no renuevas, se van gratis.' },
-      { sel: '.nav [data-tab="tactics"]', text: '**Tácticas**: sistema, mentalidad y el once. Ahí tienes además mi **análisis del rival**, que te dice qué formación te conviene.', emo: 'thinking' },
+      { sel: '.nav [data-tab="tactics"]', text: '**Tácticas**: sistema, mentalidad y el once. Después de cada partido te dejo ahí mi **repaso**: qué hizo el rival y qué podríamos haber hecho mejor.', emo: 'thinking' },
       { sel: '.nav [data-tab="market"]', text: 'El **Mercado** abre en verano hasta la jornada 3, y en invierno. Los agentes libres se fichan siempre.' },
       { sel: '.nav [data-tab="club"]', text: 'En **Club** llevas el dinero: patrocinios, préstamos, marketing… y tu crecimiento como mánager.' },
       { sel: '[data-act="news"]', tab: 'home', text: 'Y lee la prensa: fichajes, polémicas, escándalos… Los problemas de tu vestuario te llegarán al buzón como **decisiones**.' },

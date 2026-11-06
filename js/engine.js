@@ -302,35 +302,6 @@
     return { w: w / t, d: d / t, l: l / t };
   }
 
-  /**
-   * Análisis del Profe: cómo rendiría tu equipo con cada formación y mentalidad
-   * contra un rival (mismo modelo que el partido). Devuelve filas ordenadas.
-   */
-  function analyse(S, oppId, home) {
-    const W = TL.World;
-    const mine = W.squad(S, S.user), theirs = W.squad(S, oppId);
-    const ob = bestFormation(theirs);
-    const oslots = FORMATIONS[ob.formation];
-    const oppStr = teamStrength(ob.ids.map((id, i) => ({ p: S.players[id], slot: oslots[i][0] })).filter(o => o.p));
-    const bo = TL.Manager.bonus(S, S.user);
-    const rows = [];
-    for (const f of Object.keys(FORMATIONS)) {
-      const ids = autoLineup(mine, f, true), slots = FORMATIONS[f];
-      const xi = ids.map((id, i) => ({ p: S.players[id], slot: slots[i][0] })).filter(o => o.p);
-      const st = teamStrength(xi, bo.teamBoost);
-      const outOfPos = xi.filter(o => fit(o.p, o.slot) < 0.9).length;
-      for (const m of [0, 1, 2]) {
-        const own = MENT_OWN[m];
-        const xf = U.clamp(BASE_XG * Math.exp(XG_K * (st.attack - oppStr.defense + (home ? HOME_ADV : 0))) * (own > 1 ? own + bo.mentBonus : own < 1 ? own - bo.mentBonus * 0.3 : 1), 0.08, 5);
-        const xa = U.clamp(BASE_XG * Math.exp(XG_K * (oppStr.attack - st.defense + (home ? 0 : HOME_ADV))) * MENT_OPP[m], 0.08, 5);
-        const o = outcome(xf, xa);
-        rows.push({ formation: f, mentality: m, ids, st, xf, xa, ...o, pts: 3 * o.w + o.d, outOfPos });
-      }
-    }
-    rows.sort((a, b) => b.pts - a.pts);
-    return { rows, opp: { formation: ob.formation, st: oppStr } };
-  }
-
   // ------------------------------------------------------------ Partido
   class Match {
     constructor(S, homeId, awayId, opts) {
@@ -343,13 +314,13 @@
       this.score = [0, 0];
       this.stats = {
         shots: [0, 0], onT: [0, 0], yel: [0, 0], red: [0, 0], possSum: [0, 0],
-        fouls: [0, 0], corners: [0, 0], offsides: [0, 0], pens: [0, 0]
+        fouls: [0, 0], corners: [0, 0], offsides: [0, 0], pens: [0, 0], xg: [0, 0]
       };
       this.pl = {}; // pid -> registro individual
       this.incidents = []; // incidentes para noticias: {type, team, pid, min}
       this.ref = refereeFor(S, homeId);
       this.bonus = [TL.Manager.bonus(S, homeId), TL.Manager.bonus(S, awayId)];
-      this.teams = [this._team(homeId, 0), this._team(awayId, 1)];
+      this.teams = [this._team(homeId, 0, awayId), this._team(awayId, 1, homeId)];
       this._str = null;
       this._plan();
       const s0 = this._strength(0), s1 = this._strength(1);
@@ -358,10 +329,12 @@
         const mine = i === 0 ? s0 : s1, opp = i === 0 ? s1 : s0;
         t.bigGame = (opp.attack + opp.defense) > (mine.attack + mine.defense) + 4;
         if (!t.isUser) {
+          // Su entrenador decide según su estilo, el nivel de ambos, el campo y un punto de azar
           const d = (mine.attack + mine.defense) - (opp.attack + opp.defense);
-          t.mentality = d < -9 ? 0 : d > 9 ? 2 : 1;
+          t.mentality = TL.Coach.mentality(S, t.club, d, i === 0);
           t.baseMent = t.mentality;
         }
+        t.start.mentality = t.mentality;
       }
       this._str = null;
       if (this.detail) {
@@ -369,17 +342,18 @@
       }
     }
 
-    _team(clubId, idx) {
+    _team(clubId, idx, oppId) {
       const S = this.S;
       const isUser = clubId === S.user;
       const players = TL.World.squad(S, clubId);
-      let formation, ids, mentality = 1;
+      let formation, ids, mentality = 1, scouted = null;
       if (isUser) {
         const l = userLineup(S);
         formation = l.formation; ids = l.ids; mentality = S.tactics.mentality;
       } else {
-        const b = bestFormation(players);
-        formation = b.formation; ids = b.ids;
+        // El entrenador rival elige su plan: no se conoce hasta que empieza el partido
+        const b = TL.Coach.lineup(S, clubId, oppId);
+        formation = b.formation; ids = b.ids; scouted = b.scouted;
       }
       const slots = FORMATIONS[formation];
       const onPitch = [];
@@ -391,7 +365,9 @@
       const bench = pickBench(players, ids, 9);
       return {
         club: clubId, idx, isUser, formation, onPitch, bench, mentality, baseMent: mentality,
-        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: 1, talk: null
+        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: 1, talk: null,
+        coach: TL.Coach.of(S, clubId), day: TL.Coach.dayFactor(S, clubId), scouted,
+        start: { formation, ids: ids.slice(), mentality }, log: [], tchanges: 0, desperate: false
       };
     }
 
@@ -423,8 +399,12 @@
     _strength(i) {
       const t = this.teams[i];
       const b = this.bonus[i];
-      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1);
-      return teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult);
+      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1);
+      const st = teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult);
+      // Choque de sistemas: puntas contra centrales, bandas, centro del campo
+      const c = TL.Coach.clash(t.formation, this.teams[1 - i].formation);
+      st.attack += c.attack; st.mid += c.mid;
+      return st;
     }
 
     strengths() {
@@ -440,6 +420,9 @@
       const own = MENT_OWN[t.mentality];
       x *= (own > 1 ? own + bo.mentBonus : own < 1 ? own - bo.mentBonus * 0.3 : 1) * MENT_OPP[this.teams[1 - i].mentality];
       if (bo.chase && this.min >= 60 && this.score[i] < this.score[1 - i]) x *= 1 + bo.chase * 2;
+      // A la desesperada: más ocasiones propias… y más contras del rival
+      if (t.desperate) x *= 1.35;
+      if (this.teams[1 - i].desperate) x *= 1.2;
       return U.clamp(x, 0.08, 5);
     }
 
@@ -450,7 +433,21 @@
       return ma / (ma + mb);
     }
 
-    setMentality(i, m) { this.teams[i].mentality = m; this.teams[i].baseMent = m; }
+    setMentality(i, m, auto) {
+      const t = this.teams[i];
+      if (t.mentality === m) { if (!auto) t.baseMent = m; return; }
+      t.mentality = m;
+      if (!auto) t.baseMent = m;
+      this._str = null;
+      if (this.min > 0) {
+        const last = t.log[t.log.length - 1];
+        if (!last || last[2] !== m || last[0] !== this.min) t.log.push([this.min, null, m]);
+        if (this.detail && !t.isUser) {
+          const name = this.S.clubs[t.club].name;
+          this._ev('tactic', i, null, null, m === 2 ? `${U.esc(name)} adelanta líneas: va a por todas.` : m === 0 ? `${U.esc(name)} da un paso atrás y se encierra.` : `${U.esc(name)} vuelve a equilibrar el equipo.`, { ment: m });
+        }
+      }
+    }
 
     _ev(type, team, pid, pid2, text, extra) {
       const e = { min: this.min, type, team, pid, pid2, text };
@@ -488,13 +485,19 @@
       for (const i of [0, 1]) {
         const t = this.teams[i];
         if (!t.onPitch.length) continue;
-        // Mentalidad dinámica según marcador: la IA siempre; el usuario solo en
-        // "resultado rápido" (su segundo entrenador). En directo decide él.
-        if ((!t.isUser || !this.detail) && m >= 65) {
-          const diff = this.score[i] - this.score[1 - i];
-          t.mentality = diff < 0 ? 2 : diff > 0 && m >= 75 ? 0 : t.baseMent;
+        // El entrenador rival reacciona al partido; el tuyo solo en "resultado
+        // rápido" (tu segundo entrenador). En directo decides tú.
+        const diff = this.score[i] - this.score[1 - i];
+        if (!t.isUser) TL.Coach.react(this, i);
+        else {
+          if (!this.detail && m >= 65) {
+            const nm = diff < 0 ? 2 : diff > 0 && m >= 75 ? 0 : t.baseMent;
+            if (nm !== t.mentality) { t.mentality = nm; this._str = null; }
+          }
+          t.desperate = diff < 0 && diff >= -2 && m >= 84 && t.mentality === 2;
         }
         const xg = this.xg(i);
+        this.stats.xg[i] += xg / 90;
         if (Math.random() < Math.min(0.6, xg / 90 / 0.105)) this._shot(i);
         // Faltas: las comete sobre todo el equipo sin balón
         const possI = i === 0 ? poss : 1 - poss;
@@ -640,6 +643,7 @@
       const gkv = gk ? eff(gk, 'GK') : 30;
       const p = U.clamp(M.penaltyConv * Math.pow(taker.st[1] / 80, 0.35) * Math.pow(76 / Math.max(30, gkv), 0.35), 0.55, 0.92);
       this.stats.shots[i]++;
+      this.stats.xg[i] += 0.76;
       if (Math.random() < p) this._scoreGoal(i, taker, null, 'pen');
       else {
         this.pl[taker.id].pm++;
@@ -679,7 +683,26 @@
       this.stats.red[i]++;
       const txt = kind ? say(kind, { p: p.short }) : say(straight ? 'red' : 'red2', { p: p.short });
       this._ev('red', i, p.id, null, txt);
+      const t = this.teams[i];
+      const was = t.onPitch.find(o => o.pid === p.id);
       this._remove(i, p.id);
+      // El entrenador tapa el hueco: portero suplente o un defensa por un delantero
+      if (was && (!t.isUser || (t.autoSubs && !this.detail))) this._cover(i, was);
+    }
+
+    _cover(i, was) {
+      const t = this.teams[i];
+      if (t.subs >= t.maxSubs || !t.bench.length || this.min >= 88) return;
+      const line = F.LINE[was.slot];
+      if (line !== 0 && (line !== 1 || this.min >= 80)) return;
+      const att = t.onPitch.filter(o => F.LINE[o.slot] >= 2).sort((a, b) => F.LINE[b.slot] - F.LINE[a.slot] || this.P(a.pid).ovr - this.P(b.pid).ovr)[0];
+      const inn = t.bench.map(pid => this.P(pid)).filter(q => (line === 0 ? q.pos === 'GK' : F.LINE[q.pos] === 1)).sort((a, b) => eff(b, was.slot) - eff(a, was.slot))[0];
+      if (!att || !inn) return;
+      if (!this.substitute(i, att.pid, inn.id)) return;
+      const o = t.onPitch.find(x => x.pid === inn.id);
+      o.slot = was.slot; o.idx = was.idx;
+      this.pl[inn.id].slot = was.slot;
+      this._str = null;
     }
 
     _heated() {
@@ -796,7 +819,7 @@
     }
 
     /** Cambio de sistema en pleno partido: recoloca a los que están en el campo. */
-    changeFormation(i, formation) {
+    changeFormation(i, formation, why) {
       const t = this.teams[i];
       if (!FORMATIONS[formation] || t.formation === formation) return false;
       const slots = FORMATIONS[formation];
@@ -832,7 +855,11 @@
       t.onPitch = onPitch;
       t.formation = formation;
       this._str = null;
-      if (this.detail) this._ev('tactic', i, null, null, say('formation', { t: formation }));
+      t.log.push([this.min, formation, t.mentality, why || '']);
+      if (this.detail) {
+        this._ev('tactic', i, null, null, t.isUser ? say('formation', { t: formation })
+          : `Cambio táctico: ${U.esc(this.S.clubs[t.club].name)} pasa a ${formation}${why ? ' ' + why : ''}.`, { formation });
+      }
       return true;
     }
 
@@ -896,6 +923,10 @@
     finish() {
       if (!this.done) this.simulate();
       const S = this.S;
+      // Repaso a posteriori (antes de aplicar cansancio y bajas) y lo que verán los ojeadores rivales
+      const review = this.teams.some(t => t.isUser) ? TL.Coach.review(this) : null;
+      S.lastForm = S.lastForm || {};
+      for (const t of this.teams) S.lastForm[t.club] = t.start.formation;
       const ratings = this.ratings();
       let mom = null;
       for (const id in ratings) if (mom == null || ratings[id] > ratings[mom]) mom = id;
@@ -927,7 +958,7 @@
       return {
         h: this.teams[0].club, a: this.teams[1].club, hg: this.score[0], ag: this.score[1],
         mom: this.mom, ratings, injuries, reds, yellowBans, scorers, incidents: this.incidents,
-        stats: this.stats, ref: this.ref
+        stats: this.stats, ref: this.ref, review
       };
     }
   }
@@ -940,7 +971,7 @@
   }
 
   TL.Engine = {
-    FORMATIONS, TALKS, fit, eff, available, autoLineup, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore,
-    teamStrength, outcome, analyse, MENT_OWN, MENT_OPP
+    FORMATIONS, TALKS, fit, eff, available, autoLineup, lineupScore, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore,
+    teamStrength, outcome, MENT_OWN, MENT_OPP
   };
 })();

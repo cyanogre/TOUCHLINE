@@ -438,6 +438,7 @@
         ${mom != null ? `<p class="note" style="margin:6px 0 0">MVP: <b>${esc(S.players[mom].name)}</b> (${esc(S.clubs[m.teams[m.pl[mom].team].club].name)})</p>` : ''}
         ${inc ? `<p class="note bad" style="margin:6px 0 0">El partido deja ${inc} incidente${inc > 1 ? 's' : ''}: revisa las noticias y el buzón.</p>` : ''}</div>
       ${scorersHtml()}
+      <div class="mt">${UI.reviewCard(S, 0)}</div>
       <div class="card mt" style="padding:8px 10px"><div class="group-title">Notas · ${esc(S.clubs[t.club].name)}</div>
         ${rows.map(([id, r]) => {
           const p = S.players[id], rec = m.pl[id];
@@ -447,6 +448,7 @@
         }).join('')}</div>
       <div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
         ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`;
+    if (TL.Mentor) body.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
     el('mv-prompt').innerHTML = '';
     el('mv-foot').innerHTML = `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
     document.querySelectorAll('#mv-tabs button').forEach(x => { x.disabled = true; x.classList.remove('on'); });

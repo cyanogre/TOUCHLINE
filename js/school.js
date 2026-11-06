@@ -38,6 +38,7 @@
         'El **ataque** sale sobre todo de delanteros y medios. La **defensa**, de defensas, medios y portero. Los **medios** cuentan para las dos cosas y además dan **posesión**.',
         'Cada jugador rinde según su **media**, si juega **en su puesto**, su **forma física** y su **moral**. Uno reventado de cansancio puede rendir un 10% menos.',
         'Jugar **en casa** da ventaja. Y luego está el **azar**: un equipo peor puede ganarte un día. Por eso cuenta la temporada entera, no un partido.',
+        { text: 'Y enfrente hay **otro entrenador**. Elige su sistema según su estilo, cómo llega su plantilla y lo que te vio hacer la última vez. **No sabrás qué plantea hasta que empiece el partido**: ni tú ni yo.', emo: 'thinking' },
         { text: 'Resumen: pon a tus mejores jugadores **en su puesto**, **descansados** y **contentos**. Lo demás es afinar.', emo: 'proud' }
       ],
       quiz: { q: '¿Qué línea cuenta a la vez para atacar y para defender?', options: ['Los medios', 'Los delanteros', 'El portero'], ok: 0,
@@ -47,11 +48,12 @@
       id: 'formations', icon: '📋', title: 'Formaciones: cuál usar', sum: 'Qué aporta cada sistema y cuándo te conviene.',
       lines: [
         'Regla del motor: cada **defensa por encima de 4** suma defensa, cada **delantero por encima de 2** suma ataque y cada **medio por encima de 4** suma posesión.',
+        'Además los sistemas **chocan**: dos puntas contra dos centrales te dan ventaja (contra tres, no); los extremos castigan a quien tiene pocos laterales; y quien mete más gente en el centro, **tiene el balón**.',
         '**4-2-3-1**: la más equilibrada, con dos pivotes que protegen y un mediapunta. Si no sabes qué poner, pon esta.',
         '**4-3-3**: ofensiva y con amplitud. Necesita **extremos buenos** (ED/EI). **4-4-2**: sencilla y sólida, con dos puntas y dos interiores en banda.',
         '**4-5-1**: muchos medios, mucha posesión, poco gol. Ideal contra rivales **mejores** que tú. **4-1-2-1-2** (rombo): todo por el centro, para equipos con muchos MC y MCO.',
         '**3-5-2** domina el medio, pero necesita tres centrales buenos. **3-4-3** es ataque total, para **remontar**. **5-3-2** es el «autobús»: para **guardar una ventaja** o sobrevivir ante un gigante.',
-        { text: 'La mejor formación es la que pone a **tus mejores jugadores en su puesto**. En Tácticas tienes mi **análisis del rival**: te calcula cuál te da más puntos.', emo: 'thinking' }
+        { text: 'La mejor formación es la que pone a **tus mejores jugadores en su puesto**. Y después de cada partido, en Tácticas, te dejo mi **repaso**: qué hizo el rival y qué nos habría ido mejor.', emo: 'thinking' }
       ],
       quiz: { q: 'Ganas 1-0 en el minuto 80 contra un rival mejor. ¿Qué haces?', options: ['Paso a 5-3-2 y mentalidad defensiva', 'Paso a 3-4-3 ofensivo', 'No toco nada nunca'], ok: 0,
         yes: '¡Muy bien! A veces ganar es saber sufrir.', no: 'Yo cerraría: **5-3-2 y mentalidad defensiva** para proteger el resultado.' }
@@ -107,7 +109,7 @@
         { text: 'Lo primero: **tranquilo**. Hasta los mejores equipos pierden uno de cada cuatro o cinco partidos. Una racha mala no es el fin del mundo.', emo: 'worried' },
         'Repasa esto en orden: 1) ¿Algún número en **amarillo** en Tácticas? Ese jugador está fuera de su puesto. 2) ¿Hay jugadores con poca **forma física**? Rota.',
         '3) ¿La **moral** está baja? Gana un partido fácil, habla con el vestuario o dales minutos a los descontentos. 4) ¿El rival es mucho mejor? **Mentalidad defensiva** y a la contra.',
-        '5) Mira mi **análisis del rival** en Tácticas: te dice qué formación te da más puntos. 6) En el próximo mercado, refuerza la **línea más floja**.',
+        '5) Lee mi **repaso** del último partido en Tácticas: si fue mala suerte, un mal planteamiento o que el rival vino mejor preparado. 6) En el próximo mercado, refuerza la **línea más floja**.',
         { text: 'Y gasta tus **puntos de habilidad**. Un mánager que aprende es un mánager que gana. Ánimo, míster.', emo: 'happy' }
       ],
       quiz: { q: 'Vas en mala racha. ¿Qué miras primero?', options: ['Jugadores fuera de su puesto o cansados', 'Cambiar de club', 'Vender a todos'], ok: 0,

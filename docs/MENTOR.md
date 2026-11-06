@@ -91,7 +91,13 @@ En `js/school.js` hay 9 lecciones contadas por él, cada una con una pregunta de
 8. Cómo progresar
 9. Si pierdes partidos (lista de comprobación)
 
-Se abre desde el botón **?**, desde la tarjeta de Inicio y desde Club → Partida. En **Tácticas**, el *Análisis del Profe* calcula con el mismo modelo que el partido qué sistema y mentalidad dan más puntos contra el próximo rival.
+Se abre desde el botón **?**, desde la tarjeta de Inicio y desde Club → Partida.
+
+### El repaso del Profe (siempre después del partido)
+
+Antes de un partido no se sabe qué va a plantear el rival: cada club tiene su entrenador (`js/coach.js`) con estilo, sistema favorito, capacidad de adaptarse y de preparar los partidos, y decide al empezar. Por eso no hay pronósticos ni porcentajes previos.
+
+Al terminar, el Profe hace el **repaso** (en la pantalla final, en el resultado rápido y en **Tácticas**): sistema y mentalidad del rival, sus cambios durante el partido, el choque de sistemas (puntas contra centrales, bandas, centro del campo), cómo llegó cada equipo, si hubo suerte (goles esperados) y, con lo que ya se sabe, qué sistema habría rendido mejor.
 
 ### Guía de estilo para nuevas frases
 

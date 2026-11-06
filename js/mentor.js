@@ -157,16 +157,15 @@
     r.id = 'vn';
     r.className = 'vn';
     r.dataset.act = 'vn-next'; // tocar en cualquier sitio avanza
+    // El retrato asoma por encima de la caja, sin marco propio (siempre a 1:1)
     r.innerHTML = `<div class="vn-hole"></div>
       <div class="vn-box" data-act="vn-next" role="dialog" aria-live="polite" aria-label="${U.esc(CHAR.short)}">
-        <div class="vn-portrait"><div class="vn-face" aria-hidden="true"></div></div>
-        <div class="vn-main">
-          <div class="vn-name">${U.esc(CHAR.short)} <span>· ${U.esc(CHAR.role)}</span></div>
-          <div class="vn-text"></div>
-          <div class="vn-choices"></div>
-        </div>
-        <div class="vn-next" aria-hidden="true">▼</div>
-        <button class="vn-skip" data-act="vn-skip">Saltar</button>
+        <div class="vn-stage" aria-hidden="true"><i class="vn-glow"></i><i class="vn-ledge"></i><div class="vn-face"></div></div>
+        <div class="vn-tag"><b>${U.esc(CHAR.short)}</b><span>${U.esc(CHAR.role)}</span></div>
+        <div class="vn-text"></div>
+        <div class="vn-choices"></div>
+        <div class="vn-foot"><span class="vn-dots"></span><span class="vn-next" aria-hidden="true">Toca para seguir ▼</span></div>
+        <button class="vn-skip" data-act="vn-skip">Saltar ⏭</button>
       </div>`;
     document.body.appendChild(r);
     return r;
@@ -222,6 +221,8 @@
     cur.typing = true;
     cur.line = line;
     r.querySelector('.vn-choices').innerHTML = '';
+    const n = cur.lines.length;
+    r.querySelector('.vn-dots').innerHTML = n > 1 && n <= 14 ? cur.lines.map((_, k) => `<i class="${k < cur.i ? 'past' : k === cur.i ? 'on' : ''}"></i>`).join('') : n > 14 ? `${cur.i + 1}/${n}` : '';
     r.classList.remove('done');
     const box = r.querySelector('.vn-box');
     box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
@@ -330,6 +331,7 @@
       'Toca a cualquiera para renovarle, ponerle en venta o rescindir. Las etiquetas te avisan de lesiones, sanciones y contratos que acaban.'],
     tactics: S => ['El **número de cada ficha** es lo que rinde ese jugador en ese puesto. Si sale en amarillo, está fuera de sitio.',
       'Al cambiar de sistema intento mantener a cada uno en su puesto. **Mejor once** elige el equipo más en forma.',
+      { text: 'Lo que plantee el rival no lo sabrás hasta que empiece el partido: su entrenador tiene **sus propias ideas** y te estudia. Después, abajo, te dejo mi **repaso**.', emo: 'thinking' },
       { text: 'Mentalidad **ofensiva** si necesitas goles, **defensiva** para guardar un resultado. No hay más secreto… bueno, alguno hay.', emo: 'laugh' }],
     league: S => ['La **clasificación**, las jornadas y los goleadores. Las zonas verdes ascienden y las rojas bajan.',
       'Toca un equipo para ver su plantilla: conocer al rival es medio partido.'],
