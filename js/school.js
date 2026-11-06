@@ -159,7 +159,7 @@
       reply: { text: k === q.ok ? q.yes : q.no, emo: k === q.ok ? 'happy' : 'neutral' }
     })) });
     TL.UI.closeSheet();
-    TL.Mentor.say(lines, { dim: true }).then(() => { if (S) { TL.UI.refresh(); TL.UI.celebrate && TL.UI.celebrate(S); } });
+    TL.Mentor.say(lines, { dim: true, voice: 'secreto' }).then(() => { if (S) { TL.UI.refresh(); TL.UI.celebrate && TL.UI.celebrate(S); } });
   }
 
   function plain(t) { return U.esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }

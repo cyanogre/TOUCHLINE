@@ -217,8 +217,48 @@
     });
   }
 
+  // ------------------------------------------------------------ Doblaje (frases cortas al empezar algunos diálogos)
+  // Archivos en assets/mentor/voice/<clave>.mp3 (voz «Rafael», ElevenLabs). Si no están, suenan los pitidos de siempre.
+  const VOICE = {
+    hola: '¡Hombre, míster!', escucha: 'Escucha, míster.', aver: 'A ver, a ver…', bien: '¡Así se hace!', orgullo: '¡Eso es, chaval!',
+    ay: 'Ay, ay, ay…', tranquilo: 'Tranquilo, míster.', secreto: 'Te voy a contar una cosa…', campeones: '¡Campeones!', mira: 'Mira…', pena: 'Qué le vamos a hacer…'
+  };
+  const BY_EMO = { neutral: ['escucha', 'mira'], happy: ['bien'], proud: ['orgullo'], worried: ['ay', 'tranquilo'], sad: ['pena'], thinking: ['aver', 'mira'], laugh: ['campeones'], surprised: ['aver'] };
+  const clips = {}, missing = new Set();
+  let lastClip = 0;
+  function clip(key) {
+    if (missing.has(key)) return null;
+    if (!clips[key]) {
+      const a = new Audio(`assets/mentor/voice/${key}.mp3`);
+      a.preload = 'auto';
+      a.addEventListener('error', () => { missing.add(key); delete clips[key]; });
+      clips[key] = a;
+    }
+    return clips[key];
+  }
+  /** Al empezar un diálogo, a veces el Profe arranca con una frase doblada. Devuelve los ms que dura (o 0). */
+  function dub(job) {
+    if (!TL.SFX || !TL.SFX.on() || job.opts.voice === false) return 0;
+    const now = performance.now();
+    const first = job.lines[0] || {};
+    const key = job.opts.voice || (now - lastClip > 25000 && Math.random() < 0.6 ? U.pick(BY_EMO[first.emo || job.opts.emo || 'neutral'] || BY_EMO.neutral) : null);
+    if (!key) return 0;
+    const a = clip(key);
+    if (!a) return 0;
+    try {
+      a.currentTime = 0; a.volume = 0.9;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+      lastClip = now;
+      return isFinite(a.duration) && a.duration > 0 ? a.duration * 1000 : 1200;
+    } catch (e) { return 0; }
+  }
+
   function begin(job) {
     const r = root();
+    // Mientras suena la frase doblada, no hay pitidos encima
+    const dubMs = dub(job);
+    job.quietUntil = performance.now() + Math.min(2500, dubMs);
     r.style.setProperty('--pk', String(dialogScale()));
     cur = { ...job, i: -1, face: cur && cur.face ? cur.face : new Face(r.querySelector('.vn-face'), { scale: dialogScale }) };
     r.classList.toggle('dim', cur.opts.dim !== false);
@@ -272,7 +312,7 @@
     cur.n++;
     r.querySelector('.vn-text').innerHTML = renderTokens(cur.tk, cur.n);
     cur.face.say(t.ch);
-    if (TL.SFX && TL.SFX.voice && cur.n % 1 === 0) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
+    if (TL.SFX && TL.SFX.voice && !(cur.quietUntil > performance.now())) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
     let ms = 28;
     if ('.!?…'.includes(t.ch)) ms = 230;
     else if (',;:'.includes(t.ch)) ms = 120;
@@ -490,5 +530,5 @@
     if (lines.length && on()) say(lines, { dim: true }).then(() => TL.Game.save());
   }
 
-  TL.Mentor = { CHAR, EMOTIONS, Face, say, help, check, event, on, setOn, state, trust, active: () => !!cur, HELP, ROUTE };
+  TL.Mentor = { VOICE, CHAR, EMOTIONS, Face, say, help, check, event, on, setOn, state, trust, active: () => !!cur, HELP, ROUTE };
 })();
