@@ -174,6 +174,7 @@
   A.music = () => Music.toggle();
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
   A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); UI.refresh(); };
+  A['opt-mentor'] = () => { TL.Mentor.setOn(!TL.Mentor.on()); UI.refresh(); };
   UI.Music = Music;
 
   // ------------------------------------------------------------ Shell
@@ -194,6 +195,7 @@
       ${crest(c)}
       <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${U.seasonLabel(S.season)} · ${wk} · ${esc(L.name)}</div></div>
       <div class="cash ${c.cash < 0 ? 'neg' : ''} ${UI.lastCash != null && UI.lastCash !== Math.round(c.cash) ? (c.cash > UI.lastCash ? 'up pop' : 'down pop') : ''}">${U.money(c.cash)}<small>Saldo</small></div>
+      <button class="icon-btn help-btn" data-act="help" aria-label="Ayuda del Profe" title="Ayuda del Profe">?</button>
       <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
     UI.lastCash = Math.round(c.cash);
     TL.Commerce.refreshBudget(S);
@@ -216,6 +218,7 @@
     view.classList.toggle('enter', !keepScroll);
     view.innerHTML = VIEWS[UI.tab](S);
     if (VIEWS[UI.tab + 'After']) VIEWS[UI.tab + 'After'](S);
+    if (TL.Mentor) view.querySelectorAll('[data-face]').forEach(el => new TL.Mentor.Face(el));
     window.scrollTo(0, keepScroll ? y : 0);
   }
   UI.render = render;
@@ -322,7 +325,13 @@
       <div class="row between mt"><span class="muted" style="font-size:13px">Presupuesto salarial</span><span class="num">${U.money(bill)} / ${U.money(c.wageBudget)}</span></div>
       <div class="bar ${bill > c.wageBudget ? 'bad' : bill > c.wageBudget * 0.95 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${Math.min(100, bill / c.wageBudget * 100)}%"></i></div></section>`;
 
-    return `<div class="grid two three">${next}${board}${inbox}${news}${results}${mini}${fin}</div>`;
+    const lessons = (TL.Mentor.state(S).lessons || {});
+    const doneN = TL.School.LESSONS.filter(l => lessons[l.id] && lessons[l.id] !== 'read').length;
+    const school = doneN < TL.School.LESSONS.length ? `<section class="card school-card"><div class="row">
+        <div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>
+        <div class="grow"><h2>La escuela del Profe</h2><div class="note">Aprende a ganar partidos: puntos, formaciones, cambios y cómo progresar. ${doneN}/${TL.School.LESSONS.length} lecciones.</div></div></div>
+        <button class="btn sm primary block mt" data-act="school">${doneN ? 'Seguir aprendiendo' : 'Empezar la primera lección'}</button></section>` : '';
+    return `<div class="grid two three">${next}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
   };
   VIEWS.homeAfter = S => {
     // Lo mostrado en Inicio queda como leído
@@ -489,6 +498,7 @@
           <p class="note center" style="margin-top:8px">Toca una posición para cambiar el jugador. El número es su rendimiento en ese puesto.</p>
         </div>
         <div class="col">
+          ${analysisCard(S)}
           <div class="card"><h2 style="margin-bottom:10px">Mentalidad</h2>
             <div class="seg">${MENT.map((m, i) => `<button class="${T.mentality === i ? 'on' : ''}" data-act="tac-ment" data-m="${i}">${m}</button>`).join('')}</div>
             <label class="row between mt" style="font-size:14px"><span>Cambios automáticos (cansancio y lesiones)</span>
@@ -498,6 +508,55 @@
             <div class="plist">${restRows || '<div class="empty">No hay más jugadores.</div>'}</div></div>
         </div>
       </div>`;
+  };
+
+  /** Análisis del Profe: qué formación y mentalidad te dan más puntos contra el próximo rival. */
+  function analysisCard(S) {
+    const fx = SE.nextFixture(S);
+    if (!fx) return '';
+    const home = fx[0] === S.user, oppId = home ? fx[1] : fx[0];
+    const opp = S.clubs[oppId];
+    const A_ = E.analyse(S, oppId, home);
+    const best = {};
+    for (const r of A_.rows) if (!best[r.formation] || r.pts > best[r.formation].pts) best[r.formation] = r;
+    const rows = Object.values(best).sort((a, b) => b.pts - a.pts);
+    const top = rows[0];
+    const cur = A_.rows.find(r => r.formation === S.tactics.formation && r.mentality === S.tactics.mentality) || rows.find(r => r.formation === S.tactics.formation);
+    const pct = v => Math.round(v * 100) + '%';
+    const me = top.st, op = A_.opp.st;
+    // Explicación en lenguaje llano
+    const ln = me.lines, why = [];
+    const strongest = ['def', 'mid', 'att'].sort((a, b) => ln[b] - ln[a])[0];
+    why.push({ def: 'Tu punto fuerte es la **defensa**', mid: 'Tu punto fuerte es el **centro del campo**', att: 'Tu punto fuerte es el **ataque**' }[strongest]);
+    why.push(op.attack + op.defense > me.attack + me.defense + 4 ? `${opp.name} es mejor que tú: toca ser prudente` : op.attack + op.defense < me.attack + me.defense - 4 ? `eres mejor que ${opp.name}: a por ellos` : `${opp.name} es de tu nivel`);
+    const advice = `${why[0]}; ${why[1]}. Con **${top.formation}** y mentalidad **${MENT[top.mentality].toLowerCase()}** ganarías un ${pct(top.w)} de las veces` +
+      (cur && cur.formation !== top.formation ? ` (ahora, un ${pct(cur.w)}).` : '.');
+    const bar = (v, max) => `<div class="bar" style="height:6px"><i style="width:${Math.max(4, Math.min(100, v / max * 100))}%"></i></div>`;
+    const mx = Math.max(me.attack, me.defense, op.attack, op.defense, me.mid, op.mid);
+    return `<div class="card analysis"><div class="card-head"><h2>Análisis del Profe</h2><span class="muted">vs ${esc(opp.name)} · ${home ? 'en casa' : 'fuera'}</span></div>
+      <div class="row" style="align-items:flex-start;gap:10px"><div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>
+        <p class="note" style="margin:0;color:var(--text)">${esc(advice).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p></div>
+      <div class="cmp mt"><div></div><div class="note">Tú</div><div class="note">Rival (${A_.opp.formation})</div>
+        <div class="note">Ataque</div><div>${bar(me.attack, mx)}</div><div>${bar(op.attack, mx)}</div>
+        <div class="note">Defensa</div><div>${bar(me.defense, mx)}</div><div>${bar(op.defense, mx)}</div>
+        <div class="note">Medio</div><div>${bar(me.mid, mx)}</div><div>${bar(op.mid, mx)}</div></div>
+      <table class="table mt"><thead><tr><th class="l" style="text-align:left">Sistema</th><th>Gana</th><th>Empata</th><th>Pierde</th><th></th></tr></thead><tbody>
+      ${rows.map((r, k) => `<tr class="${r.formation === S.tactics.formation ? 'me' : ''}"><td class="l" style="text-align:left"><b>${r.formation}</b>
+          <div class="note">${MENT[r.mentality]}${r.outOfPos ? ` · ${r.outOfPos} fuera de sitio` : ''}</div></td>
+        <td class="pos-ok">${pct(r.w)}</td><td>${pct(r.d)}</td><td class="neg">${pct(r.l)}</td>
+        <td><button class="btn sm ${k === 0 ? 'primary' : ''}" data-act="tac-apply" data-f="${r.formation}" data-m="${r.mentality}">${k === 0 ? '★ Usar' : 'Usar'}</button></td></tr>`).join('')}
+      </tbody></table>
+      <p class="note">Probabilidades calculadas con el mismo modelo que el partido, con el mejor once disponible en cada sistema. El azar existe: úsalo como guía.</p></div>`;
+  }
+  A['tac-apply'] = el => {
+    const S = G.S, f = el.dataset.f;
+    S.tactics.formation = f;
+    S.tactics.slots = E.autoLineup(W.squad(S, S.user), f, true);
+    S.tactics.mentality = +el.dataset.m;
+    G.save();
+    toast(`Sistema ${f} · mentalidad ${MENT[+el.dataset.m].toLowerCase()}`);
+    TL.FX.sparkle(el);
+    UI.refresh();
   };
 
   A['tac-form'] = el => {
@@ -767,10 +826,12 @@
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
         <div class="btn-row"><button class="btn" data-act="save">Guardar</button><button class="btn" data-act="export">Exportar</button>
         <button class="btn" data-act="import">Importar</button><button class="btn" data-act="tutorial">Ver tutorial</button>
+        <button class="btn" data-act="school">Escuela del Profe</button>
         <button class="btn danger" data-act="quit">Nueva partida</button></div>
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
-          <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button></div>
+          <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-mentor">🧓 Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
@@ -1174,6 +1235,7 @@
     const champ = S.clubs[sum.champion];
     const ok = sum.pos <= sum.target;
     if (fresh && (ok || sum.moved === 'up')) setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); }, 300);
+    if (fresh && !sum.fired) setTimeout(() => TL.Mentor.event(S, 'seasonEnd', sum), 900);
     const moved = sum.moved === 'up' ? '<p class="pos-ok" style="font-weight:700">¡Ascenso conseguido!</p>' :
       sum.moved === 'down' ? '<p class="neg" style="font-weight:700">Descenso de categoría.</p>' : '';
     const youth = sum.youth.map(id => S.players[id]);
@@ -1213,6 +1275,9 @@
 
   function renderFired() {
     const S = G.S;
+    const fk = 'fired:' + S.season + ':' + S.week;
+    const ms = TL.Mentor.state(S);
+    if (!ms.seen[fk]) { ms.seen[fk] = true; setTimeout(() => TL.Mentor.event(S, 'fired'), 700); }
     const pendingEnd = S.over && !S.endDone;
     app().innerHTML = `<div class="title-screen"><div class="logo"><h1>DESTI<span>TUIDO</span></h1>
       <p>${esc(S.clubs[S.user].name)} prescinde de ti</p></div>
@@ -1384,6 +1449,7 @@
       S._levelUp = 0;
       setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); toast(`¡Nivel ${S.mgr.level} de mánager! Tienes puntos de habilidad.`); }, 400);
     }
+    setTimeout(() => { if (TL.Mentor) TL.Mentor.check(S); }, 1400);
   }
   UI.celebrate = celebrate;
 
@@ -1417,7 +1483,7 @@
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
-    if (TL.SFX && !/^(tab|mv-|tut-)/.test(el.dataset.act)) TL.SFX.click();
+    if (TL.SFX && !/^(tab|mv-|tut-|vn-)/.test(el.dataset.act)) TL.SFX.click();
     const f = A[el.dataset.act];
     if (f) { ev.preventDefault(); f(el, ev); }
   });

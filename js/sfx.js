@@ -86,6 +86,34 @@
         [o, o2, lfo].forEach(x => { x.start(t); x.stop(t + dur + 0.05); });
       }
     },
+    /**
+     * Voz tipo "Animal Crossing": un pitido muy corto por letra. El tono depende
+     * de la letra (la misma palabra suena siempre igual) y del ánimo del personaje.
+     * o: { pitch: Hz base, mood: semitonos extra, rate: duración relativa }
+     */
+    voice(ch, o) {
+      const c = ac(); if (!c || !on() || !ch || !/[\p{L}\d]/u.test(ch)) return;
+      o = o || {};
+      const t = c.currentTime;
+      const l = ch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const vowel = 'aeiou'.includes(l);
+      const k = (l.charCodeAt(0) * 37) % 11;                 // 0..10 según la letra
+      const semis = (vowel ? 3 : 0) + (k - 5) * 0.8 + (o.mood || 0) + (Math.random() - 0.5) * 0.6;
+      const f = (o.pitch || 760) * Math.pow(2, semis / 12);
+      const dur = (vowel ? 0.055 : 0.032) * (o.rate || 1);
+      const osc = c.createOscillator(), osc2 = c.createOscillator(), bp = c.createBiquadFilter(), g = c.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * (vowel ? 0.9 : 1.12), t + dur);
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(f * 2.01, t);
+      bp.type = 'bandpass';
+      bp.frequency.value = vowel ? 1250 + k * 60 : 2300 + k * 90; // "formante" distinto para vocales/consonantes
+      bp.Q.value = 1.4;
+      env(g, t, 0.003, vowel ? 0.09 : 0.06, dur);
+      osc.connect(bp); osc2.connect(bp); bp.connect(g); g.connect(master);
+      osc.start(t); osc2.start(t); osc.stop(t + dur + 0.03); osc2.stop(t + dur + 0.03);
+    },
     kick() { burst(0.07, 'lowpass', 260, 0.35, 0.7); tone(110, 0.08, 'sine', 0.2, 60); },
     net() { burst(0.25, 'bandpass', 1800, 0.12, 0.6); },
     card() { burst(0.05, 'highpass', 3000, 0.2); S.whistle(false); },

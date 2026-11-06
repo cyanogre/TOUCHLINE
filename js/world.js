@@ -355,7 +355,7 @@
       v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager,
       leagues: S.leagues.map(l => l.clubs),
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
-      wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone,
+      wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
       pb, pg,
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
@@ -393,7 +393,7 @@
       neg: save.neg || {}, history: save.history || [], board: save.board, fin: Object.assign(newFin(), save.fin || {}),
       results: save.results || [], mgr: save.mgr, com: save.com, news: save.news || [], newsId: save.newsId || 1,
       settings: save.settings, log: save.log || { crowd: {} }, leader: save.leader,
-      wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone,
+      wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone, mentor: save.mentor || null,
       over: save.over, fired: save.fired
     });
     dirty(S);
@@ -405,6 +405,7 @@
   function migrate(S) {
     for (const c of S.clubs) if (c.stature == null) c.stature = c.rep;
     S.wageShift = S.wageShift || 0;
+    if (!S.mentor) S.mentor = { seen: {}, trust: 50, cool: {}, chapter: 1, lessons: {} };
     TL.Manager.init(S);
     S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
     S.news = S.news || [];

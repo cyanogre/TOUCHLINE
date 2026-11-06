@@ -259,6 +259,78 @@
     };
   }
 
+  /**
+   * Fuerza de un once (función pura, la usa el partido y el análisis táctico).
+   * Cada línea aporta su media; más jugadores en una línea suman extra:
+   * +1,2 de defensa por defensa por encima de 4, +1 de ataque por delantero
+   * por encima de 2, +1,5 de posesión y +0,3 de ataque/defensa por medio por encima de 4.
+   */
+  function teamStrength(onPitch, mult) {
+    mult = mult || 1;
+    const lines = [[], [], [], []];
+    for (const o of onPitch) lines[F.LINE[o.slot]].push(eff(o.p, o.slot) * (o.hurt ? 0.6 : 1));
+    const avg = a => (a.length ? U.sum(a) / a.length : null);
+    let gk = avg(lines[0]), def = avg(lines[1]), mid = avg(lines[2]), att = avg(lines[3]);
+    const any = avg(lines.flat()) || 40;
+    if (gk == null) gk = 25;
+    if (def == null) def = any * 0.85;
+    if (mid == null) mid = any * 0.85;
+    if (att == null) att = mid * 0.85;
+    const nD = lines[1].length, nM = lines[2].length, nA = lines[3].length;
+    const miss = 11 - onPitch.length;
+    const k = v => v * mult;
+    return {
+      attack: k(0.55 * att + 0.45 * mid) + (nA - 2) * 1.0 + (nM - 4) * 0.3 - miss * 3,
+      defense: k(0.5 * def + 0.3 * mid + 0.2 * gk) + (nD - 4) * 1.2 + (nM - 4) * 0.3 - miss * 3,
+      mid: k(mid) + (nM - 4) * 1.5 - miss * 2,
+      gk, lines: { def, mid, att }
+    };
+  }
+
+  function poissonPmf(l, k) { let p = Math.exp(-l); for (let i = 1; i <= k; i++) p *= l / i; return p; }
+
+  /** Probabilidades de victoria/empate/derrota a partir de los goles esperados. */
+  function outcome(xa, xb) {
+    let w = 0, d = 0, l = 0;
+    const pa = [], pb = [];
+    for (let k = 0; k <= 9; k++) { pa.push(poissonPmf(xa, k)); pb.push(poissonPmf(xb, k)); }
+    for (let i = 0; i <= 9; i++) for (let j = 0; j <= 9; j++) {
+      const p = pa[i] * pb[j];
+      if (i > j) w += p; else if (i === j) d += p; else l += p;
+    }
+    const t = w + d + l;
+    return { w: w / t, d: d / t, l: l / t };
+  }
+
+  /**
+   * Análisis del Profe: cómo rendiría tu equipo con cada formación y mentalidad
+   * contra un rival (mismo modelo que el partido). Devuelve filas ordenadas.
+   */
+  function analyse(S, oppId, home) {
+    const W = TL.World;
+    const mine = W.squad(S, S.user), theirs = W.squad(S, oppId);
+    const ob = bestFormation(theirs);
+    const oslots = FORMATIONS[ob.formation];
+    const oppStr = teamStrength(ob.ids.map((id, i) => ({ p: S.players[id], slot: oslots[i][0] })).filter(o => o.p));
+    const bo = TL.Manager.bonus(S, S.user);
+    const rows = [];
+    for (const f of Object.keys(FORMATIONS)) {
+      const ids = autoLineup(mine, f, true), slots = FORMATIONS[f];
+      const xi = ids.map((id, i) => ({ p: S.players[id], slot: slots[i][0] })).filter(o => o.p);
+      const st = teamStrength(xi, bo.teamBoost);
+      const outOfPos = xi.filter(o => fit(o.p, o.slot) < 0.9).length;
+      for (const m of [0, 1, 2]) {
+        const own = MENT_OWN[m];
+        const xf = U.clamp(BASE_XG * Math.exp(XG_K * (st.attack - oppStr.defense + (home ? HOME_ADV : 0))) * (own > 1 ? own + bo.mentBonus : own < 1 ? own - bo.mentBonus * 0.3 : 1), 0.08, 5);
+        const xa = U.clamp(BASE_XG * Math.exp(XG_K * (oppStr.attack - st.defense + (home ? 0 : HOME_ADV))) * MENT_OPP[m], 0.08, 5);
+        const o = outcome(xf, xa);
+        rows.push({ formation: f, mentality: m, ids, st, xf, xa, ...o, pts: 3 * o.w + o.d, outOfPos });
+      }
+    }
+    rows.sort((a, b) => b.pts - a.pts);
+    return { rows, opp: { formation: ob.formation, st: oppStr } };
+  }
+
   // ------------------------------------------------------------ Partido
   class Match {
     constructor(S, homeId, awayId, opts) {
@@ -351,28 +423,8 @@
     _strength(i) {
       const t = this.teams[i];
       const b = this.bonus[i];
-      const lines = [[], [], [], []];
-      for (const o of t.onPitch) {
-        const p = this.P(o.pid);
-        lines[F.LINE[o.slot]].push(eff(p, o.slot) * (o.hurt ? 0.6 : 1));
-      }
-      const avg = a => (a.length ? U.sum(a) / a.length : null);
-      let gk = avg(lines[0]), def = avg(lines[1]), mid = avg(lines[2]), att = avg(lines[3]);
-      const any = avg(lines.flat()) || 40;
-      if (gk == null) gk = 25;
-      if (def == null) def = any * 0.85;
-      if (mid == null) mid = any * 0.85;
-      if (att == null) att = mid * 0.85;
-      const nD = lines[1].length, nM = lines[2].length, nA = lines[3].length;
-      const miss = 11 - t.onPitch.length;
-      let mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1);
-      const k = v => v * mult;
-      return {
-        attack: k(0.55 * att + 0.45 * mid) + (nA - 2) * 1.0 + (nM - 4) * 0.3 - miss * 3,
-        defense: k(0.5 * def + 0.3 * mid + 0.2 * gk) + (nD - 4) * 1.2 + (nM - 4) * 0.3 - miss * 3,
-        mid: k(mid) + (nM - 4) * 1.5 - miss * 2,
-        gk
-      };
+      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1);
+      return teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult);
     }
 
     strengths() {
@@ -888,6 +940,7 @@
   }
 
   TL.Engine = {
-    FORMATIONS, TALKS, fit, eff, available, autoLineup, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore
+    FORMATIONS, TALKS, fit, eff, available, autoLineup, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore,
+    teamStrength, outcome, analyse, MENT_OWN, MENT_OPP
   };
 })();

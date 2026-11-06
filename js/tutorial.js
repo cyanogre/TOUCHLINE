@@ -1,4 +1,4 @@
-/* TOUCHLINE — tutorial guiado (resalta elementos de la interfaz paso a paso) */
+/* TOUCHLINE — tutorial guiado, contado por el Profe (diálogos estilo novela visual) */
 (function () {
   'use strict';
   const TL = window.TL;
@@ -7,84 +7,52 @@
   function done(id) { try { return localStorage.getItem(KEY + id) === '1'; } catch (e) { return false; } }
   function mark(id) { try { localStorage.setItem(KEY + id, '1'); } catch (e) { /* nada */ } }
 
+  const club = S => (S ? S.clubs[S.user].name : 'el club');
   const TOURS = {
     main: [
-      { title: '¡Bienvenido, míster! 👋', text: 'Vas a dirigir un club con jugadores reales de EA FC 27. Te enseño lo básico en 1 minuto.' },
-      { sel: '.next-match', tab: 'home', title: 'Tu próximo partido', text: 'Juega en <b>directo</b> (ves a los jugadores, decides en los momentos clave) o pulsa <b>Resultado rápido</b> para avanzar la jornada.' },
-      { sel: '.mgr-line', tab: 'home', title: 'La directiva', text: 'Cumple el objetivo para que la confianza no caiga a cero o te destituirán. Aquí también ves tu nivel de mánager.' },
-      { sel: '.nav [data-tab="squad"]', title: 'Plantilla', text: 'Moral 🙂, forma física, contratos y tarjetas. Toca un jugador para renovarle, venderle o ver sus estadísticas.' },
-      { sel: '.nav [data-tab="tactics"]', title: 'Tácticas', text: 'Elige formación, mentalidad y el once. Toca un puesto en el campo para cambiar al jugador.' },
-      { sel: '.nav [data-tab="market"]', title: 'Mercado', text: 'Busca fichajes reales y negocia. El mercado abre en verano (hasta la jornada 3) e invierno. Los libres, siempre.' },
-      { sel: '.nav [data-tab="club"]', title: 'Club', text: 'Finanzas, <b>patrocinios, marketing, préstamos y estadio</b> (pestaña Comercial) y tu <b>árbol de habilidades</b> (pestaña Mánager).' },
-      { sel: '[data-act="news"]', tab: 'home', title: 'Noticias y polémicas', text: 'El mundo se mueve: fichajes, rumores, polémicas arbitrales y escándalos. Los de tu club llegan al buzón como <b>decisiones</b>.' },
-      { title: '¡A por todas! 🏆', text: 'Consejo: firma ya los patrocinios libres en Club → Comercial y gasta tus puntos de habilidad. ¡Suerte!', end: true }
+      { text: '¡Hombre, por fin! Soy Tomás Arrieta, aunque en los banquillos todos me llaman **el Profe**.', emo: 'happy' },
+      { text: S => `La directiva de ${club(S)} me ha pedido que te forme como mánager. Treinta años entrenando dan para muchos consejos.` },
+      { sel: '.next-match', tab: 'home', text: 'Lo más importante: el **próximo partido**. Juégalo en **directo** para ver a los chavales y decidir en los momentos clave, o dale a **Resultado rápido** si vas con prisa.' },
+      { sel: '.mgr-line', tab: 'home', text: S => `La **directiva** te pide: ${S.board.text.toLowerCase()}. Si su confianza llega a cero, te echan. Créeme, me ha pasado.`, emo: 'worried' },
+      { sel: '.nav [data-tab="squad"]', text: 'En **Plantilla** ves la moral, la forma física, los contratos y las tarjetas. Ojo con los contratos que acaban: si no renuevas, se van gratis.' },
+      { sel: '.nav [data-tab="tactics"]', text: '**Tácticas**: sistema, mentalidad y el once. Ahí tienes además mi **análisis del rival**, que te dice qué formación te conviene.', emo: 'thinking' },
+      { sel: '.nav [data-tab="market"]', text: 'El **Mercado** abre en verano hasta la jornada 3, y en invierno. Los agentes libres se fichan siempre.' },
+      { sel: '.nav [data-tab="club"]', text: 'En **Club** llevas el dinero: patrocinios, préstamos, marketing… y tu crecimiento como mánager.' },
+      { sel: '[data-act="news"]', tab: 'home', text: 'Y lee la prensa: fichajes, polémicas, escándalos… Los problemas de tu vestuario te llegarán al buzón como **decisiones**.' },
+      { sel: '[data-act="help"]', text: 'Si te pierdes, pulsa el **?** de arriba y vengo corriendo. Ahí también está mi **escuela**: lecciones para aprender a ganar, aunque no sepas nada de fútbol.', emo: 'happy' },
+      { text: 'Primer consejo gratis: firma ya los **patrocinios libres** en Club → Comercial. Es dinero que entra sin jugar. ¡A trabajar, míster!', emo: 'proud' }
     ],
     match: [
-      { sel: '#pitch', title: 'El partido, en vivo', text: 'Cada círculo es un jugador con su dorsal; el balón se mueve con la jugada. Tu equipo lleva borde blanco.' },
-      { sel: '.speeds', title: 'Velocidad', text: 'De <b>x1</b> a <b>x16</b>. Cambia cuando quieras.' },
-      { sel: '[data-act="mv-skipmenu"]', title: 'Saltar', text: 'Avanza hasta el próximo momento clave, el descanso, un minuto concreto o el final.' },
-      { sel: '[data-act="mv-settings"]', title: 'Pausas automáticas', text: 'El partido se detiene en goles, rojas, lesiones, penaltis o VAR para que decidas. Configúralo aquí.' },
-      { sel: '#mv-foot .seg', title: 'Mentalidad, cambios y táctica', text: 'Ataca si vas perdiendo, cierra si ganas. En el descanso darás la <b>charla</b> al vestuario.', end: true }
+      { sel: '#pitch', text: 'Bienvenido al **césped**. Cada círculo es un jugador con su dorsal; los tuyos llevan borde blanco. El balón va donde va la jugada.' },
+      { sel: '.speeds', text: 'La **velocidad**, de x1 a x16. Yo veo los partidos tranquilo, pero tú haz lo que quieras.' },
+      { sel: '[data-act="mv-skipmenu"]', text: '**Saltar** avanza hasta el próximo momento clave, el descanso, un minuto o el final.' },
+      { sel: '[data-act="mv-settings"]', text: 'El partido se **para solo** en goles, rojas, lesiones, penaltis o VAR, para que decidas. Aquí lo configuras.', emo: 'thinking' },
+      { sel: '#mv-foot .seg', text: 'La **mentalidad**: ataca si vas perdiendo, cierra si vas ganando. Y en el descanso me toca a mí… digo, a ti: la **charla**.', emo: 'laugh' }
     ]
   };
 
-  let cur = null;
-
+  let active = null;
   function start(id, force) {
     if (!force && done(id)) return false;
-    cur = { id, i: 0 };
-    show();
+    active = { id, onEnd: null };
+    TL.Mentor.say(TOURS[id], {
+      dim: true,
+      onEnd: () => {
+        mark(id);
+        const cb = active && active.onEnd;
+        active = null;
+        if (id === 'main' && TL.FX) TL.FX.confetti();
+        if (cb) cb();
+      }
+    });
     return true;
   }
 
-  function stop(finish) {
-    const o = document.getElementById('tut');
-    if (o) o.remove();
-    if (cur) mark(cur.id);
-    if (finish && TL.FX) TL.FX.confetti();
-    if (cur && cur.onEnd) cur.onEnd();
-    cur = null;
-  }
+  TL.UI.actions.tutorial = () => {
+    try { localStorage.removeItem(KEY + 'main'); localStorage.removeItem(KEY + 'match'); } catch (e) { /* nada */ }
+    TL.UI.tab = 'home'; TL.UI.render(false);
+    setTimeout(() => start('main', true), 200);
+  };
 
-  function show() {
-    const step = TOURS[cur.id][cur.i];
-    if (!step) { stop(true); return; }
-    if (step.tab && TL.UI.tab !== step.tab && TL.Game.S && !document.getElementById('match')) { TL.UI.tab = step.tab; TL.UI.render(false); }
-    let o = document.getElementById('tut');
-    if (!o) {
-      o = document.createElement('div');
-      o.id = 'tut';
-      o.innerHTML = '<div class="tut-hole"></div><div class="tut-card" role="dialog" aria-live="polite"></div>';
-      document.body.appendChild(o);
-    }
-    const hole = o.querySelector('.tut-hole'), card = o.querySelector('.tut-card');
-    const target = step.sel ? document.querySelector(step.sel) : null;
-    const n = TOURS[cur.id].length;
-    card.innerHTML = `<div class="tut-step">${cur.i + 1} / ${n}</div><h3>${step.title}</h3><p>${step.text}</p>
-      <div class="btn-row"><button class="btn sm ghost" data-act="tut-skip">Saltar tutorial</button>
-      <button class="btn sm primary" data-act="tut-next">${step.end ? '¡Entendido!' : 'Siguiente'}</button></div>`;
-    if (target) {
-      target.scrollIntoView({ block: 'center', behavior: 'auto' });
-      const r = target.getBoundingClientRect();
-      const pad = 6;
-      Object.assign(hole.style, { display: 'block', left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
-      o.classList.remove('center');
-      const below = r.bottom + 12 + 190 < innerHeight;
-      card.style.left = Math.max(12, Math.min(innerWidth - 332, r.left + r.width / 2 - 160)) + 'px';
-      card.style.top = below ? r.bottom + 12 + 'px' : Math.max(12, r.top - 12 - card.offsetHeight) + 'px';
-    } else {
-      hole.style.display = 'none';
-      o.classList.add('center');
-      card.style.left = ''; card.style.top = '';
-    }
-    card.classList.remove('in'); void card.offsetWidth; card.classList.add('in');
-  }
-
-  const A = TL.UI.actions;
-  A['tut-next'] = () => { TL.SFX && TL.SFX.click(); const last = TOURS[cur.id][cur.i].end; cur.i++; if (last) stop(true); else show(); };
-  A['tut-skip'] = () => stop(false);
-  A['tutorial'] = () => { try { localStorage.removeItem(KEY + 'main'); localStorage.removeItem(KEY + 'match'); } catch (e) { /* nada */ } TL.UI.tab = 'home'; TL.UI.render(false); setTimeout(() => start('main', true), 200); };
-  window.addEventListener('resize', () => { if (cur) show(); });
-
-  TL.Tutorial = { start, stop, done, active: () => !!cur, onEnd(fn) { if (cur) cur.onEnd = fn; } };
+  TL.Tutorial = { start, done, TOURS, active: () => !!active, onEnd(fn) { if (active) active.onEnd = fn; } };
 })();
