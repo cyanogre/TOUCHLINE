@@ -191,7 +191,7 @@
     for (const m of S.inbox) {
       if (m.kind === 'offer' && !m.done && m.data.exp < S.week) { m.done = true; m.res = 'Caducada'; }
     }
-    if (!windowOpen(S)) return;
+    if (!windowOpen(S)) { aiEmergency(S); return; }
     const mine = W.squad(S, S.user);
     const n = S.fixtures ? S.fixtures.length : 38, mid = Math.floor(n / 2);
     const lastWeek = S.week === 3 || S.week === mid + 2; // última semana de la ventana
@@ -218,7 +218,7 @@
         (lastWeek ? ' Es la última semana del mercado.' : ''), 'offer',
         { pid: p.id, club: b.id, amount, exp: S.week + 1 });
     }
-    aiTransfers(S, S.gender === 'M' ? 14 : 4);
+    aiTransfers(S, S.gender === 'M' ? 18 : 8);
   }
 
   function acceptOffer(S, msg) {
@@ -236,31 +236,118 @@
     return { ok: true, msg: `${p.short} vendido por ${U.money(amount)} · liberas ${U.money(freed)}/sem` };
   }
 
-  /** Traspasos entre clubes de la IA para mantener vivo el mundo. */
+  // ------------------------------------------------------------ Mercado de la IA
+  const LINE_NAME = ['la portería', 'la defensa', 'el centro del campo', 'la delantera'];
+  const XI_LINE = [1, 4, 4, 2], DEPTH = [2, 7, 7, 4];
+
+  /** Qué necesita un club de la IA: la línea de su once más floja para su nivel (o la más corta). */
+  function needOf(S, clubId) {
+    const c = S.clubs[clubId];
+    const lines = [[], [], [], []];
+    for (const p of W.squad(S, clubId)) if (p.age <= 34) lines[F.LINE[p.pos]].push(p.ovr);
+    let best = null;
+    for (let l = 0; l < 4; l++) {
+      const a = lines[l].sort((x, y) => y - x), xi = a.slice(0, XI_LINE[l]);
+      const level = xi.length ? U.sum(xi) / xi.length : 40;
+      const gap = (c.rep - level) + (a.length < DEPTH[l] ? 3 * (DEPTH[l] - a.length) : 0) + (xi.length < XI_LINE[l] ? 12 : 0);
+      if (!best || gap > best.gap) best = { line: l, gap, level, weakest: xi.length ? xi[xi.length - 1] : 40 };
+    }
+    return best;
+  }
+
+  /** Busca un refuerzo para esa línea: mejor que el titular más flojo, asequible y que quiera venir. */
+  function findTarget(S, buyer, need) {
+    const cap = power(S, buyer) * 0.55;
+    let pick = null;
+    for (let t = 0; t < 320; t++) {
+      const p = S.players[U.int(0, S.players.length - 1)];
+      if (p.club < -1 || p.club === buyer.id || p.club === S.user || F.LINE[p.pos] !== need.line) continue;
+      if (p.age > 32 || p.ovr <= need.weakest + 1 || p.ovr > buyer.rep + 5) continue;
+      if (p.club >= 0) {
+        const from = S.clubs[p.club];
+        if (from.rep > buyer.rep + 3) continue; // nadie se va a un club mucho menor
+        const sq = W.squad(S, p.club);
+        if (sq.length <= 20) continue;
+        const better = sq.filter(x => x.ovr > p.ovr).length;
+        if (better < 3 && from.rep >= buyer.rep - 2 && !p.listed) continue; // no venden a su estrella a un igual
+      }
+      const fee = p.club >= 0 ? askingPrice(S, p) : 0;
+      if (fee > cap) continue;
+      const v = p.ovr - Math.max(0, p.age - 28) * 1.3 + (p.pot - p.ovr) * 0.15 + (p.listed ? 1.5 : 0) + U.rand(0, 2);
+      if (!pick || v > pick.v) pick = { v, p, fee };
+    }
+    return pick;
+  }
+
+  /** Si la plantilla se llena, el club se deshace del que menos cuenta. */
+  function trimSquad(S, clubId) {
+    const sq = W.squad(S, clubId);
+    if (sq.length < MAX_SQUAD - 2) return;
+    const out = sq.slice().sort((a, b) => (a.ovr - Math.max(0, a.age - 30) * 2) - (b.ovr - Math.max(0, b.age - 30) * 2))[0];
+    const fee = F.roundMoney(W.value(S, out) * 0.6);
+    const b = buyersFor(S, out, fee, true).filter(c => c.rep < S.clubs[clubId].rep)[0];
+    if (b) transferOut(S, out, b.id, fee);
+    else { out.club = -1; out.contract = 0; out.listed = false; W.dirty(S); }
+  }
+
+  /**
+   * Traspasos entre clubes de la IA: cada club ficha según lo que necesita
+   * (su línea más floja), con su dinero, y vende al que le sobra. Los rivales
+   * de tu liga cambian de plantilla igual que tú, y eso se nota en sus partidos.
+   */
   function aiTransfers(S, n) {
     const userLeague = S.clubs[S.user].league;
     const clubs = S.clubs.filter(c => c.id !== S.user && S.leagues[c.league].playable);
+    const mineL = clubs.filter(c => c.league === userLeague);
     for (let k = 0; k < n; k++) {
-      const buyer = U.pick(clubs);
-      if (W.squad(S, buyer.id).length >= MAX_SQUAD - 3) continue;
-      let target = null;
-      for (let t = 0; t < 60; t++) {
-        const p = S.players[U.int(0, S.players.length - 1)];
-        if (p.club < 0 || p.club === buyer.id || p.club === S.user || p.age > 31) continue;
-        if (p.ovr < buyer.rep - 1 || p.ovr > buyer.rep + 4) continue;
-        if (S.clubs[p.club].rep > buyer.rep + 2) continue;
-        if (W.squad(S, p.club).length <= 20) continue;
-        target = p; break;
+      // Dos de cada tres operaciones, en tu liga: ahí es donde se nota
+      const pool = k % 3 !== 2 && mineL.length ? mineL : clubs;
+      let buyer = null, need = null;
+      for (let t = 0; t < 6; t++) {
+        const c = U.pick(pool);
+        if (W.squad(S, c.id).length >= MAX_SQUAD - 2) continue;
+        const nd = needOf(S, c.id);
+        const score = nd.gap + U.rand(-2, 2) + Math.log10(1 + Math.max(0, c.cash) / 1e6);
+        if (!need || score > need.score) { buyer = c; need = Object.assign(nd, { score }); }
       }
-      if (!target) continue;
-      const fee = askingPrice(S, target);
-      if (fee > power(S, buyer) * 0.6) continue;
+      if (!buyer || need.gap < -4) continue;
+      const pick = findTarget(S, buyer, need);
+      if (!pick) continue;
+      const target = pick.p, fee = pick.fee;
       const fromClub = target.club;
-      transferOut(S, target, buyer.id, fee);
-      if (buyer.league === userLeague || S.clubs[fromClub].league === userLeague || target.ovr >= 82) {
-        TL.News.add(S, 'fichajes', `${buyer.name} ficha a ${target.name}`,
-          `${target.name} deja ${S.clubs[fromClub].name} a cambio de ${U.money(fee)}.`, buyer.id, target.id, 'neu');
+      if (fromClub >= 0) transferOut(S, target, buyer.id, fee);
+      else {
+        target.club = buyer.id; target.listed = false; target.fit = Math.max(target.fit, 85);
+        target.contract = S.season + 1 + U.int(0, maxYears(target) === 1 ? 0 : 2);
+        target.wage = F.wageFor(target.ovr, target.age, wealthOf(S, buyer.id), S.econ.wage);
+        W.dirty(S);
       }
+      trimSquad(S, buyer.id);
+      if (S._power) delete S._power[buyer.id];
+      if (buyer.league === userLeague || (fromClub >= 0 && S.clubs[fromClub].league === userLeague) || target.ovr >= 82) {
+        TL.News.add(S, 'fichajes', `${buyer.name} ficha a ${target.name}`,
+          (fromClub >= 0 ? `${target.name} (${target.ovr}) deja ${S.clubs[fromClub].name} a cambio de ${U.money(fee)}.` : `${target.name} (${target.ovr}) llega con la carta de libertad.`) +
+          ` Viene a reforzar ${LINE_NAME[need.line]}.`, buyer.id, target.id, 'neu');
+      }
+    }
+  }
+
+  /** Con el mercado cerrado, un club con la plantilla diezmada puede tirar de agentes libres. */
+  function aiEmergency(S) {
+    const L = W.userLeague(S);
+    for (const id of L.clubs) {
+      if (id === S.user || Math.random() > 0.25) continue;
+      const lines = [0, 0, 0, 0];
+      for (const p of W.squad(S, id)) if (p.inj <= 0 && p.sus <= 0) lines[F.LINE[p.pos]]++;
+      const l = lines.findIndex((v, i) => v < [1, 3, 3, 1][i]);
+      if (l < 0) continue;
+      const c = S.clubs[id];
+      const p = S.players.filter(x => x.club === -1 && F.LINE[x.pos] === l && x.ovr <= c.rep + 2).sort((a, b) => b.ovr - a.ovr)[0];
+      if (!p) continue;
+      p.club = id; p.contract = S.season + 1; p.listed = false;
+      p.wage = F.wageFor(p.ovr, p.age, wealthOf(S, id), S.econ.wage);
+      W.dirty(S);
+      TL.News.add(S, 'fichajes', `${c.name} ficha a ${p.name}, agente libre`, `Con ${LINE_NAME[l]} en cuadro por lesiones y sanciones, firma hasta final de temporada.`, id, p.id, 'neu');
     }
   }
 

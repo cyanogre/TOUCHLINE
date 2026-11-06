@@ -14,7 +14,7 @@
   const EV_ICON = {
     goal: '⚽', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
     foul: '⚠️', pen: '🎯', penmiss: '❌', fk: '🎯', var: '📺', disallowed: '🚫', refmiss: '😡', controversy: '⚖️',
-    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋'
+    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥'
   };
   const PAUSE_LABEL = { goal: 'Goles', red: 'Expulsiones', inj: 'Lesiones (tuyas)', pen: 'Penaltis', var: 'VAR y polémicas', crowd: 'Incidentes en la grada', ht: 'Descanso (charla)' };
 
@@ -26,7 +26,7 @@
     UI.lineupWarning(S);
     const m = G.startMatch();
     if (!m) { A['play-quick'](); return; }
-    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, subOut: null, skip: null, prompt: null });
+    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null });
     MV.me = m.teams[0].isUser ? 0 : 1;
     const [h, a] = m.teams.map(t => S.clubs[t.club]);
     const L = W.userLeague(S);
@@ -103,9 +103,11 @@
   function tick() {
     const m = MV.m;
     if (!m || MV.paused || m.done) return;
+    // El reloj espera a que el campo termine de escenificar la jugada en curso
+    if (MV.pitch && !MV.skip && MV.pitch.busy()) { schedule(70); return; }
     const evs = m.step();
     evs.forEach(addEvent);
-    if (MV.pitch) MV.pitch.push(evs);
+    if (MV.pitch) MV.pitch.push(evs, !!MV.skip);
     if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
     if (MV.tab !== 'feed') renderTab();
@@ -202,7 +204,9 @@
     if (!foot) return;
     if (MV.finished) {
       pr.innerHTML = '';
-      foot.innerHTML = `<button class="btn primary block" data-act="mv-done">Ver resumen</button>`;
+      // Una vez visto el resumen, solo queda salir (la jornada ya se ha jugado)
+      foot.innerHTML = MV.summary ? `<button class="btn primary block" data-act="mv-close">Continuar</button>`
+        : `<button class="btn primary block" data-act="mv-done">Ver resumen</button>`;
       return;
     }
     pr.innerHTML = promptHtml();
@@ -290,7 +294,7 @@
     if (m.min === 45 && !m.teams[MV.me].talk) m.teamTalk(MV.me, 'calm');
     resume();
   };
-  A['mv-speed'] = b => { settings().speed = +b.dataset.v; if (MV.pitch) MV.pitch.speed = +b.dataset.v; TL.SFX.click(); renderFoot(); schedule(); };
+  A['mv-speed'] = b => { settings().speed = +b.dataset.v; if (MV.pitch) MV.pitch.speed = +b.dataset.v; renderFoot(); schedule(); };
   A['mv-talk'] = b => {
     const r = MV.m.teamTalk(MV.me, b.dataset.k);
     const last = MV.m.events[MV.m.events.length - 1];
@@ -321,7 +325,7 @@
       while (!m.done) {
         const evs = m.step();
         evs.forEach(addEvent);
-        if (MV.pitch) MV.pitch.push(evs);
+        if (MV.pitch) MV.pitch.push(evs, true);
         if (m.min === 45 && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
       }
       MV.htDone = true;
@@ -420,6 +424,8 @@
   // ------------------------------------------------------------ Final
   A['mv-done'] = () => {
     const m = MV.m, S = G.S;
+    if (!m || MV.summary) return;
+    MV.summary = true;
     G.completeRound(m);
     const res = S.fixtures[S.week - 1].find(x => x[0] === S.user || x[1] === S.user);
     const t = m.teams[MV.me];
@@ -438,6 +444,7 @@
         ${mom != null ? `<p class="note" style="margin:6px 0 0">MVP: <b>${esc(S.players[mom].name)}</b> (${esc(S.clubs[m.teams[m.pl[mom].team].club].name)})</p>` : ''}
         ${inc ? `<p class="note bad" style="margin:6px 0 0">El partido deja ${inc} incidente${inc > 1 ? 's' : ''}: revisa las noticias y el buzón.</p>` : ''}</div>
       ${scorersHtml()}
+      <div class="mt">${UI.reviewCard(S, 0)}</div>
       <div class="card mt" style="padding:8px 10px"><div class="group-title">Notas · ${esc(S.clubs[t.club].name)}</div>
         ${rows.map(([id, r]) => {
           const p = S.players[id], rec = m.pl[id];
@@ -447,6 +454,7 @@
         }).join('')}</div>
       <div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
         ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`;
+    if (TL.Mentor) body.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
     el('mv-prompt').innerHTML = '';
     el('mv-foot').innerHTML = `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
     document.querySelectorAll('#mv-tabs button').forEach(x => { x.disabled = true; x.classList.remove('on'); });

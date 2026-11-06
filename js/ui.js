@@ -173,7 +173,8 @@
   };
   A.music = () => Music.toggle();
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
-  A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); UI.refresh(); };
+  A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); UI.refresh(); };
+  A['opt-mentor'] = () => { TL.Mentor.setOn(!TL.Mentor.on()); UI.refresh(); };
   UI.Music = Music;
 
   // ------------------------------------------------------------ Shell
@@ -194,6 +195,7 @@
       ${crest(c)}
       <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${U.seasonLabel(S.season)} · ${wk} · ${esc(L.name)}</div></div>
       <div class="cash ${c.cash < 0 ? 'neg' : ''} ${UI.lastCash != null && UI.lastCash !== Math.round(c.cash) ? (c.cash > UI.lastCash ? 'up pop' : 'down pop') : ''}">${U.money(c.cash)}<small>Saldo</small></div>
+      <button class="icon-btn help-btn" data-act="help" aria-label="Ayuda del Profe" title="Ayuda del Profe">?</button>
       <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
     UI.lastCash = Math.round(c.cash);
     TL.Commerce.refreshBudget(S);
@@ -216,6 +218,7 @@
     view.classList.toggle('enter', !keepScroll);
     view.innerHTML = VIEWS[UI.tab](S);
     if (VIEWS[UI.tab + 'After']) VIEWS[UI.tab + 'After'](S);
+    if (TL.Mentor) view.querySelectorAll('[data-face]').forEach(el => new TL.Mentor.Face(el));
     window.scrollTo(0, keepScroll ? y : 0);
   }
   UI.render = render;
@@ -286,6 +289,10 @@
       next = `<section class="card next-match span2">
         <div class="nm-meta"><span>${esc(L.name)} · J${S.week + 1}/${S.fixtures.length}</span><span>${U.fmtDate(U.dateOf(S.season, S.week))}</span></div>
         <div class="nm-teams">${team(h)}<div class="nm-vs">VS</div>${team(a)}</div>
+        ${(() => {
+          const oid = fx[0] === S.user ? fx[1] : fx[0], co = TL.Coach.of(S, oid);
+          return co ? `<p class="nm-coach">Banquillo rival: <b>${esc(co.name)}</b> · fama de técnico ${TL.Coach.STYLES[co.style].name}. <span>Su once y su sistema, al empezar.</span></p>` : '';
+        })()}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
         <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     }
@@ -322,7 +329,13 @@
       <div class="row between mt"><span class="muted" style="font-size:13px">Presupuesto salarial</span><span class="num">${U.money(bill)} / ${U.money(c.wageBudget)}</span></div>
       <div class="bar ${bill > c.wageBudget ? 'bad' : bill > c.wageBudget * 0.95 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${Math.min(100, bill / c.wageBudget * 100)}%"></i></div></section>`;
 
-    return `<div class="grid two three">${next}${board}${inbox}${news}${results}${mini}${fin}</div>`;
+    const lessons = (TL.Mentor.state(S).lessons || {});
+    const doneN = TL.School.LESSONS.filter(l => lessons[l.id] && lessons[l.id] !== 'read').length;
+    const school = doneN < TL.School.LESSONS.length ? `<section class="card school-card"><div class="row">
+        <div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>
+        <div class="grow"><h2>La escuela del Profe</h2><div class="note">Aprende a ganar partidos: puntos, formaciones, cambios y cómo progresar. ${doneN}/${TL.School.LESSONS.length} lecciones.</div></div></div>
+        <button class="btn sm primary block mt" data-act="school">${doneN ? 'Seguir aprendiendo' : 'Empezar la primera lección'}</button></section>` : '';
+    return `<div class="grid two three">${next}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
   };
   VIEWS.homeAfter = S => {
     // Lo mostrado en Inicio queda como leído
@@ -489,6 +502,7 @@
           <p class="note center" style="margin-top:8px">Toca una posición para cambiar el jugador. El número es su rendimiento en ese puesto.</p>
         </div>
         <div class="col">
+          ${reviewCard(S, 0)}
           <div class="card"><h2 style="margin-bottom:10px">Mentalidad</h2>
             <div class="seg">${MENT.map((m, i) => `<button class="${T.mentality === i ? 'on' : ''}" data-act="tac-ment" data-m="${i}">${m}</button>`).join('')}</div>
             <label class="row between mt" style="font-size:14px"><span>Cambios automáticos (cansancio y lesiones)</span>
@@ -498,6 +512,66 @@
             <div class="plist">${restRows || '<div class="empty">No hay más jugadores.</div>'}</div></div>
         </div>
       </div>`;
+  };
+
+  // ------------------------------------------------------------ Repaso del Profe (siempre a posteriori)
+  const REV_IC = { sys: '📋', chg: '🔁', edge: '⚔️', day: '🔋', luck: '🎲', hind: '🔍' };
+  const bold = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+  /** Tarjeta con el repaso de un partido ya jugado: qué hizo el rival y qué nos habría ido mejor. */
+  function reviewCard(S, k) {
+    const all = S.reviews || [];
+    k = Math.min(k || 0, Math.max(0, all.length - 1));
+    const r = all[k];
+    const face = '<div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>';
+    if (!r) {
+      return `<div class="card review"><div class="card-head"><h2>Repaso del Profe</h2></div>
+        <div class="rv-intro">${face}<p>Antes del partido nadie sabe qué va a plantear el rival, <b>ni yo</b>. Su entrenador decide según su estilo, cómo llega su plantilla y lo que le viste hacer la última vez. Juega y aquí te cuento qué pasó.</p></div></div>`;
+    }
+    const opp = S.clubs[r.opp];
+    const lines = TL.Coach.lines(S, r);
+    const [g, a] = r.score;
+    const res = g > a ? 'V' : g < a ? 'D' : 'E';
+    const MENT_S = ['Def.', 'Equil.', 'Ofens.'];
+    const maxP = Math.max(3, ...r.best.map(b => b[2]), r.actual);
+    const bar = (v, me) => `<div class="rv-bar ${me ? 'me' : ''}"><i style="width:${Math.max(4, v / maxP * 100)}%"></i></div>`;
+    const picker = all.length > 1 ? `<div class="chips rv-pick">${all.map((x, i) => `<button class="chip ${i === k ? 'on' : ''}" data-act="review-pick" data-k="${i}">J${x.w + 1} · ${esc(S.clubs[x.opp].name)}</button>`).join('')}</div>` : '';
+    return `<div class="card review" data-k="${k}"><div class="card-head"><h2>Repaso del Profe</h2>
+        <span class="rv-score ${res}">J${r.w + 1} · ${r.home ? 'en casa' : 'fuera'} · <b class="num">${g}-${a}</b></span></div>
+      ${picker}
+      <div class="rv-intro">${face}<p>${bold(lines[0].t)}</p></div>
+      <div class="rv-stats">
+        <div><span class="k">Goles esperados</span><b class="num">${r.xg[0].toFixed(1).replace(".", ",")} <i>·</i> ${r.xg[1].toFixed(1).replace(".", ",")}</b></div>
+        <div><span class="k">Tiros</span><b class="num">${r.shots[0]} <i>·</i> ${r.shots[1]}</b></div>
+        <div><span class="k">Posesión</span><b class="num">${r.poss}%</b></div>
+        <div class="wide"><span class="k">Sistemas · tú y ${esc(opp.name)}</span><b class="num">${r.me.f} <i>·</i> ${r.them.f}</b></div></div>
+      <ul class="rv-list">${lines.slice(1).map(l => `<li><span class="ic">${REV_IC[l.k] || '•'}</span><span>${bold(l.t)}</span></li>`).join('')}</ul>
+      <div class="rv-hind"><div class="group-title">Con lo que sabemos ahora · puntos esperados</div>
+        ${r.best.map(b => `<div class="rv-row"><b>${b[0]}</b><span class="note">${MENT_S[b[1]]}</span>${bar(b[2])}<span class="num">${b[2].toFixed(2).replace(".", ",")}</span></div>`).join('')}
+        <div class="rv-row"><b>${r.me.f}</b><span class="note">Tu plan</span>${bar(r.actual, true)}<span class="num">${r.actual.toFixed(2).replace(".", ",")}</span></div>
+        <p class="note" style="margin:6px 0 0">Calculado después del partido, sabiendo ya cómo jugó el rival. Si hubieras cambiado, su entrenador también habría cambiado.</p></div>
+      <button class="btn sm block mt" data-act="review-talk" data-k="${k}">🎙️ Que me lo cuente el Profe</button></div>`;
+  }
+  UI.reviewCard = reviewCard;
+  A['review-pick'] = el => {
+    const card = el.closest('.review');
+    const html = reviewCard(G.S, +el.dataset.k);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const nu = tmp.firstElementChild;
+    card.replaceWith(nu);
+    if (TL.Mentor) nu.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
+  };
+  A['review-talk'] = el => {
+    const S = G.S, r = (S.reviews || [])[+el.dataset.k || 0];
+    if (!r || !TL.Mentor) return;
+    const emo = { sys: 'thinking', chg: 'thinking', edge: 'thinking', day: 'neutral', luck: r.score[0] < r.score[1] ? 'worried' : 'neutral', hind: 'thinking' };
+    TL.Mentor.say(TL.Coach.lines(S, r).map(l => ({ text: l.t, emo: emo[l.k] || 'neutral' })));
+  };
+  A['review-open'] = () => {
+    const S = G.S;
+    const sh = sheet(sheetHead('Repaso del partido') + reviewCard(S, 0) + '<button class="btn primary block mt" data-act="close-sheet">Cerrar</button>', { onClose: UI.onSheetClose });
+    if (TL.Mentor) sh.querySelectorAll('[data-face]').forEach(f => new TL.Mentor.Face(f));
   };
 
   A['tac-form'] = el => {
@@ -765,12 +839,14 @@
           <tr><td class="l" style="text-align:left">Agresión al árbitro</td><td>${pct(R.match.refAssault)}</td></tr></tbody></table></details></section>
       <section class="card span2"><div class="card-head"><h2>Historial</h2></div>${hist}</section>
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
-        <div class="btn-row"><button class="btn" data-act="save">Guardar</button><button class="btn" data-act="export">Exportar</button>
-        <button class="btn" data-act="import">Importar</button><button class="btn" data-act="tutorial">Ver tutorial</button>
+        <div class="btn-grid"><button class="btn" data-act="save">💾 Guardar</button><button class="btn" data-act="export">📤 Exportar</button>
+        <button class="btn" data-act="import">📥 Importar</button><button class="btn" data-act="tutorial">🧭 Ver tutorial</button>
+        <button class="btn" data-act="school">🎓 Escuela del Profe</button>
         <button class="btn danger" data-act="quit">Nueva partida</button></div>
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
-          <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button></div>
+          <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-mentor">🧓 Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
@@ -1174,6 +1250,7 @@
     const champ = S.clubs[sum.champion];
     const ok = sum.pos <= sum.target;
     if (fresh && (ok || sum.moved === 'up')) setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); }, 300);
+    if (fresh && !sum.fired) setTimeout(() => TL.Mentor.event(S, 'seasonEnd', sum), 900);
     const moved = sum.moved === 'up' ? '<p class="pos-ok" style="font-weight:700">¡Ascenso conseguido!</p>' :
       sum.moved === 'down' ? '<p class="neg" style="font-weight:700">Descenso de categoría.</p>' : '';
     const youth = sum.youth.map(id => S.players[id]);
@@ -1213,6 +1290,9 @@
 
   function renderFired() {
     const S = G.S;
+    const fk = 'fired:' + S.season + ':' + S.week;
+    const ms = TL.Mentor.state(S);
+    if (!ms.seen[fk]) { ms.seen[fk] = true; setTimeout(() => TL.Mentor.event(S, 'fired'), 700); }
     const pendingEnd = S.over && !S.endDone;
     app().innerHTML = `<div class="title-screen"><div class="logo"><h1>DESTI<span>TUIDO</span></h1>
       <p>${esc(S.clubs[S.user].name)} prescinde de ti</p></div>
@@ -1245,7 +1325,7 @@
     </div>`;
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
-  A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.click(); renderTitle(); };
+  A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); renderTitle(); };
   UI.renderTitle = renderTitle;
 
   A.continue = async () => {
@@ -1384,6 +1464,7 @@
       S._levelUp = 0;
       setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); toast(`¡Nivel ${S.mgr.level} de mánager! Tienes puntos de habilidad.`); }, 400);
     }
+    setTimeout(() => { if (TL.Mentor) TL.Mentor.check(S); }, 1400);
   }
   UI.celebrate = celebrate;
 
@@ -1399,8 +1480,9 @@
         <div class="nm-team">${crest(a, 'lg')}<span class="nm-name">${esc(a.name)}</span></div></div>
         <p class="center" style="margin:0;font-weight:700;color:${res === 'V' ? 'var(--accent2)' : res === 'D' ? 'var(--danger)' : 'var(--muted)'}">${res === 'V' ? 'Victoria' : res === 'D' ? 'Derrota' : 'Empate'}</p></div>`;
     }
+    const rv = my && S.reviews && S.reviews[0] && S.reviews[0].w === r && S.reviews[0].s === S.season;
     sheet(sheetHead(`Jornada ${r + 1}`) + head + `<div class="card" style="padding:6px 10px">${S.fixtures[r].map(m => fixtureHtml(S, m)).join('')}</div>
-      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { render(false); celebrate(S); } });
+      <div class="btn-row mt">${rv ? '<button class="btn" data-act="review-open">🧑‍🏫 Repaso del Profe</button>' : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { render(false); celebrate(S); } });
     if (my) {
       const res = resultLetter(S, my);
       setTimeout(() => {
@@ -1413,11 +1495,19 @@
   UI.showRoundResults = showRoundResults;
 
   // ------------------------------------------------------------ Eventos globales
-  document.addEventListener('pointerdown', () => TL.SFX && TL.SFX.unlock(), { once: true });
+  /** Sonido de cada botón según su tipo (los diálogos del Profe ya tienen su voz). */
+  function buttonSound(el) {
+    const S_ = TL.SFX, act = el.dataset.act;
+    if (!S_ || /^(tab|vn-|tut-)/.test(act)) return;
+    if (act === 'close-sheet' || el.classList.contains('icon-btn') && /close|back/.test(act + el.getAttribute('aria-label'))) S_.back();
+    else if (el.classList.contains('primary')) { S_.press(); if (navigator.vibrate && S_.on()) try { navigator.vibrate(8); } catch (e) { /* nada */ } }
+    else if (el.matches('.chip, .seg button, [role="tab"]')) S_.select();
+    else S_.click();
+  }
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
-    if (TL.SFX && !/^(tab|mv-|tut-)/.test(el.dataset.act)) TL.SFX.click();
+    buttonSound(el);
     const f = A[el.dataset.act];
     if (f) { ev.preventDefault(); f(el, ev); }
   });
@@ -1428,7 +1518,10 @@
     if (f) f(el, ev);
   };
   document.addEventListener('input', ev => { if (ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev); });
-  document.addEventListener('change', ev => { if (!ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev); });
+  document.addEventListener('change', ev => {
+    if (ev.target.matches('input[type="checkbox"]') && TL.SFX) TL.SFX.toggle(ev.target.checked);
+    if (!ev.target.matches('input[type="search"], input[type="text"]')) onChange(ev);
+  });
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && document.querySelector('.sheet-back')) closeSheet();
   });

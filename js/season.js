@@ -139,7 +139,10 @@
         }
       }
     }
+    // Repaso del Profe (solo a posteriori) y la vida de los banquillos rivales
+    for (const r of results) if (r.review) TL.Coach.store(S, r.review);
     S.week++;
+    TL.Coach.weekly(S);
     TL.News.afterRound(S, results);
     TL.News.morale(S, results);
     TL.News.weekly(S);
