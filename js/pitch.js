@@ -91,13 +91,31 @@
       return [{ main: a.c1, gk: '#f2c94c' }, { main: away.main, gk: '#4ad7d1' }];
     }
 
+    /** Dorsales: se asignan una vez y no cambian con los cambios. */
     _numbers() {
       for (const t of this.m.teams) {
+        const taken = new Set(t.onPitch.concat(t.bench.map(pid => ({ pid }))).map(o => this.num[o.pid]).filter(Boolean));
         let n = 2;
-        for (const o of t.onPitch) this.num[o.pid] = o.slot === 'GK' ? 1 : n++;
+        for (const o of t.onPitch) {
+          if (this.num[o.pid]) continue;
+          if (o.slot === 'GK' && !taken.has(1)) { this.num[o.pid] = 1; taken.add(1); continue; }
+          while (taken.has(n)) n++;
+          this.num[o.pid] = n; taken.add(n);
+        }
         let k = 12;
-        for (const pid of t.bench) this.num[pid] = k++;
+        for (const pid of t.bench) { if (this.num[pid]) continue; while (taken.has(k)) k++; this.num[pid] = k; taken.add(k); }
       }
+    }
+
+    /** Fin del partido: se acabó el juego, los jugadores se saludan en el centro. */
+    end() {
+      this.over = true;
+      this.hold = true;
+      this.queue = [];
+      this.act = null;
+      this.tw = null;
+      this.carrier = null;
+      this.ball.x = L / 2; this.ball.y = Wd / 2; this.ball.h = 0;
     }
 
     resize() {
@@ -116,7 +134,9 @@
     // ------------------------------------------------------------ Posiciones
     _slotPos(i, o, k) {
       const t = this.m.teams[i];
-      const slot = TL.Engine.FORMATIONS[t.formation].find(s => s[0] === o.slot && !this._used.has(i + ':' + s[1] + ':' + s[2]));
+      const F_ = TL.Engine.FORMATIONS[t.formation];
+      const slot = o.idx != null && F_[o.idx] && F_[o.idx][0] === o.slot && !this._used.has(i + ':' + F_[o.idx][1] + ':' + F_[o.idx][2])
+        ? F_[o.idx] : F_.find(s => s[0] === o.slot && !this._used.has(i + ':' + s[1] + ':' + s[2]));
       let sx = 50, sy = 50;
       if (slot) { this._used.add(i + ':' + slot[1] + ':' + slot[2]); sx = slot[1]; sy = slot[2]; }
       const att = this.poss === i;
@@ -135,6 +155,12 @@
     _targets() {
       this._used = new Set();
       const out = {};
+      if (this.over) {
+        this.m.teams.forEach((t, i) => t.onPitch.forEach((o, k) => {
+          out[o.pid] = [L / 2 + (i === 0 ? -3 : 3) + Math.sin(this.t + k) * 0.3, 10 + k * (Wd - 20) / Math.max(1, t.onPitch.length - 1)];
+        }));
+        return out;
+      }
       this.m.teams.forEach((t, i) => t.onPitch.forEach((o, k) => { out[o.pid] = this._slotPos(i, o, k); }));
       return out;
     }
@@ -311,6 +337,7 @@
         else step();
         return;
       }
+      if (this.over) return;
       if (this.queue.length) { this._apply(this.queue.shift(), false); return; }
       // Conducción y pases
       if (this.carrier != null && this.pos[this.carrier]) {

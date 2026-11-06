@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const TL = window.TL;
+  TL.VERSION = '3.2';
 
   function boot() {
     TL.UI.renderTitle();
@@ -15,9 +16,24 @@
     });
   }
 
-  // Modo offline / app instalable (GitHub Pages sirve por https; en file:// no aplica)
+  // Modo offline / app instalable (GitHub Pages sirve por https; en file:// no aplica).
+  // Al publicar una versión nueva, el service worker se actualiza y la página se recarga
+  // sola (salvo en mitad de un partido, para no perderlo).
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname !== 'localhost') {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      if (document.getElementById('match')) { TL.UI.toast('Hay una versión nueva: se aplicará al recargar la página.'); return; }
+      reloading = true;
+      if (TL.Game.S) TL.Game.save();
+      location.reload();
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+        .then(reg => reg.update())
+        .catch(() => {});
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

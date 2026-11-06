@@ -45,10 +45,13 @@
 
   // ------------------------------------------------------------ Componentes
   /** Escudo: el real si existe (CDN) y, si no carga, el generado con iniciales. */
+  const CREST_OK = new Set();
   function crest(c, cls) {
-    const img = c.logo ? `<img src="${esc(c.logo)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : '';
-    return `<span class="crest ${cls || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"><b>${esc(c.code)}</b>${img}</span>`;
+    const known = c.logo && CREST_OK.has(c.logo);
+    const img = c.logo ? `<img src="${esc(c.logo)}" alt="" ${known ? '' : 'loading="lazy"'} decoding="async" onload="TL.UI.crestOk(this)" onerror="this.remove()">` : '';
+    return `<span class="crest ${cls || ''} ${known ? 'ok ready' : ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"><b>${esc(c.code)}</b>${img}</span>`;
   }
+  UI.crestOk = img => { CREST_OK.add(img.getAttribute('src')); img.parentNode && img.parentNode.classList.add('ok'); };
   function crestFor(name, cls, gender) {
     const [c1, c2] = U.clubColors(name);
     return crest({ c1, c2, code: U.clubCode(name), logo: U.crestUrl(gender || (UI.wz && UI.wz.gender) || 'M', name) }, cls);
@@ -193,10 +196,12 @@
       <div class="cash ${c.cash < 0 ? 'neg' : ''} ${UI.lastCash != null && UI.lastCash !== Math.round(c.cash) ? (c.cash > UI.lastCash ? 'up pop' : 'down pop') : ''}">${U.money(c.cash)}<small>Saldo</small></div>
       <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
     UI.lastCash = Math.round(c.cash);
+    TL.Commerce.refreshBudget(S);
     const unread = S.inbox.filter(m => !m.read).length;
+    const offers = S.inbox.filter(m => m.kind === 'offer' && !m.done).length;
     document.getElementById('nav').innerHTML = TABS.map(([k, label]) =>
       `<button class="${UI.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" aria-current="${UI.tab === k ? 'page' : 'false'}">
-        ${icon(k)}<span>${label}</span>${k === 'home' && unread ? `<span class="badge">${unread > 9 ? '9+' : unread}</span>` : ''}</button>`).join('');
+        ${icon(k)}<span>${label}</span>${k === 'home' && unread ? `<span class="badge">${unread > 9 ? '9+' : unread}</span>` : ''}${k === 'market' && offers ? `<span class="badge">${offers}</span>` : ''}</button>`).join('');
   }
 
   const VIEWS = {};
@@ -207,7 +212,9 @@
     if (!document.getElementById('view')) renderShell();
     const y = window.scrollY;
     renderTop(S);
-    document.getElementById('view').innerHTML = VIEWS[UI.tab](S);
+    const view = document.getElementById('view');
+    view.classList.toggle('enter', !keepScroll);
+    view.innerHTML = VIEWS[UI.tab](S);
     if (VIEWS[UI.tab + 'After']) VIEWS[UI.tab + 'After'](S);
     window.scrollTo(0, keepScroll ? y : 0);
   }
@@ -310,7 +317,7 @@
 
     const bill = W.wageBill(S, S.user);
     const fin = `<section class="card"><div class="card-head"><h2>Finanzas</h2><button class="link" data-act="tab" data-tab="club">Detalle</button></div>
-      <div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><div class="k">Saldo</div><div class="v ${c.cash < 0 ? 'neg' : ''}">${U.money(c.cash)}</div></div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><div class="k">Para fichajes</div><div class="v ${TL.Commerce.transferBudget(S) < 0 ? 'neg' : ''}">${U.money(TL.Commerce.transferBudget(S))}</div></div>
       <div class="kpi"><div class="k">Salarios/sem</div><div class="v">${U.money(bill)}</div></div></div>
       <div class="row between mt"><span class="muted" style="font-size:13px">Presupuesto salarial</span><span class="num">${U.money(bill)} / ${U.money(c.wageBudget)}</span></div>
       <div class="bar ${bill > c.wageBudget ? 'bad' : bill > c.wageBudget * 0.95 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${Math.min(100, bill / c.wageBudget * 100)}%"></i></div></section>`;
@@ -498,11 +505,9 @@
     const old = S.tactics.formation;
     const nf = el.dataset.f;
     if (old === nf) return;
-    // Recoloca a los jugadores actuales en la nueva formación
-    const current = S.tactics.slots.filter(id => id >= 0).map(id => S.players[id]);
+    // Recoloca a los jugadores actuales en la nueva formación conservando sus puestos
+    S.tactics.slots = E.remapLineup(W.squad(S, S.user), old, S.tactics.slots, nf);
     S.tactics.formation = nf;
-    const ids = E.autoLineup(current.length >= 11 ? current : W.squad(S, S.user), nf, false);
-    S.tactics.slots = ids;
     G.save();
     UI.refresh();
   };
@@ -628,7 +633,7 @@
     const banner = `<div class="card" style="margin-bottom:12px;border-color:${open ? '#2f6b45' : 'var(--line)'}">
       <div class="row between wrap"><div><b style="color:${open ? 'var(--accent2)' : 'var(--warn)'}">${open ? '● Mercado abierto' : '● Mercado cerrado'}</b>
       <div class="note">${open ? (S.week <= 3 ? 'Cierra tras la jornada 3' : `Cierra tras la jornada ${mid + 2}`) : (S.week < mid ? `Reabre en la jornada ${mid}` : 'Reabre en verano')} · Los agentes libres se pueden fichar siempre.</div></div>
-      <div class="num" style="text-align:right"><div style="font-size:20px;font-weight:700">${U.money(c.cash)}</div><div class="note">Salarios ${U.money(W.wageBill(S, S.user))} / ${U.money(c.wageBudget)}</div></div></div></div>`;
+      <div class="num" style="text-align:right"><div style="font-size:20px;font-weight:700">${U.money(TL.Commerce.transferBudget(S))}</div><div class="note">para fichajes · salarios ${U.money(W.wageBill(S, S.user))} / ${U.money(c.wageBudget)}</div></div></div></div>`;
     const seg = `<div class="seg" style="margin-bottom:12px">${[['search', 'Buscar'], ['free', 'Libres'], ['mine', 'Mis ventas']]
       .map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-act="mk-tab" data-k="${k}">${l}</button>`).join('')}</div>`;
     let body;
@@ -725,8 +730,8 @@
     return `<div class="grid two">
       <section class="card span2"><div class="card-head"><h2>Finanzas</h2><span class="muted">Temporada ${U.seasonLabel(S.season)}</span></div>
         <div class="kpis"><div class="kpi"><div class="k">Saldo</div><div class="v ${c.cash < 0 ? 'neg' : ''}">${U.money(c.cash)}</div></div>
+        <div class="kpi"><div class="k">Para fichajes</div><div class="v ${TL.Commerce.transferBudget(S) < 0 ? 'neg' : ''}">${U.money(TL.Commerce.transferBudget(S))}</div></div>
         <div class="kpi"><div class="k">Presup. salarial</div><div class="v">${U.money(c.wageBudget)}</div></div>
-        <div class="kpi"><div class="k">Salarios/sem</div><div class="v ${bill > c.wageBudget ? 'neg' : ''}">${U.money(bill)}</div></div>
         <div class="kpi"><div class="k">Deuda</div><div class="v ${debt ? 'neg' : ''}">${U.money(debt)}</div></div></div>
         <div class="grid two mt">
           <table class="table"><thead><tr><th class="l" style="text-align:left">Ingresos</th><th></th></tr></thead><tbody>
@@ -738,6 +743,7 @@
             ${line('Multas', fin.fines)}${line('Rescisiones y obras', fin.other)}
             <tr><td class="l" style="text-align:left"><b>Balance</b></td><td class="${inc - exp < 0 ? 'neg' : 'pos-ok'}"><b>${U.money(inc - exp)}</b></td></tr></tbody></table>
         </div><p class="note mt">Valor de la plantilla: ${U.money(total)}. Gestiona patrocinios, marketing, entradas y préstamos en la pestaña Comercial.</p></section>
+      ${budgetCard(S)}
       <section class="card"><div class="card-head"><h2>Estadio</h2><button class="link" data-act="rename-stadium">Renombrar</button></div>
         <div style="font-weight:700;font-size:17px">${esc(c.stadium)}</div>
         <div class="info mt"><div><div class="k">Aforo</div><div class="v">${U.num(c.capacity)}</div></div>
@@ -768,6 +774,33 @@
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
+
+  /** Presupuestos: base de la directiva + ampliación salarial a costa de los fichajes. */
+  function budgetCard(S) {
+    const CM = TL.Commerce, c = S.clubs[S.user];
+    const bill = W.wageBill(S, S.user);
+    const base = CM.boardWageBudget(S), shift = S.wageShift || 0, total = CM.refreshBudget(S);
+    const wl = CM.weeksLeft(S);
+    const steps = [0.05, 0.1, 0.25].map(k => Math.round(Math.max(base, bill) * k / 1000) * 1000);
+    return `<section class="card span2"><div class="card-head"><h2>Presupuestos</h2><span class="muted">${wl} semanas de temporada</span></div>
+      <div class="row between"><span>Salarios actuales</span><b class="num">${U.money(bill)} / ${U.money(total)} por semana</b></div>
+      <div class="bar ${bill > total ? 'bad' : bill > total * 0.95 ? 'warn' : ''}" style="margin:6px 0 10px"><i style="width:${Math.min(100, bill / Math.max(1, total) * 100)}%"></i></div>
+      <div class="info">
+        <div><div class="k">Base de la directiva</div><div class="v">${U.money(base)}/sem</div></div>
+        <div><div class="k">Ampliación tuya</div><div class="v">${shift ? '+' + U.money(shift) + '/sem' : '—'}</div></div>
+        <div><div class="k">Libre para fichajes</div><div class="v">${U.money(CM.transferBudget(S))}</div></div></div>
+      <p class="note mt">La directiva calcula el presupuesto salarial con tus <b>ingresos recurrentes</b> (TV, patrocinios, merchandising y taquilla) más una parte de tus <b>ahorros</b>. Si ganas dinero, firmas patrocinios o vendes jugadores, sube. Si gastas en fichajes, baja.</p>
+      <div class="group-title">Subir sueldos a costa del dinero de fichajes</div>
+      <div class="btn-row">${steps.map(v => `<button class="btn sm" data-act="wage-shift" data-v="${shift + v}">+${U.money(v)}/sem</button>`).join('')}
+        ${shift ? '<button class="btn sm ghost" data-act="wage-shift" data-v="0">Quitar ampliación</button>' : ''}</div>
+      <p class="note">Cada ${U.money(steps[0])}/sem de ampliación reserva ${U.money(steps[0] * wl)} del dinero de fichajes hasta final de temporada.</p></section>`;
+  }
+  A['wage-shift'] = el => {
+    const r = TL.Commerce.setWageShift(G.S, +el.dataset.v);
+    toast(r.msg, !r.ok);
+    if (r.ok) { TL.SFX.coin(); G.save(); }
+    UI.refresh();
+  };
 
   // ------------------------------------------------------------ Comercial
   function clubCommercial(S) {
@@ -970,7 +1003,12 @@
     let actions = '';
     if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
-    sheet(head + `<div class="stats6">${stats6}</div>` + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
+    const sh = sheet(head + `<div class="stats6">${stats6}</div>` + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
+    if (UI.nego && UI.nego.pid === id && UI.nego.focus) {
+      UI.nego.focus = false;
+      const box = sh.querySelector('.nego');
+      if (box) { box.scrollIntoView({ block: 'center', behavior: 'smooth' }); box.classList.add('flash-in'); }
+    }
   }
   UI.openPlayer = openPlayer;
   A.player = el => { UI.nego = null; openPlayer(+el.dataset.id); };
@@ -988,7 +1026,7 @@
         if (!years.includes(n.years)) n.years = years[Math.min(years.length - 1, 1)];
         renew = `<div class="nego"><b>Renovación</b><p class="note">${esc(p.short)} pide ${U.money(demand)}/sem (ahora ${U.money(p.wage)}).</p>
           <div class="row"><select data-change="nego-years" aria-label="Duración">${years.map(y =>
-            `<option value="${y}" ${n.years === y ? 'selected' : ''}>Hasta ${S.season + y} (${y} temporada${y > 1 ? 's' : ''})</option>`).join('')}</select>
+            `<option value="${y}" ${n.years === y ? 'selected' : ''}>Hasta ${M.renewEnd(S, y)} (+${y} temporada${y > 1 ? 's' : ''})</option>`).join('')}</select>
           <button class="btn primary" data-act="renew-ok" data-id="${p.id}">Firmar</button></div>
           ${n.msg ? `<p class="note ${n.ok ? 'ok' : 'bad'}">${esc(n.msg)}</p>` : ''}</div>`;
       }
@@ -1056,7 +1094,7 @@
   };
   A.renew = el => {
     const p = G.S.players[+el.dataset.id];
-    UI.nego = { pid: p.id, stage: 'renew', years: Math.min(3, M.maxYears(p)) };
+    UI.nego = { pid: p.id, stage: 'renew', years: Math.min(3, M.maxYears(p)), focus: true };
     openPlayer(p.id);
   };
   A['renew-ok'] = el => {
@@ -1095,14 +1133,47 @@
   };
 
   // ------------------------------------------------------------ Fin de temporada / destitución
+  function jobsHtml(S, jobs, fired) {
+    if (!jobs || !jobs.length) return fired ? '<p class="note mt">Ningún club te ha llamado todavía.</p>' : '';
+    return `<div class="group-title">${fired ? 'Clubes interesados en ti' : 'Ofertas de trabajo'}</div>
+      ${jobs.map(j => {
+        const c = S.clubs[j.club];
+        return `<div class="offer job">${crest(c)}<div class="grow"><b>${esc(c.name)}</b>
+          <div class="note">${esc(j.league)} · nivel ${c.rep.toFixed(1)} ${stars(c.rep)} · ${esc(j.expect)}</div>
+          <div class="note">Saldo del club ${U.money(c.cash)}</div></div>
+          <button class="btn sm primary" data-act="job-accept" data-id="${c.id}">Aceptar</button></div>`;
+      }).join('')}
+      ${fired ? '' : '<p class="note">Si no aceptas ninguna, sigues en tu club.</p>'}`;
+  }
+  A['job-accept'] = el => {
+    const S = G.S, c = S.clubs[+el.dataset.id];
+    const run = () => {
+      const r = TL.Career.accept(S, c.id);
+      toast(r.msg);
+      if (S.over) { UI.seasonSum = null; closeSheet(); SE.newSeason(S); }
+      G.save();
+      UI.tab = 'home';
+      renderShell(); render();
+      TL.FX.confetti(); TL.SFX.levelUp();
+    };
+    if (G.S.fired) run();
+    else confirmBox('Cambiar de club', `¿Dejar ${esc(S.clubs[S.user].name)} y fichar por ${esc(c.name)}? Conservas tu nivel y habilidades.`, 'Fichar', run);
+  };
+
   A['season-end'] = () => {
     const S = G.S;
     if (!S.over) return;
-    const sum = SE.endSeason(S);
+    if (S.endDone && !UI.seasonSum) {
+      // Temporada ya cerrada (p. ej. tras recargar): pasar directamente a la siguiente
+      if (!S.fired) { SE.newSeason(S); G.save(); }
+      render(); return;
+    }
+    const fresh = !S.endDone;
+    const sum = fresh ? SE.endSeason(S) : UI.seasonSum;
     UI.seasonSum = sum;
     const champ = S.clubs[sum.champion];
     const ok = sum.pos <= sum.target;
-    if (ok || sum.moved === 'up') setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); }, 300);
+    if (fresh && (ok || sum.moved === 'up')) setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); }, 300);
     const moved = sum.moved === 'up' ? '<p class="pos-ok" style="font-weight:700">¡Ascenso conseguido!</p>' :
       sum.moved === 'down' ? '<p class="neg" style="font-weight:700">Descenso de categoría.</p>' : '';
     const youth = sum.youth.map(id => S.players[id]);
@@ -1123,7 +1194,8 @@
       ${youth.length ? `<div class="group-title">Llegan de la cantera</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${Math.max(p.ovr, p.pot - 3)}–${Math.min(95, p.pot + 3)}` })).join('')}` : ''}
       ${sum.lastChance ? '<p class="note bad mt">La directiva está muy descontenta, pero te da una última oportunidad. Otra temporada así y estarás fuera.</p>' : ''}
       ${sum.fired ? '<p class="note bad mt">La directiva ha decidido prescindir de ti.</p>' : ''}
-      <p class="note mt">Presupuesto salarial para la próxima temporada: ${U.money(sum.wageBudget)}/sem.</p>
+      <p class="note mt">Reputación de mánager: ${S.mgr.rep} (${sum.repDelta >= 0 ? '+' : ''}${Math.round(sum.repDelta)}).</p>
+      ${jobsHtml(S, sum.jobs, sum.fired)}
       <button class="btn primary block mt" data-act="season-next">${sum.fired ? 'Continuar' : `Empezar temporada ${U.seasonLabel(sum.season + 1)}`}</button>`,
     { onClose: () => { if (UI.seasonSum) A['season-next'](); } });
   };
@@ -1141,10 +1213,15 @@
 
   function renderFired() {
     const S = G.S;
+    const pendingEnd = S.over && !S.endDone;
     app().innerHTML = `<div class="title-screen"><div class="logo"><h1>DESTI<span>TUIDO</span></h1>
       <p>${esc(S.clubs[S.user].name)} prescinde de ti</p></div>
-      <div class="card" style="max-width:420px;width:100%"><p class="muted" style="margin:0">La directiva ha perdido la confianza en tu proyecto. ${S.history.length ? `Temporadas dirigidas: ${S.history.length}.` : ''}</p></div>
-      <div class="title-actions"><button class="btn primary" data-act="fired-new">Empezar de nuevo</button></div></div>`;
+      <div class="card" style="max-width:460px;width:100%"><p class="muted" style="margin:0">La directiva ha perdido la confianza en tu proyecto.
+        ${S.history.length ? `Temporadas dirigidas: ${S.history.length}.` : ''} Reputación de mánager: ${TL.Career.rep(S)}.</p>
+        ${pendingEnd ? '<p class="note mt">Cierra la temporada para ver qué clubes te llaman.</p>' : jobsHtml(S, S.jobOffers, true)}</div>
+      <div class="title-actions">
+        ${pendingEnd ? '<button class="btn primary" data-act="season-end">Cerrar la temporada</button>' : ''}
+        <button class="btn ${pendingEnd || (S.jobOffers && S.jobOffers.length) ? 'ghost' : 'primary'}" data-act="fired-new">Empezar una partida nueva</button></div></div>`;
   }
   A['fired-new'] = () => { G.wipe(); renderTitle(); };
 
@@ -1164,7 +1241,7 @@
         <button data-act="title-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
         <button data-act="title-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
       </div>
-      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Música: “Strategic Swing”.</p>
+      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Música: “Strategic Swing”. · v${TL.VERSION || '3'}</p>
     </div>`;
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
@@ -1299,6 +1376,10 @@
 
   /** Celebraciones pendientes (subida de nivel del mánager). */
   function celebrate(S) {
+    if (S._newOffers) {
+      const n = S._newOffers; S._newOffers = 0;
+      setTimeout(() => { toast(`📩 ${n} oferta${n > 1 ? 's' : ''} por tus jugadores · Mercado → Mis ventas`); TL.SFX.coin(); }, 900);
+    }
     if (S._levelUp) {
       S._levelUp = 0;
       setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); toast(`¡Nivel ${S.mgr.level} de mánager! Tienes puntos de habilidad.`); }, 400);

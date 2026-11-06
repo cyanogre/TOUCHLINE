@@ -154,8 +154,12 @@
     }
     if (S.week === Math.floor(total / 2)) TL.Game.mail(S, 'Mercado de invierno abierto', 'El mercado de fichajes abre durante 3 jornadas.', 'market');
     if (S.week === 4) TL.Game.mail(S, 'Mercado cerrado', 'El mercado de verano se ha cerrado. Reabrirá a mitad de temporada. Los agentes libres se pueden fichar en cualquier momento.', 'market');
-    if (S.board.conf <= 0) S.fired = true;
     if (S.week >= total) S.over = true;
+    if (S.board.conf <= 0 && !S.fired) {
+      S.fired = true;
+      // Destituido con la liga en marcha: solo llaman clubes de tu liga que van mal
+      if (!S.over) TL.Career.makeOffers(S, 'midseason');
+    }
     S.results = results.map(r => [r.h, r.a, r.hg, r.ag]);
     return results;
   }
@@ -163,7 +167,7 @@
   function weeklyFinances(S, cid, round) {
     const c = S.clubs[cid];
     const wages = W.wageBill(S, cid);
-    const commercial = c.revScale * W.revenueCurve(c.rep);
+    const commercial = c.revScale * W.revenueCurve(c.stature != null ? c.stature : c.rep);
     let tickets = 0;
     const m = round.find(m => m[0] === cid);
     if (m) {
@@ -263,6 +267,10 @@
     });
 
     if (S.board.conf < 15) { S.fired = true; sum.fired = true; }
+    // Reputación del mánager y ofertas de trabajo de otros clubes
+    sum.repDelta = TL.Career.seasonRep(S, sum);
+    sum.jobs = TL.Career.makeOffers(S, sum.fired ? 'fired' : 'season', sum);
+    S.endDone = true;
 
     // Evolución, retiradas y contratos
     const userPlayers = new Set(W.squad(S, S.user).map(p => p.id));
@@ -322,14 +330,17 @@
     });
     W.dirty(S);
 
-    // Economía de la nueva temporada
+    // Economía de la nueva temporada. La "talla" del club (de la que dependen TV y
+    // patrocinios) cambia despacio: no se hunde porque se vayan jugadores un verano.
     for (const c of S.clubs) {
-      const income = c.revScale * W.revenueCurve(c.rep);
-      if (c.id === S.user) c.wageBudget = F.roundMoney(Math.max(W.wageBill(S, c.id) * 1.02, income / 0.72 * 1.12 * TL.Manager.B(S).wageBudget));
-      else c.wageBudget = F.roundMoney(W.wageBill(S, c.id) * 1.12);
+      if (c.stature == null) c.stature = c.rep;
+      const finish = c.league === L.id ? tab.findIndex(r => r.id === c.id) : -1;
+      const bonus = finish >= 0 ? (1 - finish / Math.max(1, n - 1) - 0.5) * 1.5 : 0;
+      c.stature = Math.round((c.stature + (c.rep - c.stature) * 0.2 + bonus) * 10) / 10;
+      if (c.id !== S.user) c.wageBudget = F.roundMoney(W.wageBill(S, c.id) * 1.12);
       if (c.id !== S.user && c.cash < 0) c.cash = Math.round(c.cash * 0.5);
     }
-    sum.wageBudget = S.clubs[S.user].wageBudget;
+    sum.wageBudget = TL.Commerce.refreshBudget(S);
     return sum;
   }
 
@@ -358,6 +369,8 @@
   function newSeason(S) {
     S.season++;
     S.week = 0;
+    S.endDone = false;
+    S.jobOffers = null;
     S.stats = {};
     S.neg = {};
     S.over = false;
@@ -384,6 +397,7 @@
     keep.forEach((p, i) => { remap.set(p.id, i); p.id = i; });
     S.players = keep;
     S.tactics.slots = (S.tactics.slots || []).map(id => remap.has(id) ? remap.get(id) : -1);
+    for (const n of S.news || []) n.pid = n.pid >= 0 && remap.has(n.pid) ? remap.get(n.pid) : -1;
     for (const m of S.inbox) if (m.data && m.data.pid != null) m.done = true;
   }
 
