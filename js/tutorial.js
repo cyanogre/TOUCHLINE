@@ -54,5 +54,11 @@
     setTimeout(() => start('main', true), 200);
   };
 
-  TL.Tutorial = { start, done, TOURS, active: () => !!active, onEnd(fn) { if (active) active.onEnd = fn; } };
+  /** Partida nueva: el tutorial vuelve a empezar (también el del primer partido). */
+  function fresh() {
+    try { localStorage.removeItem(KEY + 'main'); localStorage.removeItem(KEY + 'match'); } catch (e) { /* nada */ }
+    return start('main', true);
+  }
+
+  TL.Tutorial = { start, fresh, done, TOURS, active: () => !!active, onEnd(fn) { if (active) active.onEnd = fn; } };
 })();

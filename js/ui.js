@@ -1597,7 +1597,7 @@
       UI.tab = 'home';
       renderShell(); render();
       TL.FX.confetti(); TL.SFX.success();
-      setTimeout(() => TL.Tutorial.start('main'), 700);
+      setTimeout(() => TL.Tutorial.fresh(), 700);
     }, 30);
   };
 
