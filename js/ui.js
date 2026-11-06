@@ -426,6 +426,112 @@
   // ------------------------------------------------------------ Plantilla
   const SQ_SORTS = [['pos', 'Posición'], ['ovr', 'Media'], ['age', 'Edad'], ['value', 'Valor'], ['fit', 'Forma'], ['contract', 'Contrato']];
 
+  // ------------------------------------------------------------ Vestuario
+  const face = cls => `<div class="vn-portrait ${cls || 'sm'}"><div class="vn-face" data-face="1"></div></div>`;
+  UI.face = face;
+  function mountFaces(root) { if (TL.Mentor && root) root.querySelectorAll('[data-face]').forEach(el => { if (!el.firstChild) new TL.Mentor.Face(el); }); }
+  UI.mountFaces = mountFaces;
+
+  function lockerCard(S) {
+    const LK = TL.Locker;
+    if (!LK || !S.lk) return '';
+    const sq = W.squad(S, S.user);
+    const avgMor = sq.length ? U.sum(sq, p => (p.mor == null ? 70 : p.mor)) / sq.length : 70;
+    const [ml, me] = TL.News.moraleLabel(avgMor);
+    const acts = Object.entries(LK.ACT).map(([k, a]) => {
+      const ready = LK.actReady(S, k), cost = LK.actCost(S, k);
+      return `<button class="act-btn" data-act="lk-act" data-k="${k}" ${ready ? '' : 'disabled'} title="${esc(a.desc)}">
+        <span class="ai">${a.icon}</span><span class="at">${a.name}<small>${ready ? (cost ? U.money(cost) : 'Gratis') : 'Desde J' + (S.lk.cool[k] + 1)}</small></span></button>`;
+    }).join('');
+    const li = (ic, html, cls) => `<li class="${cls || ''}"><span class="li-ic">${ic}</span><span>${html}</span></li>`;
+    const pl = p => `<button class="link" data-act="player" data-id="${p.id}">${esc(p.short)}</button>`;
+    const prs = LK.pairs(S).slice(0, 4).map(([a, b, r]) => li(r > 0 ? '🤝' : '⚡', `${pl(a)} y ${pl(b)} · <em>${LK.relLabel(r)}</em>`, r > 0 ? 'good' : 'bad')).join('');
+    const men = Object.entries(S.lk.mentor).map(([k, m]) => [S.players[k], S.players[m]]).filter(([a, b]) => a && b && a.club === S.user && b.club === S.user)
+      .map(([a, b]) => li('🎓', `${pl(b)} apadrina a ${pl(a)}`)).join('');
+    const gems = Object.keys(S.lk.gems).map(id => S.players[id]).filter(p => p && p.club === S.user)
+      .map(p => { const g = S.lk.gems[p.id]; return li(g.stage >= 2 ? '🌟' : '✨', `${pl(p)} · ${g.stage === 0 ? 'talento oculto' : g.stage === 1 ? 'ADN: ' + LK.DNA[g.dna].name : g.stage === 2 ? 'ADN desbloqueado' : 'superestrella'}`); }).join('');
+    const loans = S.lk.loans.map(l => { const p = S.players[l.pid]; if (!p) return ''; return li('🔁', `${pl(p)} · ${l.from === S.user ? 'cedido al ' + esc(S.clubs[l.to].name) : 'llega cedido del ' + esc(S.clubs[l.from].name)}`); }).join('');
+    const staff = S.lk.staff.map(s => li('🧑‍🏫', `<b>${esc(s.name)}</b> · ${LK.STAFF[s.role].name}`)).join('');
+    const pending = S.inbox.filter(m => m.kind === 'decision' && !m.done && m.data && /^lk_/.test(m.data.ev || '')).length;
+    const block = (t, body) => (body ? `<div class="lk-block"><div class="group-title">${t}</div><ul class="lk-list">${body}</ul></div>` : '');
+    return `<section class="card locker" style="margin-bottom:12px">
+      <div class="card-head"><h2>Vestuario</h2><span class="muted">${me} Ambiente ${ml.toLowerCase()}</span></div>
+      ${pending ? `<button class="lk-office" data-act="inbox"><span>🚪</span><span><b>${pending} reunión${pending > 1 ? 'es' : ''} pendiente${pending > 1 ? 's' : ''}</b><small>Te esperan en el despacho</small></span><span class="go">›</span></button>` : ''}
+      <div class="act-row">${acts}</div>
+      <div class="lk-grid">${block('Relaciones', prs)}${block('Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loans)}${block('Cuerpo técnico', staff)}</div>
+      <p class="note" style="margin:8px 0 0">Toca a un jugador para hablar con él en el despacho, ponerle padrino o un plan de entrenamiento.</p></section>`;
+  }
+
+  function lockerSection(S, p) {
+    const LK = TL.Locker;
+    if (!LK || !S.lk) return '';
+    const out = [];
+    const tr = LK.traits(S, p.id);
+    if (tr.length) out.push(`<div class="trait-list">${tr.map(k => `<div class="trait"><span class="ti">${LK.TRAITS[k].icon}</span><span><b>${LK.TRAITS[k].name}</b><small>${esc(LK.TRAITS[k].desc)}</small></span></div>`).join('')}</div>`);
+    const g = S.lk.gems[p.id];
+    if (g) {
+      const d = LK.DNA[g.dna];
+      const txt = g.stage === 0 ? `<b>✨ Talento oculto.</b> Los técnicos ven algo especial. Dale partidos (${g.apps}/8 en su sitio) para descubrir qué es.`
+        : g.stage === 1 ? `<b>✨ ADN: ${d.name}.</b> ${d.hint} Partidos esta temporada en su sitio: ${g.apps}/15 · entrenamiento: ${S.lk.focus[p.id] === d.focus ? '✅' : '❌ ' + LK.FOCUS[d.focus].name}.`
+          : g.stage === 2 ? `<b>🌟 ADN desbloqueado: ${d.name}.</b> Si llega a 80 de media antes de los 23, será una superestrella.` : `<b>🌟 Superestrella.</b> El ${d.name.toLowerCase()} de una generación.`;
+      out.push(`<div class="gem-box">${txt}</div>`);
+    }
+    const b = LK.boss(S, p.id);
+    const rels = W.squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, LK.rel(S, p.id, q.id)]);
+    const fr = rels.filter(r => r[1] >= 40).sort((a, c) => c[1] - a[1]).slice(0, 3);
+    const en = rels.filter(r => r[1] <= -30).sort((a, c) => a[1] - c[1]).slice(0, 2);
+    out.push(`<div class="info"><div><div class="k">Relación contigo</div><div class="v">${LK.bossLabel(b)}</div><div class="bar" style="margin-top:4px"><i style="width:${(b + 100) / 2}%;background:${b >= 20 ? 'var(--accent2)' : b <= -20 ? 'var(--danger)' : 'var(--warn)'}"></i></div></div>
+      <div><div class="k">Se lleva bien con</div><div class="v small">${fr.length ? fr.map(r => esc(r[0].short)).join(', ') : '—'}</div></div>
+      <div><div class="k">Choca con</div><div class="v small">${en.length ? en.map(r => esc(r[0].short)).join(', ') : 'Nadie'}</div></div></div>`);
+    if (p.club === S.user) {
+      const rows = [];
+      if (p.age <= 23) {
+        const cur = S.lk.focus[p.id] || '';
+        rows.push(`<label class="lk-field"><span>Entrenamiento individual</span><select data-change="lk-focus" data-id="${p.id}"><option value="">Normal</option>${Object.entries(LK.FOCUS).filter(([k]) => (k === 'porteria') === (p.pos === 'GK')).map(([k, f]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${f.name}</option>`).join('')}</select></label>`);
+      }
+      if (LK.canBePupil(S, p)) {
+        const vets = W.squad(S, S.user).filter(q => LK.canMentor(S, q)).sort((a, c) => (F.LINE[c.pos] === F.LINE[p.pos]) - (F.LINE[a.pos] === F.LINE[p.pos]) || c.ovr - a.ovr);
+        const cur = S.lk.mentor[p.id];
+        rows.push(`<label class="lk-field"><span>Padrino</span><select data-change="lk-mentor" data-id="${p.id}"><option value="">Sin padrino</option>${vets.map(q => `<option value="${q.id}" ${cur === q.id ? 'selected' : ''}>${esc(q.short)} (${q.age}, ${F.POS_ES[q.pos]}${LK.hasTrait(S, q.id, 'leader') ? ', líder' : ''})</option>`).join('')}</select></label>`);
+      }
+      const pupils = LK.pupilsOf(S, p.id).map(id => S.players[id]).filter(Boolean);
+      if (pupils.length) rows.push(`<p class="note" style="margin:0">🎓 Apadrina a ${pupils.map(q => esc(q.short)).join(' y ')}.</p>`);
+      if (rows.length) out.push(`<div class="lk-fields">${rows.join('')}</div>`);
+      const met = S.lk.met && S.lk.met[p.id];
+      const wait = met != null && S.week - met < 3 && S.week >= met;
+      out.push(`<button class="btn block mt office-btn" data-act="lk-meet" data-id="${p.id}" ${wait ? 'disabled' : ''}>🚪 ${wait ? 'Ya hablasteis hace poco' : 'Reunión en el despacho'}</button>`);
+    }
+    return `<div class="group-title">Vestuario</div><div class="lk-section">${out.join('')}</div>`;
+  }
+
+  A['lk-act'] = el => {
+    const r = TL.Locker.activity(G.S, el.dataset.k);
+    toast(r.msg, !r.ok);
+    if (r.ok) { TL.FX && TL.FX.sparkle(el); TL.SFX && TL.SFX.success(); G.save(); UI.refresh(); }
+  };
+  C['lk-focus'] = el => { const S = G.S; if (el.value) TL.Locker.state(S).focus[+el.dataset.id] = el.value; else delete S.lk.focus[+el.dataset.id]; G.save(); toast('Plan de entrenamiento actualizado'); };
+  C['lk-mentor'] = el => { const r = TL.Locker.setMentor(G.S, +el.dataset.id, el.value === '' ? null : +el.value); toast(r.msg, !r.ok); G.save(); openPlayer(+el.dataset.id); };
+  A['lk-meet'] = el => {
+    const S = G.S, p = S.players[+el.dataset.id];
+    const opts = TL.Locker.meetOptions(S, p);
+    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p class="note" style="margin:0;color:var(--text)">${esc(p.name)} entra en tu despacho y se sienta. ¿De qué quieres hablar?</p></div>
+      <div class="col mt">${opts.map(([k, l, d]) => `<button class="btn block office-opt" data-act="lk-meet-do" data-id="${p.id}" data-k="${k}"><b>${esc(l)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`);
+    mountFaces(document.querySelector('.sheet'));
+  };
+  A['lk-meet-do'] = el => {
+    const S = G.S, p = S.players[+el.dataset.id];
+    const r = TL.Locker.meet(S, p, el.dataset.k);
+    G.save();
+    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${esc(r.msg)}</p></div>
+      <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
+    mountFaces(document.querySelector('.sheet'));
+    if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
+    UI.refresh();
+  };
+  A['loan-out'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.loanOut(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); closeSheet(); UI.refresh(); } };
+  A['loan-in'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.loanIn(S, p); toast(r.msg, !r.ok); if (r.ok) { TL.SFX && TL.SFX.coin(); G.save(); closeSheet(); UI.refresh(); } };
+  A['loan-recall'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.recall(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); openPlayer(p.id); UI.refresh(); } };
+
   VIEWS.squad = S => {
     const sq = W.squad(S, S.user);
     const bill = W.wageBill(S, S.user);
@@ -1123,7 +1229,7 @@
     }
     const loan = TL.Locker.loanOf(S, p.id);
     if (loan && loan.to === S.user) return `<div class="nego mt"><p class="note">Llega cedido por el <b>${esc(S.clubs[loan.from].name)}</b> hasta final de temporada. No se puede vender ni renovar.</p></div>`;
-    return `<div class="btn-row mt">
+    return `<div class="btn-grid mt">
       <button class="btn sm" data-act="renew" data-id="${p.id}">Renovar</button>
       ${open ? `<button class="btn sm" data-act="loan-out" data-id="${p.id}">Ceder</button>` : ''}
       <button class="btn sm" data-act="list" data-id="${p.id}">${p.listed ? 'Quitar de venta' : 'Poner en venta'}</button>
@@ -1148,6 +1254,7 @@
         <div class="stepper mt"><button class="btn" data-act="fee" data-d="${-step}" aria-label="Bajar">−</button>
         <input class="num" value="${U.money(n.fee)}" readonly aria-label="Oferta"><button class="btn" data-act="fee" data-d="${step}" aria-label="Subir">+</button></div>
         <button class="btn primary block mt" data-act="bid" data-id="${p.id}">Ofertar ${U.money(n.fee)}</button>
+        ${TL.Locker.loanable(S, p).ok ? `<button class="btn block mt" data-act="loan-in" data-id="${p.id}">🔁 Pedirlo cedido · pagas su ficha (${U.money(p.wage)}/sem)</button>` : ''}
         ${n.msg ? `<p class="note ${n.ok ? 'ok' : 'bad'}">${esc(n.msg)}</p>` : ''}</div>`;
     }
     const wage = M.wageDemand(S, p, S.user);

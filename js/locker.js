@@ -317,7 +317,8 @@
     // Donde vaya a jugar: pocos jugadores de su línea por encima de él
     return U.weighted(cands, c => {
       const better = W().squad(S, c.id).filter(x => F.LINE[x.pos] === line && x.ovr > p.ovr).length;
-      return (better <= 1 ? 3 : better <= 3 ? 1.5 : 0.4) * (S.leagues[c.league].wealth + 0.3);
+      const home = S.leagues[c.league].country === S.leagues[S.clubs[S.user].league].country ? 4 : 1; // mejor en tu país, para seguirle
+      return (better <= 1 ? 3 : better <= 3 ? 1.5 : 0.4) * (S.leagues[c.league].wealth + 0.3) * home;
     });
   }
 
@@ -581,6 +582,64 @@
     for (const k in L.boss) if (!ids.has(+k)) delete L.boss[k];
   }
 
+  // ------------------------------------------------------------ Reuniones que pides tú
+  function enemyOf(S, p) {
+    return W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).filter(r => r[1] <= -30).sort((a, b) => a[1] - b[1]).map(r => r[0])[0] || null;
+  }
+  function meetOptions(S, p) {
+    const o = [['praise', 'Elogiarle', 'Sube su moral y vuestra relación.'], ['demand', 'Exigirle más', 'Puede picarse para bien… o tomárselo mal.'], ['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente.']];
+    const en = enemyOf(S, p);
+    if (en) o.push(['reconcile', `Mediar con ${en.short}`, 'Intentar que hagan las paces.']);
+    if (hasTrait(S, p.id, 'ego')) o.push(['ego', 'Hablar de su ego', 'Que entienda que el equipo va primero.']);
+    return o;
+  }
+  function meet(S, p, k) {
+    const L = state(S);
+    L.met = L.met || {};
+    L.met[p.id] = S.week;
+    const b = boss(S, p.id), m = p.mor == null ? 70 : p.mor;
+    const again = (L.praised || (L.praised = {}))[p.id] != null && S.week - L.praised[p.id] < 8 && S.week >= L.praised[p.id];
+    if (k === 'praise') {
+      L.praised[p.id] = S.week;
+      if (b < -40) { mor(p, 1); return { msg: `${p.short} escucha sin mirarte. "Ya, míster". Vuestra relación necesita algo más que palabras.` }; }
+      if (again) { mor(p, 1); return { msg: `"Gracias, míster… otra vez". Los elogios repetidos pierden fuerza.` }; }
+      mor(p, 7); bossAdd(S, p.id, 6);
+      return { msg: `${p.short} sale del despacho con una sonrisa. "Gracias, míster, no le voy a fallar".`, good: true };
+    }
+    if (k === 'demand') {
+      if (m >= 60 && b >= -10 && Math.random() < 0.6) { mor(p, 4); bossAdd(S, p.id, 2); return { msg: `${p.short} aprieta los dientes: "Tiene razón. Va a ver lo que soy capaz de hacer".`, good: true }; }
+      mor(p, -8); bossAdd(S, p.id, -7);
+      return { msg: `${p.short} se lo toma como algo personal y se marcha dando un portazo.`, bad: true };
+    }
+    if (k === 'future') {
+      const st = S.stats[p.id] || [0], share = st[0] / Math.max(1, S.week);
+      const sq = W().squad(S, S.user).sort((a, c) => c.ovr - a.ovr), r = sq.findIndex(q => q.id === p.id);
+      let want;
+      if (onLoan(S, p.id)) want = 'Está a gusto, pero sabe que en verano vuelve a su club.';
+      else if (m < 40) want = 'No es feliz aquí. Si no cambia algo, pedirá salir.';
+      else if (share < 0.35 && r < 16 && S.week >= 4) want = p.age <= 22 ? 'Quiere jugar. Si no hay sitio, prefiere salir cedido.' : 'Quiere más minutos: cree que merece jugar.';
+      else if (p.contract <= S.season + 1) want = 'Le gustaría renovar antes de que acabe su contrato.';
+      else if (p.age >= 32) want = 'Piensa en sus últimos años de carrera; le haría ilusión quedarse en el club después, como técnico.';
+      else want = 'Está contento con su papel y con el grupo.';
+      const fr = W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).sort((a, c) => c[1] - a[1])[0];
+      bossAdd(S, p.id, 2);
+      return { msg: `${want}${fr && fr[1] >= 40 ? ` Su mejor amigo en el vestuario es ${fr[0].short}.` : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.` };
+    }
+    if (k === 'reconcile') {
+      const en = enemyOf(S, p);
+      if (!en) return { msg: 'Ya no hay nada que arreglar.' };
+      if (Math.random() < 0.55 + b / 300) { bond(S, p.id, en.id, 40); mor(p, 3); mor(en, 3); return { msg: `${p.short} y ${en.short} se dan la mano delante de ti. El vestuario lo agradece.`, good: true }; }
+      bond(S, p.id, en.id, -8);
+      return { msg: `La reunión sube de tono: ${p.short} y ${en.short} siguen sin soportarse.`, bad: true };
+    }
+    if (k === 'ego') {
+      if (Math.random() < (b >= 10 ? 0.45 : 0.22)) { convertEgo(S, p); return { msg: `${p.short} se queda pensativo: "Si el equipo gana, yo gano". Algo ha cambiado.`, good: true }; }
+      mor(p, -3);
+      return { msg: `"Un delantero tiene que ser egoísta, míster". No le convences… todavía. Un padrino con galones podría ayudar.` };
+    }
+    return { msg: '' };
+  }
+
   // ------------------------------------------------------------ Decisiones (despacho)
   const mor = (p, d) => { p.mor = U.clamp((p.mor == null ? 70 : p.mor) + d, 0, 100); };
   const DEC = {
@@ -686,7 +745,7 @@
     TRAITS, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
     canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem,
     onLoan, loanOf, loanOut, loanIn, loanable, recall, endLoans, activity, actCost, actReady, matchBoost,
-    afterRound, weekly, seasonEnd, windowStart, DEC
+    afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet
   };
   if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);
 })();
