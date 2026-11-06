@@ -44,6 +44,8 @@
         <div class="mprog"><i id="mv-prog" style="width:0%"></i></div>
       </div>
       <div class="pitch-box"><canvas id="pitch" aria-label="Vista del partido"></canvas>
+        <i class="pip-grip" aria-hidden="true"></i>
+        <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
       <div class="mtabs"><div class="seg" id="mv-tabs">
           <button class="on" data-act="mv-tab" data-k="feed">Narración</button>
@@ -57,6 +59,7 @@
     for (const e of m.events) addEvent(e);
     MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
     MV.pitch.speed = settings().speed || 1;
+    setupPip();
     if (settings().mini) setMini(true);
     renderFoot();
     TL.SFX.startCrowd();
@@ -305,16 +308,82 @@
     renderFoot();
   };
 
-  /** Campo minimizado: sigue jugándose en una miniatura y la narración ocupa la pantalla. */
+  /** Campo minimizado: ventana flotante que se arrastra y se pega al borde más cercano. */
+  const PIP_W = [0.44, 0.66]; // ancho relativo al de la pantalla (pequeño / grande)
+  function pipBox() { const r = el('match'); return r && r.querySelector('.pitch-box'); }
+  function pipWidth() {
+    const big = settings().pipBig ? 1 : 0;
+    return Math.round(Math.min(innerWidth * PIP_W[big], big ? 420 : 270));
+  }
+  function placePip(x, y, snap) {
+    const box = pipBox();
+    if (!box) return;
+    const w = pipWidth(), h = Math.round(w * 85 / 117);
+    const m = 8, top0 = (el('match').querySelector('.mh') || { getBoundingClientRect: () => ({ bottom: 60 }) }).getBoundingClientRect().bottom;
+    const foot = el('match').querySelector('.mfoot');
+    const bottom = foot ? foot.getBoundingClientRect().top : innerHeight;
+    if (x == null) { x = innerWidth - w - m; y = bottom - h - m; }
+    if (snap) x = x + w / 2 < innerWidth / 2 ? m : innerWidth - w - m;
+    x = Math.max(m, Math.min(innerWidth - w - m, x));
+    y = Math.max(top0 + m, Math.min(Math.max(top0 + m, bottom - h - m), y));
+    box.style.setProperty('--pw', w + 'px');
+    box.style.setProperty('--px', x + 'px');
+    box.style.setProperty('--py', y + 'px');
+    settings().pip = { x: x / innerWidth, y: y / innerHeight };
+  }
   function setMini(on) {
     const root = el('match');
     if (!root) return;
     root.classList.toggle('mini', on);
-    const mh = root.querySelector('.mh'), tabs = root.querySelector('.mtabs');
-    root.style.setProperty('--mh', ((mh ? mh.getBoundingClientRect().height : 110) + (tabs ? tabs.getBoundingClientRect().height : 40)) + 'px');
+    if (on) {
+      const p = settings().pip;
+      placePip(p ? p.x * innerWidth : null, p ? p.y * innerHeight : null, true);
+    }
     requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
-  A['mv-mini'] = () => { const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
+  /** Arrastrar la ventana con el dedo o el ratón. */
+  function setupPip() {
+    const box = pipBox();
+    if (!box) return;
+    let drag = null;
+    box.addEventListener('pointerdown', e => {
+      if (!el('match').classList.contains('mini')) return;
+      const r = box.getBoundingClientRect();
+      drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, sx: e.clientX, sy: e.clientY, moved: false };
+    });
+    box.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
+      if (!drag.moved) { try { box.setPointerCapture(e.pointerId); } catch (err) { /* nada */ } }
+      drag.moved = true;
+      box.classList.add('dragging');
+      placePip(e.clientX - drag.dx, e.clientY - drag.dy, false);
+    });
+    const end = e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      box.classList.remove('dragging');
+      if (drag.moved) {
+        MV.pipDragged = true; // que el clic al soltar no cuente como pulsar un botón
+        setTimeout(() => { MV.pipDragged = false; }, 60);
+        const r = box.getBoundingClientRect();
+        placePip(r.left, r.top, true);
+      }
+      drag = null;
+    };
+    box.addEventListener('pointerup', end);
+    box.addEventListener('pointercancel', end);
+    window.addEventListener('resize', () => {
+      if (el('match') && el('match').classList.contains('mini')) { const r = pipBox().getBoundingClientRect(); placePip(r.left, r.top, true); MV.pitch && MV.pitch.resize(); }
+    });
+  }
+  A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
+  A['mv-pip-size'] = () => {
+    if (MV.pipDragged) return;
+    settings().pipBig = !settings().pipBig;
+    const r = pipBox().getBoundingClientRect();
+    placePip(r.left, r.top, true);
+    requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
+  };
 
   A['mv-skipmenu'] = () => {
     const m = MV.m;
