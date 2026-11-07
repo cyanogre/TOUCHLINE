@@ -1,0 +1,13 @@
+BASE DE DATOS SIN LICENCIAS (estilo ISS Pro Evolution) - v3
+
+players_clean.csv     27.244 jugadores. club_id, gender (M/F), generated (1 = inventado),
+                      origen: '' = jugador base | relleno_plantilla | liga_sudamericana (= ligas añadidas, incluidas v3)
+                      Medias, potencial y stats VARIADOS ±1-3 (±1 si media original >=88). Edad sin tocar.
+players.csv / players_search.json   Mismos jugadores, formatos alternativos.
+clubs.json            1.039 clubes: colores, escudo, medias y coef_inicial (coeficiente para la temporada 1).
+leagues.json          74 ligas + asociacion, confederacion, division, ranking_uefa, region_afc.
+competiciones.json    Especificación de torneos internacionales para la IA del juego (formato + plazas temporada 1).
+COMPETICIONES.md      Lo mismo explicado en texto. Incluye equivalencias reales: SOLO uso interno.
+escudos/Cxxxx.svg     Escudo por club.
+_equivalencias_PRIVADO.csv   Original -> nuevo. NO incluir en el juego publicado.
+_script_generador.py / _script_competiciones.py   Regeneran todo (python3 -I script.py in out ; python3 -I script.py out).

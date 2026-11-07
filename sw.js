@@ -6,7 +6,7 @@ const CORE = [
   'js/icons.js', 'js/i18n.js', 'data/i18n/ui.js', 'data/i18n/ui2.js', 'data/i18n/club.js', 'data/i18n/match.js', 'data/i18n/social.js', 'data/i18n/news.js', 'data/i18n/profe.js', 'data/i18n/school.js', 'data/i18n/fem.js', 'data/i18n/lower.js', 'data/i18n/manage.js', 'data/i18n/vestuario.js', 'data/i18n/mercado.js', 'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/staff.js', 'js/world.js', 'js/engine.js', 'js/coach.js',
   'js/season.js', 'js/market.js', 'js/commerce.js', 'js/news.js', 'js/game.js', 'js/charts.js', 'js/ui.js', 'js/matchview.js', 'js/main.js',
   'js/sfx.js', 'js/fx.js', 'js/splash.js', 'js/pitch.js', 'js/tutorial.js', 'js/career.js', 'js/locker.js', 'js/social.js', 'js/cups.js', 'js/tournament.js', 'js/mentor.js', 'js/school.js',
-  'assets/mentor/neutral-talk.png', 'assets/mentor/neutral-idle.png', 'data/game/crests.js', 'data/game/kits.js', 'data/game/pyramid.js',
+  'assets/mentor/neutral-talk.png', 'assets/mentor/neutral-idle.png', 'data/game/pyramid.js',
   'assets/icon.svg', 'assets/icon-192.png', 'assets/icon-512.png'
 ];
 
@@ -35,7 +35,7 @@ self.addEventListener('fetch', e => {
   if (!sameOrigin && !isFont && !isCrest) return;
   // Datos y banderas: primero caché (no cambian entre versiones salvo regenerar)
   // Resto: red primero con respaldo en caché (así las actualizaciones llegan al momento)
-  const cacheFirst = isFont || isCrest || url.pathname.includes('/data/game/') || url.pathname.includes('/assets/flags/');
+  const cacheFirst = isFont || isCrest || url.pathname.includes('/data/game/') || url.pathname.includes('/data/legacy/') || url.pathname.includes('/assets/flags/') || url.pathname.includes('/assets/escudos/');
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     if (cacheFirst) {

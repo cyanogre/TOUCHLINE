@@ -56,8 +56,8 @@ jobs:
         run: |
           mkdir -p _site/data
           cp -r index.html manifest.webmanifest sw.js .nojekyll css js assets _site/
-          cp -r data/game _site/data/
-          cp "Strategic Swing.mp3" _site/
+          # Datos del juego (base nueva), base antigua (para abrir partidas guardadas con ella) y traducciones
+          cp -r data/game data/legacy data/i18n _site/data/
           # Versión del caché offline = commit actual
           sed -i "s/__BUILD__/${GITHUB_SHA::8}/" _site/sw.js
           du -sh _site

@@ -1,0 +1,2592 @@
+{
+ "version": "2026-27 (temporada inicial del juego)",
+ "notas": [
+  "Los nombres de las competiciones son inventados. No usar marcas reales en el juego.",
+  "Las fases principales (fase de liga, grupos, eliminatorias) reproducen exactamente el formato real. Las rondas previas mantienen sus rondas y caminos reales, pero su tamaño se recalcula porque no todas las asociaciones existen en el juego."
+ ],
+ "reglas_generales": {
+  "eliminatoria_ida_vuelta_uefa": "Sin valor doble de goles fuera. Empate global -> prórroga 2x15 -> penaltis.",
+  "eliminatoria_ida_vuelta_conmebol": "Sin valor doble de goles fuera. Empate global -> penaltis directamente (sin prórroga).",
+  "partido_unico": "Empate -> prórroga 2x15 -> penaltis (salvo que se indique lo contrario).",
+  "desempate_fase_liga_uefa": [
+   "puntos",
+   "diferencia de goles",
+   "goles a favor",
+   "goles a favor fuera",
+   "victorias",
+   "victorias fuera",
+   "puntos de los rivales",
+   "diferencia de goles de los rivales",
+   "goles a favor de los rivales",
+   "puntos disciplinarios (menos es mejor)",
+   "coeficiente de club"
+  ],
+  "desempate_grupos_conmebol": [
+   "puntos",
+   "diferencia de goles",
+   "goles a favor",
+   "goles a favor fuera",
+   "sorteo"
+  ],
+  "sin_copa_nacional": "El juego no tiene copas nacionales: toda plaza de \"campeón de copa\" pasa al mejor clasificado de liga que aún no tenga plaza (regla real cuando el campeón de copa ya está clasificado).",
+  "plaza_ya_ocupada": "Si un club ya está clasificado para una competición superior (o como campeón vigente), su plaza pasa al siguiente clasificado de su liga no clasificado.",
+  "ligas_parciales": "BUL, AZE y FIN solo tienen 1 club en el juego: ese club es su campeón; el resto de plazas de esas asociaciones quedan vacantes.",
+  "vacantes": "Las plazas de asociaciones que no existen en el juego quedan vacantes y se cubren con el algoritmo de reequilibrio."
+ },
+ "reequilibrio": {
+  "descripcion": "Reequilibrio de rondas previas (adaptación del reequilibrio real UEFA/AFC a las asociaciones que existen en el juego).",
+  "pseudocodigo": [
+   "Entrada: rondas de un camino (de la primera a la última) con sus entrantes directos y su nº de eliminatorias de diseño; T = nº de clasificados que debe dar el camino.",
+   "N = total de entrantes del camino. Si N <= T: todos pasan y quedan T-N vacantes (se cubren con \"mejor eliminado\" de la última ronda del camino, por coeficiente).",
+   "need = T. Para cada ronda i desde la ÚLTIMA hacia la PRIMERA:",
+   "  Ni = entrantes de la ronda i + entrantes de todas las rondas anteriores aún sin ubicar.",
+   "  t = min(eliminatorias_diseño_i, Ni - need)   (en la primera ronda: t = Ni - need)",
+   "  Los (need - t) equipos MÁS FUERTES de ese conjunto quedan exentos de la ronda i y pasan directamente a la siguiente fase.",
+   "  La ronda i se juega con 2t equipos: primero los entrantes directos de la ronda i; el resto (2t - directos) vienen como ganadores/exentos de rondas anteriores.",
+   "  Si los entrantes directos de la ronda i superan 2t, los más débiles bajan a la ronda anterior.",
+   "  need = 2t - directos_ronda_i; continuar con la ronda anterior.",
+   "Fortaleza (orden): 1) ronda de entrada más tardía, 2) coeficiente de club, 3) ranking de la asociación, 4) puesto en liga.",
+   "Vacante de campeón vigente: como en la UEFA real, se cubre subiendo de ronda al equipo más fuerte del camino correspondiente (campeón vigente de Campions -> camino de campeones; de Euroleague -> camino de liga; de Rising -> play-off de Euroleague)."
+  ]
+ },
+ "coeficientes": {
+  "asociacion_uefa": "Suma de las 5 últimas temporadas. Puntos de temporada = puntos de todos sus clubes en las 3 competiciones / nº de clubes participantes. Victoria 2, empate 1 (en previas, la mitad); bonus: +4 por jugar fase de liga de Campions, +1 por cada eliminatoria superada desde octavos. Valores iniciales aproximados en \"asociaciones\".",
+  "club": "Suma de las 5 últimas temporadas con el mismo sistema de puntos. Temporada 1: usar coef_inicial de clubs.json.",
+  "plazas_por_rendimiento_EPS": "Las 2 asociaciones con mejor coeficiente de la temporada anterior obtienen una plaza extra (su 5º) en la fase de liga de Campions. Temporada 1: ENG y ITA."
+ },
+ "asociaciones": [
+  {
+   "codigo": "ARG",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Argentina",
+   "clubes": 30,
+   "estado": "completa"
+  },
+  {
+   "codigo": "AUS",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Este",
+   "liga_principal": "Liga Australiana",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "AUT",
+   "confederacion": "UEFA",
+   "ranking_uefa": 13,
+   "puntos_iniciales": 38,
+   "region_afc": null,
+   "liga_principal": "Liga Austriaca",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "AZE",
+   "confederacion": "UEFA",
+   "ranking_uefa": 30,
+   "puntos_iniciales": 20,
+   "region_afc": null,
+   "liga_principal": "Liga Azerí",
+   "clubes": 1,
+   "estado": "parcial"
+  },
+  {
+   "codigo": "BEL",
+   "confederacion": "UEFA",
+   "ranking_uefa": 8,
+   "puntos_iniciales": 58,
+   "region_afc": null,
+   "liga_principal": "Liga Belga",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "BOL",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Boliviana",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "BRA",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Brasileña",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "BUL",
+   "confederacion": "UEFA",
+   "ranking_uefa": 29,
+   "puntos_iniciales": 21,
+   "region_afc": null,
+   "liga_principal": "Liga Búlgara",
+   "clubes": 1,
+   "estado": "parcial"
+  },
+  {
+   "codigo": "CHI",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Chilena",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "CHN",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Este",
+   "liga_principal": "Liga China",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "COL",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Colombiana",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "CRO",
+   "confederacion": "UEFA",
+   "ranking_uefa": 21,
+   "puntos_iniciales": 29,
+   "region_afc": null,
+   "liga_principal": "Liga Croata",
+   "clubes": 10,
+   "estado": "completa"
+  },
+  {
+   "codigo": "CYP",
+   "confederacion": "UEFA",
+   "ranking_uefa": 19,
+   "puntos_iniciales": 31,
+   "region_afc": null,
+   "liga_principal": "Liga Chipriota",
+   "clubes": 14,
+   "estado": "completa"
+  },
+  {
+   "codigo": "CZE",
+   "confederacion": "UEFA",
+   "ranking_uefa": 9,
+   "puntos_iniciales": 52,
+   "region_afc": null,
+   "liga_principal": "Liga Checa",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "DEN",
+   "confederacion": "UEFA",
+   "ranking_uefa": 16,
+   "puntos_iniciales": 35,
+   "region_afc": null,
+   "liga_principal": "Liga Danesa",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "ECU",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Ecuatoriana",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "EGY",
+   "confederacion": "CAF",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Egipcia",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "ENG",
+   "confederacion": "UEFA",
+   "ranking_uefa": 1,
+   "puntos_iniciales": 115,
+   "region_afc": null,
+   "liga_principal": "Liga Inglesa",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "ESP",
+   "confederacion": "UEFA",
+   "ranking_uefa": 3,
+   "puntos_iniciales": 92,
+   "region_afc": null,
+   "liga_principal": "Liga Española",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "FIN",
+   "confederacion": "UEFA",
+   "ranking_uefa": 38,
+   "puntos_iniciales": 13,
+   "region_afc": null,
+   "liga_principal": "Liga Finlandesa",
+   "clubes": 1,
+   "estado": "parcial"
+  },
+  {
+   "codigo": "FRA",
+   "confederacion": "UEFA",
+   "ranking_uefa": 5,
+   "puntos_iniciales": 76,
+   "region_afc": null,
+   "liga_principal": "Liga Francesa",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "GER",
+   "confederacion": "UEFA",
+   "ranking_uefa": 4,
+   "puntos_iniciales": 88,
+   "region_afc": null,
+   "liga_principal": "Liga Alemana",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "GRE",
+   "confederacion": "UEFA",
+   "ranking_uefa": 12,
+   "puntos_iniciales": 43,
+   "region_afc": null,
+   "liga_principal": "Liga Griega",
+   "clubes": 14,
+   "estado": "completa"
+  },
+  {
+   "codigo": "HUN",
+   "confederacion": "UEFA",
+   "ranking_uefa": 24,
+   "puntos_iniciales": 26,
+   "region_afc": null,
+   "liga_principal": "Liga Húngara",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "IND",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Sur",
+   "liga_principal": "Liga India",
+   "clubes": 11,
+   "estado": "completa"
+  },
+  {
+   "codigo": "IRL",
+   "confederacion": "UEFA",
+   "ranking_uefa": 31,
+   "puntos_iniciales": 19,
+   "region_afc": null,
+   "liga_principal": "Liga Irlandesa",
+   "clubes": 10,
+   "estado": "completa"
+  },
+  {
+   "codigo": "ITA",
+   "confederacion": "UEFA",
+   "ranking_uefa": 2,
+   "puntos_iniciales": 96,
+   "region_afc": null,
+   "liga_principal": "Liga Italiana",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "JPN",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Este",
+   "liga_principal": "Liga Japonesa",
+   "clubes": 20,
+   "estado": "completa"
+  },
+  {
+   "codigo": "KOR",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Este",
+   "liga_principal": "Liga Coreana",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "KSA",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Oeste",
+   "liga_principal": "Liga Saudí",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "MAR",
+   "confederacion": "CAF",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Marroquí",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "MEX",
+   "confederacion": "CONCACAF",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Mexicana",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "NED",
+   "confederacion": "UEFA",
+   "ranking_uefa": 6,
+   "puntos_iniciales": 68,
+   "region_afc": null,
+   "liga_principal": "Liga Neerlandesa",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "NOR",
+   "confederacion": "UEFA",
+   "ranking_uefa": 11,
+   "puntos_iniciales": 45,
+   "region_afc": null,
+   "liga_principal": "Liga Noruega",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "PAR",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Paraguaya",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "PER",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Peruana",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "POL",
+   "confederacion": "UEFA",
+   "ranking_uefa": 15,
+   "puntos_iniciales": 36,
+   "region_afc": null,
+   "liga_principal": "Liga Polaca",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "POR",
+   "confederacion": "UEFA",
+   "ranking_uefa": 7,
+   "puntos_iniciales": 64,
+   "region_afc": null,
+   "liga_principal": "Liga Portuguesa",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "QAT",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Oeste",
+   "liga_principal": "Liga Catarí",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "ROU",
+   "confederacion": "UEFA",
+   "ranking_uefa": 25,
+   "puntos_iniciales": 25,
+   "region_afc": null,
+   "liga_principal": "Liga Rumana",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "RUS",
+   "confederacion": "UEFA",
+   "ranking_uefa": 26,
+   "puntos_iniciales": 24,
+   "region_afc": null,
+   "liga_principal": "Liga Rusa",
+   "clubes": 16,
+   "estado": "excluida"
+  },
+  {
+   "codigo": "SCO",
+   "confederacion": "UEFA",
+   "ranking_uefa": 14,
+   "puntos_iniciales": 37,
+   "region_afc": null,
+   "liga_principal": "Liga Escocesa",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "SRB",
+   "confederacion": "UEFA",
+   "ranking_uefa": 22,
+   "puntos_iniciales": 28,
+   "region_afc": null,
+   "liga_principal": "Liga Serbia",
+   "clubes": 14,
+   "estado": "completa"
+  },
+  {
+   "codigo": "SUI",
+   "confederacion": "UEFA",
+   "ranking_uefa": 17,
+   "puntos_iniciales": 34,
+   "region_afc": null,
+   "liga_principal": "Liga Suiza",
+   "clubes": 12,
+   "estado": "completa"
+  },
+  {
+   "codigo": "SWE",
+   "confederacion": "UEFA",
+   "ranking_uefa": 20,
+   "puntos_iniciales": 30,
+   "region_afc": null,
+   "liga_principal": "Liga Sueca",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "THA",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Este",
+   "liga_principal": "Liga Tailandesa",
+   "clubes": 1,
+   "estado": "parcial"
+  },
+  {
+   "codigo": "TUR",
+   "confederacion": "UEFA",
+   "ranking_uefa": 10,
+   "puntos_iniciales": 47,
+   "region_afc": null,
+   "liga_principal": "Liga Turca",
+   "clubes": 18,
+   "estado": "completa"
+  },
+  {
+   "codigo": "UAE",
+   "confederacion": "AFC",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": "Oeste",
+   "liga_principal": "Liga Emiratí",
+   "clubes": 14,
+   "estado": "completa"
+  },
+  {
+   "codigo": "UKR",
+   "confederacion": "UEFA",
+   "ranking_uefa": 23,
+   "puntos_iniciales": 27,
+   "region_afc": null,
+   "liga_principal": "Liga Ucraniana",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "URU",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Uruguaya",
+   "clubes": 16,
+   "estado": "completa"
+  },
+  {
+   "codigo": "USA",
+   "confederacion": "CONCACAF",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Norteamericana",
+   "clubes": 30,
+   "estado": "completa"
+  },
+  {
+   "codigo": "VEN",
+   "confederacion": "CONMEBOL",
+   "ranking_uefa": null,
+   "puntos_iniciales": null,
+   "region_afc": null,
+   "liga_principal": "Liga Venezolana",
+   "clubes": 14,
+   "estado": "completa"
+  }
+ ],
+ "competiciones": [
+  {
+   "id": "campions",
+   "nombre": "Campions",
+   "confederacion": "UEFA",
+   "temporada": "julio-junio",
+   "fase_liga": {
+    "equipos": 36,
+    "partidos_por_equipo": 8,
+    "sorteo": "4 bombos de 9 por coeficiente de club (bombo 1: campeón vigente + 8 mejores coeficientes). Cada equipo juega contra 2 rivales de cada bombo: 1 en casa y 1 fuera (4 local, 4 visitante).",
+    "restricciones": [
+     "sin rivales de la misma asociación",
+     "máximo 2 rivales de una misma asociación"
+    ],
+    "clasificacion": {
+     "1-8": "octavos de final (cabezas de serie)",
+     "9-24": "play-off de eliminatorias (9-16 cabezas de serie, 17-24 no)",
+     "25-36": "eliminados (no bajan a otra competición)"
+    }
+   },
+   "play_off_eliminatorias": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado",
+    "cruces": [
+     "9/10 vs 23/24",
+     "11/12 vs 21/22",
+     "13/14 vs 19/20",
+     "15/16 vs 17/18"
+    ],
+    "nota": "dentro de cada pareja de puestos se sortea el rival"
+   },
+   "octavos": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado en fase liga",
+    "cruces": [
+     "1/2 vs ganador (15/16 vs 17/18)",
+     "3/4 vs ganador (13/14 vs 19/20)",
+     "5/6 vs ganador (11/12 vs 21/22)",
+     "7/8 vs ganador (9/10 vs 23/24)"
+    ]
+   },
+   "cuadro": "Fijo desde octavos hasta la final. 1º y 2º en mitades opuestas; 3º y 4º también, etc. (cuadro tipo tenis por puesto en fase liga).",
+   "cuartos_y_semis": "ida y vuelta; vuelta en casa del mejor clasificado en fase liga",
+   "final": "partido único en sede neutral designada antes de la temporada",
+   "previas": {
+    "caminos": [
+     "campeones",
+     "liga"
+    ],
+    "formato": "ida y vuelta; cabezas de serie por coeficiente; sin cruces entre clubes de la misma asociación",
+    "diseño_real": {
+     "campeones": "Q1 28 equipos -> Q2 24 -> Q3 12 -> Play-off 10 -> 5 a fase liga",
+     "liga": "Q2 6 -> Q3 8 -> Play-off 4 -> 2 a fase liga"
+    },
+    "eliminados_van_a": {
+     "Q1 (campeones)": "Rising League, Q2 camino campeones",
+     "Q2 campeones": "Euroleague, Q3 camino campeones",
+     "Q2 liga": "Euroleague, Q3 camino principal",
+     "Q3 campeones": "Euroleague, play-off",
+     "Q3 liga": "Euroleague, fase de liga",
+     "Play-off (ambos caminos)": "Euroleague, fase de liga"
+    }
+   },
+   "acceso_directo_fase_liga": "29 plazas: campeón vigente Campions, campeón vigente Euroleague, campeones asoc. 1-10, segundos 1-6, terceros 1-5, cuartos 1-4, 2 plazas por rendimiento (5º de las 2 asociaciones con mejor coeficiente de la temporada anterior).",
+   "clasifica_a": "Eurosupercopa (campeón) y fase de liga de Campions de la temporada siguiente"
+  },
+  {
+   "id": "euroleague",
+   "nombre": "Euroleague",
+   "confederacion": "UEFA",
+   "temporada": "julio-junio",
+   "fase_liga": {
+    "equipos": 36,
+    "partidos_por_equipo": 8,
+    "sorteo": "4 bombos de 9 por coeficiente de club. 2 rivales por bombo (1 casa, 1 fuera).",
+    "restricciones": [
+     "sin rivales de la misma asociación",
+     "máximo 2 rivales de una misma asociación"
+    ],
+    "clasificacion": {
+     "1-8": "octavos de final (cabezas de serie)",
+     "9-24": "play-off de eliminatorias (9-16 cabezas de serie, 17-24 no)",
+     "25-36": "eliminados (no bajan a otra competición)"
+    }
+   },
+   "play_off_eliminatorias": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado",
+    "cruces": [
+     "9/10 vs 23/24",
+     "11/12 vs 21/22",
+     "13/14 vs 19/20",
+     "15/16 vs 17/18"
+    ],
+    "nota": "dentro de cada pareja de puestos se sortea el rival"
+   },
+   "octavos": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado en fase liga",
+    "cruces": [
+     "1/2 vs ganador (15/16 vs 17/18)",
+     "3/4 vs ganador (13/14 vs 19/20)",
+     "5/6 vs ganador (11/12 vs 21/22)",
+     "7/8 vs ganador (9/10 vs 23/24)"
+    ]
+   },
+   "cuadro": "Fijo desde octavos hasta la final. 1º y 2º en mitades opuestas; 3º y 4º también, etc. (cuadro tipo tenis por puesto en fase liga).",
+   "cuartos_y_semis": "ida y vuelta; vuelta en casa del mejor clasificado en fase liga",
+   "final": "partido único en sede neutral designada antes de la temporada",
+   "previas": {
+    "formato": "ida y vuelta",
+    "diseño_real": "Q1 12 -> Q2 18 -> Q3 (campeones 12 / principal 14) -> Play-off 24 -> 12 a fase liga",
+    "eliminados_van_a": {
+     "Q1": "Rising League, Q2 principal",
+     "Q2": "Rising League, Q3 principal",
+     "Q3 campeones": "Rising League, play-off campeones",
+     "Q3 principal": "Rising League, play-off principal",
+     "Play-off": "Rising League, fase de liga"
+    }
+   },
+   "acceso_directo_fase_liga": "campeón vigente Rising League, plaza de copa asoc. 1-7, 5º asoc. 1-5, + 11 eliminados de Campions (5 play-off campeones, 2 play-off liga, 4 Q3 liga)",
+   "clasifica_a": "Eurosupercopa y fase de liga de Campions de la temporada siguiente (si no entra por su liga)"
+  },
+  {
+   "id": "rising",
+   "nombre": "Rising League",
+   "confederacion": "UEFA",
+   "temporada": "julio-junio",
+   "fase_liga": {
+    "equipos": 36,
+    "partidos_por_equipo": 6,
+    "sorteo": "6 bombos de 6 por coeficiente de club. 1 rival de cada bombo (3 en casa, 3 fuera).",
+    "restricciones": [
+     "sin rivales de la misma asociación",
+     "máximo 2 rivales de una misma asociación"
+    ],
+    "clasificacion": {
+     "1-8": "octavos de final (cabezas de serie)",
+     "9-24": "play-off de eliminatorias (9-16 cabezas de serie, 17-24 no)",
+     "25-36": "eliminados (no bajan a otra competición)"
+    }
+   },
+   "play_off_eliminatorias": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado",
+    "cruces": [
+     "9/10 vs 23/24",
+     "11/12 vs 21/22",
+     "13/14 vs 19/20",
+     "15/16 vs 17/18"
+    ],
+    "nota": "dentro de cada pareja de puestos se sortea el rival"
+   },
+   "octavos": {
+    "formato": "ida y vuelta, vuelta en casa del mejor clasificado en fase liga",
+    "cruces": [
+     "1/2 vs ganador (15/16 vs 17/18)",
+     "3/4 vs ganador (13/14 vs 19/20)",
+     "5/6 vs ganador (11/12 vs 21/22)",
+     "7/8 vs ganador (9/10 vs 23/24)"
+    ]
+   },
+   "cuadro": "Fijo desde octavos hasta la final. 1º y 2º en mitades opuestas; 3º y 4º también, etc. (cuadro tipo tenis por puesto en fase liga).",
+   "cuartos_y_semis": "ida y vuelta; vuelta en casa del mejor clasificado en fase liga",
+   "final": "partido único en sede neutral designada antes de la temporada",
+   "previas": {
+    "caminos": [
+     "campeones",
+     "principal"
+    ],
+    "formato": "ida y vuelta",
+    "diseño_real": {
+     "campeones": "Q2 12 -> Q3 8 -> Play-off 10 -> 5 a fase liga",
+     "principal": "Q1 52 -> Q2 86 -> Q3 52 -> Play-off 38 -> 19 a fase liga"
+    }
+   },
+   "acceso_directo_fase_liga": "ninguno por liga; 12 eliminados del play-off de Euroleague",
+   "clasifica_a": "fase de liga de Euroleague de la temporada siguiente (si no entra por su liga)"
+  },
+  {
+   "id": "eurosupercopa",
+   "nombre": "Eurosupercopa",
+   "confederacion": "UEFA",
+   "formato": "partido único en sede neutral (agosto): campeón de Campions vs campeón de Euroleague. Empate -> penaltis directamente (sin prórroga)."
+  },
+  {
+   "id": "liberadores",
+   "nombre": "Liberadores",
+   "confederacion": "CONMEBOL",
+   "temporada": "febrero-noviembre (año natural)",
+   "equipos": 47,
+   "fase_1": {
+    "equipos": 6,
+    "formato": "ida y vuelta, 3 eliminatorias",
+    "entran": "1 club de BOL, ECU, PAR, PER, URU, VEN",
+    "ganadores": "Fase 2",
+    "perdedores": "eliminados"
+   },
+   "fase_2": {
+    "equipos": 16,
+    "formato": "ida y vuelta, 8 eliminatorias",
+    "entran": "13 directos + 3 ganadores Fase 1",
+    "ganadores": "Fase 3",
+    "perdedores": "eliminados"
+   },
+   "fase_3": {
+    "equipos": 8,
+    "formato": "ida y vuelta, 4 eliminatorias",
+    "ganadores": "Fase de grupos (4)",
+    "perdedores": "Latinoamericana, fase de grupos"
+   },
+   "fase_grupos": {
+    "equipos": 32,
+    "grupos": "8 de 4",
+    "partidos": "6 (doble vuelta)",
+    "sorteo": "4 bombos de 8 por ranking de clubes (bombo 1: campeón vigente + 7 mejores). No coinciden dos clubes del mismo país en un grupo, salvo los que llegan de la Fase 3.",
+    "clasificacion": {
+     "1º y 2º": "octavos",
+     "3º": "play-off de la Latinoamericana",
+     "4º": "eliminado"
+    }
+   },
+   "octavos": "Sorteo: primeros de grupo (bombo 1) vs segundos (bombo 2); el primero juega la vuelta en casa; no se cruzan equipos del mismo grupo; sí del mismo país. El sorteo fija el cuadro hasta la final.",
+   "cuartos_semis": "ida y vuelta; vuelta en casa del equipo con mejor campaña acumulada desde la fase de grupos",
+   "final": "partido único en sede neutral designada; empate -> prórroga -> penaltis",
+   "reglas_eliminatorias": "Sin valor doble de goles fuera. Empate global -> penaltis directamente (sin prórroga).",
+   "campeon_vigente": "Plaza directa en fase de grupos. Si ya está clasificado por su liga (o en temporada 1, que no hay), la plaza pasa al siguiente clasificado no clasificado de su asociación; temporada 1: el 6º de la Liga Brasileña sube a grupos y el resto de plazas brasileñas bajan un puesto.",
+   "campeon_latinoamericana": "Plaza directa en fase de grupos; misma regla de vacante (temporada 1: el 6º de la Liga Argentina sube a grupos y el resto de plazas argentinas bajan un puesto).",
+   "clasifica_a": "Recopa Latina e Intercontinental Planeta"
+  },
+  {
+   "id": "latinoamericana",
+   "nombre": "Latinoamericana",
+   "confederacion": "CONMEBOL",
+   "temporada": "marzo-noviembre",
+   "equipos": 56,
+   "primera_fase": {
+    "equipos": 32,
+    "formato": "ida y vuelta (desde 2027), 16 eliminatorias entre clubes del MISMO país (BOL, CHI, COL, ECU, PAR, PER, URU, VEN: 4 clubes cada uno -> 2 cruces por país)"
+   },
+   "fase_grupos": {
+    "equipos": 32,
+    "composicion": "16 ganadores primera fase + 6 BRA + 6 ARG + 4 eliminados Fase 3 de Liberadores",
+    "grupos": "8 de 4, doble vuelta"
+   },
+   "play_off": "8 eliminatorias ida y vuelta: segundos de grupo vs terceros de grupo de Liberadores (el que viene de Liberadores juega la vuelta en casa).",
+   "octavos": "primeros de grupo vs ganadores del play-off; primero de grupo juega la vuelta en casa",
+   "cuartos_semis": "ida y vuelta",
+   "final": "partido único en sede neutral; empate -> prórroga -> penaltis",
+   "reglas_eliminatorias": "Sin valor doble de goles fuera. Empate global -> penaltis directamente (sin prórroga).",
+   "clasifica_a": "Liberadores (fase de grupos) siguiente y Recopa Latina"
+  },
+  {
+   "id": "recopa_latina",
+   "nombre": "Recopa Latina",
+   "confederacion": "CONMEBOL",
+   "formato": "campeón de Liberadores vs campeón de Latinoamericana, ida y vuelta (febrero); empate global -> penaltis"
+  },
+  {
+   "id": "asia_elite",
+   "nombre": "Asia Élite",
+   "confederacion": "AFC",
+   "temporada": "agosto-mayo",
+   "play_off_previo": "4 partidos únicos (2 por región) en casa del mejor clasificado; ganadores a fase de liga. Perdedores eliminados.",
+   "fase_liga": {
+    "equipos": 32,
+    "regiones": "Oeste 16 y Este 16 (tabla separada por región)",
+    "partidos": 8,
+    "sorteo": "4 bombos de 4 por región según ranking de clubes; 2 rivales de cada bombo (1 casa, 1 fuera); sin rivales de la misma asociación",
+    "clasificacion_temporada_1": "1-8 de cada región a octavos",
+    "clasificacion_desde_temporada_2": "1-6 a octavos; 7-10 play-off a partido único (7 vs 10 y 8 vs 9, en casa del 7º y 8º)"
+   },
+   "octavos": "dentro de cada región, ida y vuelta: 1-8, 2-7, 3-6, 4-5; vuelta en casa del mejor clasificado",
+   "fase_final": "cuartos, semifinales y final a partido único en una sede centralizada (cuartos: sorteo cruzando Oeste vs Este); empate -> prórroga -> penaltis",
+   "clasifica_a": "Intercontinental Planeta y fase de liga de la temporada siguiente"
+  },
+  {
+   "id": "copa_norte",
+   "nombre": "Copa de Campeones del Norte",
+   "confederacion": "CONCACAF",
+   "temporada": "febrero-mayo",
+   "formato_real": "27 clubes; ronda 1 (22 clubes, ida y vuelta) + 5 exentos -> octavos, cuartos, semis ida y vuelta; final a partido único",
+   "en_el_juego": "Solo existen la Liga Norteamericana y la Liga Mexicana: 8 + 8 = 16 clubes -> por reequilibrio todos entran en octavos (la ronda 1 queda vacía).",
+   "plazas": {
+    "Liga Norteamericana": "puestos 1-8 de la clasificación general (si no hay ningún club canadiense, el mejor canadiense sustituye al 8º)",
+    "Liga Mexicana": "puestos 1-8 de la tabla anual"
+   },
+   "cruces": "octavos 1-16, 2-15... por ranking de clubes; vuelta en casa del mejor; cuadro fijo",
+   "final": "partido único en el estadio del finalista con mejor rendimiento en el torneo",
+   "clasifica_a": "Intercontinental Planeta (Derbi de las Américas)"
+  },
+  {
+   "id": "africa_masters",
+   "nombre": "África Masters",
+   "confederacion": "CAF",
+   "activa": false,
+   "motivo": "En el juego solo hay 2 ligas africanas (Egipcia y Marroquí). Activar cuando haya al menos 8 asociaciones africanas.",
+   "formato_real": "2 rondas previas ida y vuelta -> fase de grupos 16 (4 de 4, doble vuelta) -> cuartos, semis y final a ida y vuelta. 12 mejores asociaciones: 2 clubes; resto: 1."
+  },
+  {
+   "id": "intercontinental",
+   "nombre": "Intercontinental Planeta",
+   "confederacion": "FIFA",
+   "temporada": "anual (diciembre)",
+   "formato": [
+    "Derbi de las Américas: campeón Copa de Campeones del Norte vs campeón Liberadores",
+    "Copa Desafío: ganador del Derbi vs campeón Asia Élite (y de África Masters si se activa, en una ronda previa)",
+    "Final: ganador Copa Desafío vs campeón de Campions"
+   ],
+   "reglas": "partidos únicos en sede neutral; empate -> prórroga -> penaltis"
+  }
+ ],
+ "temporada_1": {
+  "uefa_plazas_por_asociacion": [
+   {
+    "asociacion": "ENG",
+    "ranking": 1,
+    "liga": "Liga Inglesa",
+    "clubes_en_liga": 20,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "EPS"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P5"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Rising League",
+      "entrada": "Play-off (camino principal)",
+      "tipo_plaza": "P6"
+     }
+    ]
+   },
+   {
+    "asociacion": "ITA",
+    "ranking": 2,
+    "liga": "Liga Italiana",
+    "clubes_en_liga": 20,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "EPS"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P5"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Rising League",
+      "entrada": "Play-off (camino principal)",
+      "tipo_plaza": "P6"
+     }
+    ]
+   },
+   {
+    "asociacion": "ESP",
+    "ranking": 3,
+    "liga": "Liga Española",
+    "clubes_en_liga": 20,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P5"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Rising League",
+      "entrada": "Play-off (camino principal)",
+      "tipo_plaza": "P6"
+     }
+    ]
+   },
+   {
+    "asociacion": "GER",
+    "ranking": 4,
+    "liga": "Liga Alemana",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P5"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Rising League",
+      "entrada": "Play-off (camino principal)",
+      "tipo_plaza": "P6"
+     }
+    ]
+   },
+   {
+    "asociacion": "FRA",
+    "ranking": 5,
+    "liga": "Liga Francesa",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Campions",
+      "entrada": "3ª previa (camino liga)",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "P5"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Rising League",
+      "entrada": "Play-off (camino principal)",
+      "tipo_plaza": "P6"
+     }
+    ]
+   },
+   {
+    "asociacion": "NED",
+    "ranking": 6,
+    "liga": "Liga Neerlandesa",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Campions",
+      "entrada": "3ª previa (camino liga)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P5"
+     }
+    ]
+   },
+   {
+    "asociacion": "POR",
+    "ranking": 7,
+    "liga": "Liga Portuguesa",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "3ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "BEL",
+    "ranking": 8,
+    "liga": "Liga Belga",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "3ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Play-off",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "CZE",
+    "ranking": 9,
+    "liga": "Liga Checa",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "3ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Play-off",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "TUR",
+    "ranking": 10,
+    "liga": "Liga Turca",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Fase de liga",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Play-off",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "NOR",
+    "ranking": 11,
+    "liga": "Liga Noruega",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Play-off (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Play-off",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "GRE",
+    "ranking": 12,
+    "liga": "Liga Griega",
+    "clubes_en_liga": 14,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Play-off (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "Play-off",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "AUT",
+    "ranking": 13,
+    "liga": "Liga Austriaca",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Play-off (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "3ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "SCO",
+    "ranking": 14,
+    "liga": "Liga Escocesa",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "Play-off (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "3ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "POL",
+    "ranking": 15,
+    "liga": "Liga Polaca",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino liga)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Euroleague",
+      "entrada": "3ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P4"
+     }
+    ]
+   },
+   {
+    "asociacion": "DEN",
+    "ranking": 16,
+    "liga": "Liga Danesa",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "SUI",
+    "ranking": 17,
+    "liga": "Liga Suiza",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "CYP",
+    "ranking": 19,
+    "liga": "Liga Chipriota",
+    "clubes_en_liga": 14,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "SWE",
+    "ranking": 20,
+    "liga": "Liga Sueca",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "CRO",
+    "ranking": 21,
+    "liga": "Liga Croata",
+    "clubes_en_liga": 10,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "SRB",
+    "ranking": 22,
+    "liga": "Liga Serbia",
+    "clubes_en_liga": 14,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "UKR",
+    "ranking": 23,
+    "liga": "Liga Ucraniana",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "HUN",
+    "ranking": 24,
+    "liga": "Liga Húngara",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "2ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "ROU",
+    "ranking": 25,
+    "liga": "Liga Rumana",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "1ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "BUL",
+    "ranking": 29,
+    "liga": "Liga Búlgara",
+    "clubes_en_liga": 1,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "1ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     }
+    ]
+   },
+   {
+    "asociacion": "AZE",
+    "ranking": 30,
+    "liga": "Liga Azerí",
+    "clubes_en_liga": 1,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "1ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     }
+    ]
+   },
+   {
+    "asociacion": "IRL",
+    "ranking": 31,
+    "liga": "Liga Irlandesa",
+    "clubes_en_liga": 10,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "1ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Euroleague",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "CW"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Rising League",
+      "entrada": "2ª previa (camino principal)",
+      "tipo_plaza": "RU"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Rising League",
+      "entrada": "1ª previa (camino principal)",
+      "tipo_plaza": "P3"
+     }
+    ]
+   },
+   {
+    "asociacion": "FIN",
+    "ranking": 38,
+    "liga": "Liga Finlandesa",
+    "clubes_en_liga": 1,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Campions",
+      "entrada": "1ª previa (camino campeones)",
+      "tipo_plaza": "C"
+     }
+    ]
+   }
+  ],
+  "uefa_rondas": {
+   "campions": [
+    {
+     "camino": "campeones",
+     "ronda": "Q1",
+     "eliminatorias": 0,
+     "exentos_que_suben": 2
+    },
+    {
+     "camino": "campeones",
+     "ronda": "Q2",
+     "eliminatorias": 1,
+     "exentos_que_suben": 11
+    },
+    {
+     "camino": "campeones",
+     "ronda": "Q3",
+     "eliminatorias": 6,
+     "exentos_que_suben": 1
+    },
+    {
+     "camino": "campeones",
+     "ronda": "PO",
+     "eliminatorias": 5,
+     "exentos_que_suben": 1
+    },
+    {
+     "camino": "liga",
+     "ronda": "Q2",
+     "eliminatorias": 2,
+     "exentos_que_suben": 2
+    },
+    {
+     "camino": "liga",
+     "ronda": "Q3",
+     "eliminatorias": 4,
+     "exentos_que_suben": 0
+    },
+    {
+     "camino": "liga",
+     "ronda": "PO",
+     "eliminatorias": 2,
+     "exentos_que_suben": 1
+    }
+   ],
+   "euroleague": [
+    {
+     "camino": "campeones",
+     "ronda": "Q3",
+     "eliminatorias": 0,
+     "exentos_que_suben": 1
+    },
+    {
+     "camino": "principal",
+     "ronda": "Q1",
+     "eliminatorias": 0,
+     "exentos_que_suben": 2
+    },
+    {
+     "camino": "principal",
+     "ronda": "Q2",
+     "eliminatorias": 1,
+     "exentos_que_suben": 13
+    },
+    {
+     "camino": "principal",
+     "ronda": "Q3",
+     "eliminatorias": 7,
+     "exentos_que_suben": 7
+    }
+   ],
+   "rising": [
+    {
+     "camino": "principal",
+     "ronda": "Q1",
+     "eliminatorias": 0,
+     "exentos_que_suben": 0
+    },
+    {
+     "camino": "principal",
+     "ronda": "Q2",
+     "eliminatorias": 0,
+     "exentos_que_suben": 8
+    },
+    {
+     "camino": "principal",
+     "ronda": "Q3",
+     "eliminatorias": 4,
+     "exentos_que_suben": 26
+    },
+    {
+     "camino": "principal",
+     "ronda": "PO",
+     "eliminatorias": 19,
+     "exentos_que_suben": 4
+    }
+   ]
+  },
+  "euroleague_play_off": {
+   "eliminatorias": 13,
+   "directos": 11,
+   "desde_camino_campeones": 1,
+   "desde_camino_principal": 14
+  },
+  "conmebol_plazas_por_asociacion": [
+   {
+    "asociacion": "BRA",
+    "liga": "Liga Brasileña",
+    "clubes_en_liga": 20,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 9,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 10,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 11,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 12,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 13,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     }
+    ]
+   },
+   {
+    "asociacion": "ARG",
+    "liga": "Liga Argentina",
+    "clubes_en_liga": 30,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 9,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 10,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 11,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 12,
+      "competicion": "Latinoamericana",
+      "entrada": "Fase de grupos"
+     }
+    ]
+   },
+   {
+    "asociacion": "CHI",
+    "liga": "Liga Chilena",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "COL",
+    "liga": "Liga Colombiana",
+    "clubes_en_liga": 20,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "BOL",
+    "liga": "Liga Boliviana",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "ECU",
+    "liga": "Liga Ecuatoriana",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "PAR",
+    "liga": "Liga Paraguaya",
+    "clubes_en_liga": 12,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "PER",
+    "liga": "Liga Peruana",
+    "clubes_en_liga": 18,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "URU",
+    "liga": "Liga Uruguaya",
+    "clubes_en_liga": 16,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   },
+   {
+    "asociacion": "VEN",
+    "liga": "Liga Venezolana",
+    "clubes_en_liga": 14,
+    "plazas": [
+     {
+      "puesto_liga": 1,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 2,
+      "competicion": "Liberadores",
+      "entrada": "Fase de grupos"
+     },
+     {
+      "puesto_liga": 3,
+      "competicion": "Liberadores",
+      "entrada": "Fase 2"
+     },
+     {
+      "puesto_liga": 4,
+      "competicion": "Liberadores",
+      "entrada": "Fase 1"
+     },
+     {
+      "puesto_liga": 5,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 6,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 7,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     },
+     {
+      "puesto_liga": 8,
+      "competicion": "Latinoamericana",
+      "entrada": "Primera fase (cruce nacional)"
+     }
+    ]
+   }
+  ],
+  "afc_plazas_por_asociacion": {
+   "Oeste": [
+    {
+     "asociacion": "KSA",
+     "liga": "Liga Saudí",
+     "directos_fase_liga": 6,
+     "play_off": 1,
+     "puestos_directos": "1-6",
+     "puestos_play_off": "7"
+    },
+    {
+     "asociacion": "UAE",
+     "liga": "Liga Emiratí",
+     "directos_fase_liga": 4,
+     "play_off": 2,
+     "puestos_directos": "1-4",
+     "puestos_play_off": "5-6"
+    },
+    {
+     "asociacion": "QAT",
+     "liga": "Liga Catarí",
+     "directos_fase_liga": 4,
+     "play_off": 1,
+     "puestos_directos": "1-4",
+     "puestos_play_off": "5"
+    }
+   ],
+   "Este": [
+    {
+     "asociacion": "JPN",
+     "liga": "Liga Japonesa",
+     "directos_fase_liga": 5,
+     "play_off": 1,
+     "puestos_directos": "1-5",
+     "puestos_play_off": "6"
+    },
+    {
+     "asociacion": "KOR",
+     "liga": "Liga Coreana",
+     "directos_fase_liga": 4,
+     "play_off": 1,
+     "puestos_directos": "1-4",
+     "puestos_play_off": "5"
+    },
+    {
+     "asociacion": "THA",
+     "liga": "Liga Tailandesa",
+     "directos_fase_liga": 1,
+     "play_off": 0,
+     "puestos_directos": "1",
+     "puestos_play_off": "-"
+    },
+    {
+     "asociacion": "CHN",
+     "liga": "Liga China",
+     "directos_fase_liga": 3,
+     "play_off": 0,
+     "puestos_directos": "1-3",
+     "puestos_play_off": "-"
+    },
+    {
+     "asociacion": "AUS",
+     "liga": "Liga Australiana",
+     "directos_fase_liga": 1,
+     "play_off": 2,
+     "puestos_directos": "1",
+     "puestos_play_off": "2-3"
+    }
+   ]
+  },
+  "rusia": "Excluida de las competiciones UEFA (como en la realidad). Configurable: excluir_rusia=true."
+ }
+}

@@ -134,4 +134,5 @@ TL_I18N_ADD([
   ['{} renovados.', '{} renewed.', '{} prolongés.', '{} verlängert.', '{} rinnovati.'],
   ['{} renovados. {}', '{} renewed. {}', '{} prolongés. {}', '{} verlängert. {}', '{} rinnovati. {}'],
   ['No hay contratos que acaben este verano.', 'No contracts end this summer.', 'Aucun contrat ne se termine cet été.', 'In diesem Sommer läuft kein Vertrag aus.', 'Nessun contratto scade quest’estate.'],
+  ['Base de datos sin licencias: clubes, jugadores y escudos inventados. Tema del juego: “Strategic Swing”.', 'License-free database: invented clubs, players and crests. Game theme: “Strategic Swing”.', 'Base de données sans licences : clubs, joueurs et écussons inventés. Thème du jeu : « Strategic Swing ».', 'Lizenzfreie Datenbank: erfundene Vereine, Spieler und Wappen. Titelmusik: „Strategic Swing“.', 'Database senza licenze: club, giocatori e stemmi inventati. Tema del gioco: “Strategic Swing”.'],
 ]);

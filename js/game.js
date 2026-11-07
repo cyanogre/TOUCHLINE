@@ -6,21 +6,47 @@
 
   const SAVE_KEY = 'touchline.save.v1';
   const META_KEY = 'touchline.meta.v1';
-  const DATA_FILES = { M: 'data/game/men.js', F: 'data/game/women.js' };
+  /*
+   * Base de datos: la nueva (sin licencias, data/game/) o la antigua (data/legacy/), que se conserva
+   * para abrir las partidas guardadas con ella. Se elige al cargar la página: abrir una partida de la
+   * otra base recarga la página con la base que toca.
+   */
+  const DB_KEY = 'touchline.db';
+  const DB = (() => { try { return localStorage.getItem(DB_KEY) === 'legacy' ? 'legacy' : 'v3'; } catch (e) { return 'v3'; } })();
+  const DATA_FILES = DB === 'legacy'
+    ? { M: 'data/legacy/men.js', F: 'data/legacy/women.js', extra: ['data/legacy/crests.js', 'data/legacy/kits.js', 'data/legacy/pyramid.js'] }
+    : { M: 'data/game/men.js', F: 'data/game/women.js', extra: [] };
 
+  function script(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  let extras = null;
   const loading = {};
   function loadData(gender) {
     window.TL_DATA = window.TL_DATA || {};
     if (window.TL_DATA[gender]) return Promise.resolve(window.TL_DATA[gender]);
     if (loading[gender]) return loading[gender];
-    loading[gender] = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = DATA_FILES[gender];
-      s.onload = () => (window.TL_DATA[gender] ? resolve(window.TL_DATA[gender]) : reject(new Error('Datos vacíos')));
-      s.onerror = () => { loading[gender] = null; reject(new Error('No se pudo cargar ' + DATA_FILES[gender])); };
-      document.head.appendChild(s);
-    });
+    if (!extras) extras = Promise.all(DATA_FILES.extra.map(script));
+    loading[gender] = extras.then(() => script(DATA_FILES[gender])).then(() => {
+      if (!window.TL_DATA[gender]) throw new Error('Datos vacíos');
+      return window.TL_DATA[gender];
+    }).catch(e => { loading[gender] = null; throw e; });
     return loading[gender];
+  }
+  /** Cambia de base de datos y recarga; al volver, sigue con lo que se iba a hacer (cargar o empezar). */
+  function switchDB(db, then) {
+    try {
+      if (db === 'legacy') localStorage.setItem(DB_KEY, 'legacy'); else localStorage.removeItem(DB_KEY);
+      if (then) sessionStorage.setItem('touchline.then', then);
+    } catch (e) { /* nada */ }
+    location.reload();
+    return new Promise(() => {});
   }
 
   /** Datos de una carrera: los del juego más las divisiones inferiores de esa versión (0 = sin ellas,
@@ -45,6 +71,7 @@
 
   const Game = {
     S: null,
+    DB, switchDB,
     loadData,
     careerData,
     preview,
@@ -78,6 +105,8 @@
       let save;
       try { save = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { save = null; }
       if (!save) throw new Error('No hay partida guardada');
+      // Partida de la otra base de datos (las anteriores a la nueva no llevan marca: son de la antigua)
+      if ((save.db || 'legacy') !== DB) return switchDB(save.db || 'legacy', 'load');
       const data = await careerData(save.gender, save.pyr || 0);
       Game.S = W.restore(data, save);
       return Game.S;
@@ -112,6 +141,11 @@
     async importSave(text) {
       const save = JSON.parse(text);
       if (!save || !save.pb || !save.gender) throw new Error('Archivo de partida no válido');
+      if ((save.db || 'legacy') !== DB) {
+        // Se guarda tal cual y se abre con su base de datos tras recargar
+        localStorage.setItem(SAVE_KEY, text);
+        return switchDB(save.db || 'legacy', 'load');
+      }
       const data = await careerData(save.gender, save.pyr || 0);
       Game.S = W.restore(data, save);
       Game.save();
