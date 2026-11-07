@@ -257,9 +257,25 @@
     S.board = { conf: 60 };
     S.fin = newFin();
     S.tactics = { formation: '4-3-3', slots: [], mentality: 1, autoSubs: true };
+    spreadContracts(S);
     dirty(S);
     migrate(S);
     return S;
+  }
+
+  /**
+   * Los datos son una foto de un momento: un tercio de cada plantilla acababa contrato en el
+   * primer verano y se iban todos de golpe. Como en la realidad, solo acaba un ~15 % cada año:
+   * los más veteranos; al resto se le alargan 1-3 temporadas.
+   */
+  function spreadContracts(S) {
+    const by = squadsIndex(S);
+    for (const c of S.clubs) {
+      const sq = (by[c.id] || []).map(id => S.players[id]);
+      const exp = sq.filter(p => p.contract <= S.season + 1).sort((a, b) => b.age - a.age);
+      const keep = Math.round(sq.length * 0.15);
+      for (const p of exp.slice(keep)) p.contract = S.season + 1 + U.int(1, p.age >= 31 ? 1 : 3);
+    }
   }
 
   function newFin() {

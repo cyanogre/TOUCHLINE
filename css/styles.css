@@ -1184,3 +1184,6 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .sale-note { margin-top: 6px; }
 /* Escudos dentro de una línea de texto: no la parten */
 .psub .crest, .note .crest { display: inline-grid; vertical-align: -0.28em; --s: 15px; margin-right: 1px; }
+.rn-row { gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.rn-row .link.left { text-align: left; display: flex; flex-direction: column; min-width: 0; }
+.rn-row .note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

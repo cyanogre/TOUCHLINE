@@ -397,6 +397,7 @@
         <div class="nm-meta"><span class="cup-badge">${cp.cup.icon} ${esc(cp.cup.name)}</span><span>Entre semana · J${S.week + 1}</span></div>
         <div class="cup-round">${esc(cp.round)}${cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
         <div class="nm-teams">${[h, a].map(cl => `<div class="nm-team">${crest(cl, 'lg')}<span class="nm-name">${esc(cl.name)}</span><span class="nm-info">${esc(S.leagues[cl.league].country)}</span></div>`).join('<div class="nm-vs">VS</div>')}</div>
+        ${expiringWarn(S)}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
         <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     } else {
@@ -422,6 +423,7 @@
           const head = tired.length === 1 ? (fem ? '1 titular llega cansada' : '1 titular llega cansado') : tired.length + (fem ? ' titulares llegan cansadas' : ' titulares llegan cansados');
           return `<button class="nm-warn" data-act="tab" data-tab="tactics">⚠️ <span><b>${head}</b> (${tired.slice(0, 4).map(p => esc(p.short) + ' ' + p.fit + '%').join(', ')}${tired.length > 4 ? '…' : ''}). <i>Rota o rendirán menos y se lesionarán más.</i></span></button>`;
         })()}
+        ${expiringWarn(S)}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
         <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     }
@@ -1694,6 +1696,42 @@
     const p = G.S.players[+el.dataset.id];
     UI.nego = { pid: p.id, stage: 'renew', years: Math.min(3, M.maxYears(p)), focus: true };
     openPlayer(p.id);
+  };
+  // ------------------------------------------------------------ Renovaciones: que nadie se vaya gratis sin que lo sepas
+  function expiring(S) { return W.squad(S, S.user).filter(p => p.contract <= S.season + 1 && !TL.Locker.onLoan(S, p.id)).sort((a, b) => b.ovr - a.ovr); }
+  function expiringWarn(S) {
+    const n = S.fixtures.length, exp = expiring(S);
+    if (!exp.length || S.week < Math.floor(n / 2) - 1) return '';
+    const head = exp.length === 1 ? '1 contrato acaba en verano' : `${exp.length} contratos acaban en verano`;
+    return `<button class="nm-warn" data-act="renewals">📝 <span><b>${head}</b> (${exp.slice(0, 4).map(p => esc(p.short)).join(', ')}${exp.length > 4 ? '…' : ''}). <i>Si no renuevas, se irán gratis al acabar la temporada.</i></span></button>`;
+  }
+  const renewYears = (S, p) => { const ys = M.renewOptions(S, p); return ys.includes(2) ? 2 : ys[0]; };
+  A.renewals = () => {
+    const S = G.S, exp = expiring(S);
+    const extra = exp.reduce((s, p) => s + Math.max(0, M.renewDemand(S, p) - p.wage), 0);
+    const rows = exp.map(p => {
+      const d = M.renewDemand(S, p), y = renewYears(S, p);
+      return `<div class="row rn-row">${posB(p.pos)}<button class="grow link left" data-act="player" data-id="${p.id}"><b>${esc(p.name)}</b><span class="note">${p.age} años · ${U.money(p.wage)} → ${U.money(d)}/sem · hasta ${M.renewEnd(S, y)}</span></button>
+        ${ovrB(p.ovr)}<button class="btn sm" data-act="renew-one" data-id="${p.id}">Renovar</button></div>`;
+    }).join('');
+    sheet(sheetHead('Renovaciones') + `<p class="note">Estos contratos acaban este verano. Si no renuevas, se irán gratis al acabar la temporada. Renueva a los que quieras conservar y deja ir a los demás.</p>
+      ${exp.length ? `<div class="col mt">${rows}</div><button class="btn primary block mt" data-act="renew-all">Renovar a todos · +${U.money(extra)}/sem</button>` : '<div class="empty">No hay contratos que acaben este verano.</div>'}`);
+  };
+  A['renew-one'] = el => {
+    const S = G.S, p = S.players[+el.dataset.id];
+    const r = M.renew(S, p, renewYears(S, p));
+    toast(r.msg, !r.ok);
+    if (r.ok) { G.save(); UI.refresh(); A.renewals(); }
+  };
+  A['renew-all'] = () => {
+    const S = G.S;
+    let ok = 0, fail = null;
+    for (const p of expiring(S)) {
+      const r = M.renew(S, p, renewYears(S, p));
+      if (r.ok) ok++; else { fail = r.msg; break; }
+    }
+    toast(fail ? `${ok} renovados. ${fail}` : `${ok} renovados.`, !!fail);
+    G.save(); UI.refresh(); A.renewals();
   };
   A['renew-ok'] = el => {
     const S = G.S, p = S.players[+el.dataset.id], n = UI.nego;
