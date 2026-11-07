@@ -1658,7 +1658,7 @@
         const a = this.A[f.pid] || this.leaving.find(l => l.pid === f.pid); if (!a) continue;
         const x = X(a.x), y = Y(a.y) - R * 2.5 + Math.sin(this.t * 9) * 1.5;
         if (f.icon === 'yellow' || f.icon === 'red') this._card(x, y, R, f.icon === 'red' ? '#ff4040' : '#ffd23f');
-        else if (f.icon === 'med') { const q = R * 0.75; c.fillStyle = '#ff5a5a'; c.beginPath(); c.roundRect ? c.roundRect(x - q, y - q, q * 2, q * 2, q * 0.5) : c.rect(x - q, y - q, q * 2, q * 2); c.fill(); c.fillStyle = '#fff'; c.fillRect(x - q * 0.18, y - q * 0.6, q * 0.36, q * 1.2); c.fillRect(x - q * 0.6, y - q * 0.18, q * 1.2, q * 0.36); }
+        else if (f.icon === 'med') { c.font = `${Math.round(R * 1.5)}px sans-serif`; c.fillText('🚑', x, y); }
       }
       // Tablilla del cuarto árbitro
       if (this.board && this.board.until > this.t) {
