@@ -1825,7 +1825,7 @@
     const head = t => `<div class="wizard-head"><button class="icon-btn" data-act="tz-back" aria-label="Atrás">${icon('back')}</button><h1>${t}</h1></div>`;
     if (z.step === 0) {
       html = head('Modo torneo') + `<div class="pick-list">${Object.entries(TL.Tour.KINDS).map(([k, K]) => ['M', 'F'].map(g =>
-        `<button class="pick big-pick" data-act="tz-kind" data-k="${k}" data-g="${g}"><span class="flag">${K.icon}</span><span class="grow"><div class="t">${esc(K.name)} ${g === 'F' ? 'femenino' : ''}</div><div class="s">${esc(K.desc)} Grupos y eliminatorias.</div></span>${icon('next')}</button>`).join('')).join('')}</div>`;
+        `<button class="pick big-pick" data-act="tz-kind" data-k="${k}" data-g="${g}"><span class="flag">${K.icon}</span><span class="grow"><div class="t">${esc(K.name)} ${g === 'F' ? (k === 'cl' ? 'femenina' : 'femenino') : ''}</div><div class="s">${esc(g === 'F' ? K.desc.replace('jugadores', 'jugadoras') : K.desc)} Grupos y eliminatorias.</div></span>${icon('next')}</button>`).join('')).join('')}</div>`;
     } else if (!z.S) {
       html = head(TL.Tour.KINDS[z.kind].name) + '<div class="spinner"></div><p class="center muted">Formando los equipos…</p>';
     } else {
