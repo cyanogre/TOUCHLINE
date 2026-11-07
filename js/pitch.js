@@ -310,8 +310,8 @@
     world(i, depth, lat) { return this.dir[i] > 0 ? [depth, lat] : [L - depth, Wd - lat]; }
     energy(a) {
       if (a.pid == null) return 1;
-      const p = this.P(a.pid);
-      const e = p.fit / 100 - this.m.min / 90 * (0.3 - (p.st[5] || 60) / 500);
+      // La misma energía que usa el motor: los cansados se mueven más despacio
+      const e = (this.m.energy ? this.m.energy(a.pid) : this.P(a.pid).fit) / 100;
       return clamp(this.m.teams[a.team].onPitch.find(o => o.pid === a.pid && o.hurt) ? e - 0.3 : e, 0.3, 1);
     }
     nearest(list, pt, skip) {
@@ -1711,6 +1711,24 @@
       }
     }
 
+    /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
+    _sweat(x, y, r, e, seed) {
+      const c = this.cx, n = e < 0.45 ? 2 : 1, phi = 0.982;
+      for (let k = 0; k < n; k++) {
+        const ph = (this.t * (0.8 + (0.6 - e) * 2.2) + seed + k * 0.5) % 1;
+        const side = k % 2 ? -1 : 1;
+        const dx = x + side * r * (0.8 + ph * 0.15), dy = y - r * 0.9 + ph * r * 1.15;
+        const s = Math.max(1.3, r * 0.22) * (1 - ph * 0.25);
+        c.globalAlpha = (1 - ph) * 0.95;
+        c.fillStyle = '#8fdcff';
+        c.beginPath(); c.moveTo(dx, dy - s * 1.8);
+        c.arc(dx, dy, s, -Math.PI / 2 + phi, Math.PI * 1.5 - phi); c.closePath(); c.fill();
+        c.fillStyle = 'rgb(255 255 255 / 0.85)';
+        c.beginPath(); c.arc(dx - s * 0.32, dy - s * 0.1, s * 0.3, 0, 6.283); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+
     _card(x, y, R, color) {
       const c = this.cx;
       c.save(); c.translate(x, y); c.rotate(-0.15);
@@ -1727,8 +1745,11 @@
         const i = a.team;
         const gk = this.isGK(a);
         let col = gk ? this.colors[i].gk : this.colors[i].main;
-        let r = R;
         const e = this.energy(a);
+        const upright = !['down', 'sit', 'slide', 'dive'].includes(a.state) && !a.leave;
+        // Jadeo: los cansados «respiran» (más rápido y más hondo cuanto peor van)
+        let r = R;
+        if (upright && e < 0.72) r = R * (1 + Math.sin(this.t * (5 + (0.72 - e) * 14) + a.bob) * (0.02 + (0.72 - e) * 0.12));
         // Saltos: celebración, remate de cabeza
         if (a.state === 'celebrate') y -= Math.abs(Math.sin(this.t * 9 + a.bob)) * R * 0.7;
         if (a.jump && this.t - a.jump < 0.5) y -= Math.sin((this.t - a.jump) / 0.5 * Math.PI) * R * 1.1;
@@ -1752,6 +1773,12 @@
           c.fillStyle = inkCol;
           c.font = `700 ${Math.round(r * 1.05)}px Barlow Condensed, sans-serif`;
           c.shadowColor = dark ? 'rgb(255 255 255 / 0.55)' : 'rgb(0 0 0 / 0.7)'; c.shadowBlur = 2;
+          // En camisetas con dibujo (rayas, cuadros…) el dorsal lleva contorno para que se lea
+          if (!gk && this.colors[i].p) {
+            c.lineJoin = 'round'; c.lineWidth = Math.max(1.6, r * 0.3);
+            c.strokeStyle = dark ? 'rgb(255 255 255 / 0.85)' : 'rgb(0 0 0 / 0.75)';
+            c.strokeText(String(this.num[a.pid] || ''), x, y + 0.5);
+          }
           c.fillText(String(this.num[a.pid] || ''), x, y + 0.5);
           c.shadowBlur = 0;
         }
@@ -1759,11 +1786,17 @@
           // Estrellitas del golpe
           for (let k = 0; k < 3; k++) { const ang = this.t * 5 + k * 2.1; c.fillStyle = '#ffd23f'; c.fillRect(x + Math.cos(ang) * r * 1.2, y - r * 0.9 + Math.sin(ang) * r * 0.4, 2, 2); }
         }
-        // Cansancio: gotas de sudor
-        if (e < 0.55 && !a.leave && a.state !== 'down' && Math.sin(this.t * 2 + a.pid) > 0.2) {
-          c.fillStyle = '#7fd3ff';
-          c.beginPath(); c.arc(x + r * 0.95, y - r * 0.95 + ((this.t * 3 + a.pid) % 1) * r * 0.6, Math.max(1.3, r * 0.22), 0, 6.283); c.fill();
+        // Cansancio: medidor de aire bajo el jugador (solo en los que van justos) y gotas de sudor
+        if (upright && e < 0.66) {
+          const a0 = Math.PI * 0.2, span = Math.PI * 0.6, rr = r + Math.max(2.4, r * 0.34);
+          c.lineCap = 'round'; c.lineWidth = Math.max(1.6, r * 0.2);
+          c.strokeStyle = 'rgb(0 0 0 / 0.38)'; c.beginPath(); c.arc(x, y, rr, a0, a0 + span); c.stroke();
+          const frac = clamp((e - 0.25) / 0.41, 0.06, 1);
+          c.strokeStyle = e > 0.5 ? '#ffc247' : '#ff5d5d';
+          c.beginPath(); c.arc(x, y, rr, a0 + span * (1 - frac) / 2, a0 + span * (1 + frac) / 2); c.stroke();
+          c.lineCap = 'butt';
         }
+        if (upright && e < 0.6) this._sweat(x, y, r, e, a.bob);
         c.globalAlpha = 1;
         return;
       }

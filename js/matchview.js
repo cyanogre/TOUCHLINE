@@ -12,7 +12,7 @@
   const MV = { m: null, timer: null, paused: false, tab: 'feed', me: 0, htDone: false, finished: false, subOut: null, skip: null, prompt: null };
 
   const EV_ICON = {
-    goal: '⚽', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
+    goal: '⚽', tired: '🔋', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
     foul: '⚠️', pen: '🎯', penmiss: '❌', fk: '🎯', var: '📺', disallowed: '🚫', refmiss: '😡', controversy: '⚖️',
     heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥'
   };
@@ -260,18 +260,23 @@
         const c = S.clubs[t.club];
         const on = t.onPitch.map(o => {
           const p = S.players[o.pid], r = m.pl[o.pid];
-          return `<div class="row lu-row" data-pid="${o.pid}">${UI.posB(o.slot)}<span class="grow ellipsis">${esc(p.short)}</span>
+          return `<div class="row lu-row" data-pid="${o.pid}">${UI.posB(o.slot)}<span class="grow ellipsis">${esc(p.short)}</span>${enBar(m.energy(o.pid))}
             ${r.g ? `<span title="${r.g} gol${r.g > 1 ? 'es' : ''}">${'⚽'.repeat(r.g)}</span>` : ''}${r.a ? `<span class="faint" title="Asistencia">A</span>` : ''}${r.y ? '<span title="Amarilla">🟨</span>' : ''}${o.hurt ? '<span title="Tocado">🚑</span>' : ''}<b class="num">${p.ovr}</b></div>`;
         }).join('');
         const bench = t.bench.map(id => `<span class="faint">${esc(S.players[id].short)}</span>`).join(', ');
         return `<div class="card"><div class="row" style="margin-bottom:6px">${UI.crest(c, 'sm')}<b class="grow ellipsis">${esc(c.name)}</b>${kitSwatch(ti)}<span class="note">${t.formation} · ${UI.MENT[t.mentality]}</span></div>
           ${on}<p class="note mt">Banquillo: ${bench || '—'}</p></div>`;
       }).join('')}</div>
-      <p class="note center lu-key">⚽ goles en el partido · A asistencia · 🟨 amarilla · 🚑 tocado · <i class="lu-ball"></i> lleva el balón ahora</p>`;
+      <p class="note center lu-key">⚽ goles en el partido · A asistencia · 🟨 amarilla · 🚑 tocado · <i class="lu-en"><i style="width:60%"></i></i> energía · <i class="lu-ball"></i> lleva el balón ahora</p>`;
       markBall();
     }
   }
 
+  /** Barra de energía de un jugador en el partido (verde → amarillo → rojo). */
+  function enBar(en) {
+    const v = Math.round(en), c = v >= 70 ? 'ok' : v >= 50 ? 'mid' : 'low';
+    return `<i class="lu-en ${c}" title="Energía ${v}%"><i style="width:${v}%"></i></i>`;
+  }
   /** Muestra de la camiseta que lleva cada equipo en el campo (para reconocer los puntitos). */
   function kitSwatch(i) {
     const k = MV.pitch && MV.pitch.colors && MV.pitch.colors[i];
@@ -504,15 +509,15 @@
     let html = UI.sheetHead(`Cambios (${left} restantes)`);
     if (!left) html += '<div class="empty">Ya has hecho todos los cambios.</div>';
     else if (MV.subOut == null) {
-      html += '<p class="note">¿Quién sale?</p>' + t.onPitch.map(o => {
+      html += '<p class="note">¿Quién sale? Los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
-        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · forma ${p.fit}%${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
+        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · energía ${Math.round(m.energy(o.pid))}%${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
       }).join('');
     } else {
       const o = t.onPitch.find(x => x.pid === MV.subOut);
       html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]}). ¿Quién entra?</p>` +
         (t.bench.length ? t.bench.map(id => S.players[id]).sort((a, b) => E.eff(b, o.slot) - E.eff(a, o.slot)).map(p =>
-          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${Math.round(E.fit(p, o.slot) * 100)}% en ${F.POS_ES[o.slot]} · forma ${p.fit}%` })).join('')
+          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${Math.round(E.fit(p, o.slot) * 100)}% en ${F.POS_ES[o.slot]} · energía ${p.fit}%` })).join('')
           : '<div class="empty">No quedan suplentes.</div>');
     }
     UI.sheet(html, { onClose: done });

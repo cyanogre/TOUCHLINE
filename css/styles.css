@@ -1022,3 +1022,10 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .big-pick .flag .ic { width: 28px; height: 28px; vertical-align: 0; }
 .big-pick .s { margin-top: 4px; font-size: 13.5px; }
 @media (max-width: 480px) { .big-pick .t { font-size: 22px; } }
+
+/* Energía en el partido (alineaciones en directo) */
+.lu-en { flex: none; display: inline-block; width: 34px; height: 5px; border-radius: 9px; background: var(--bg2); overflow: hidden; margin: 0 8px 0 4px; vertical-align: middle; }
+.lu-en > i { display: block; height: 100%; border-radius: inherit; background: var(--accent2); transition: width 0.6s; }
+.lu-en.mid > i { background: var(--warn); }
+.lu-en.low > i { background: var(--danger); }
+.lu-key .lu-en { margin: 0 4px; }
