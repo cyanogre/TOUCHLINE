@@ -569,6 +569,10 @@
       { text: 'Necesitamos resultados ya. Juega a lo seguro unas semanas.', emo: 'neutral' }] },
     { id: 'cashNegative', cooldown: 12, when: S => S.clubs[S.user].cash < 0, lines: [
       { text: 'Estamos en **números rojos**. Vende a alguien que no juegue, firma patrocinios o pide un préstamo pequeño.', emo: 'worried', voice: 'rojos' }] },
+    { id: 'firstMoment', once: true, when: S => TL.Social && S.lk && TL.Social.active(S).length > 0, lines: [
+      { text: 'Míster, en el vestuario ha pasado algo que pide una **charla**. Mira en **Plantilla → Vestuario → Momentos**.', emo: 'thinking' },
+      { text: 'Cada jugador es un mundo: a unos les va que les arropes y a otros que les aprietes. Al principio no sabrás cómo es cada uno: lo **descubrirás hablando**.', emo: 'neutral' },
+      { text: 'Solo tienes **dos charlas por semana** y los momentos caducan. Elige bien a quién atiendes: un acierto da un subidón en el campo y un error, un bajón.', emo: 'happy' }] },
     { id: 'tiredXI', cooldown: 12, when: S => (S.tactics.slots || []).map(id => S.players[id]).filter(p => p && p.club === S.user && p.fit < 75 && p.inj <= 0).length >= 3, lines: [
       { text: 'Míster, el once **llega fundido**. El cansancio se acumula: si juegan siempre los mismos, rinden menos y se lesionan más.', emo: 'worried' },
       { text: 'Rota a los que estén por debajo del 75 % y dales una semana de descanso: quien descansa recupera mucho más.', emo: 'thinking', choices: [

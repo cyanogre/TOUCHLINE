@@ -422,7 +422,7 @@
   // ------------------------------------------------------------ Actividades de equipo
   const ACT = {
     bbq: { name: 'Barbacoa de equipo', icon: '🍖', cool: 4, desc: 'Sube la moral de todos y crea amistades.' },
-    dayoff: { name: 'Día libre', icon: '🛌', cool: 4, desc: 'Recuperan forma física y moral. Algún riesgo de salir de fiesta.' },
+    dayoff: { name: 'Día libre', icon: '🛌', cool: 4, desc: 'Recuperan forma física y moral, pero llegan algo menos preparados al próximo partido. Algún riesgo de salir de fiesta.' },
     retreat: { name: 'Concentración', icon: '🏨', cool: 5, desc: '+3% de rendimiento en el próximo partido y más unión. Algo de cansancio mental.' }
   };
   function actCost(S, k) { return k === 'bbq' ? F.roundMoney(Math.max(5000, W().wageBill(S, S.user) * 0.06)) : k === 'retreat' ? F.roundMoney(Math.max(8000, W().wageBill(S, S.user) * 0.1)) : 0; }
@@ -438,10 +438,16 @@
     S.clubs[S.user].cash -= cost;
     L.cool[k] = S.week + a.cool;
     const sq = W().squad(S, S.user);
-    const morAdd = d => sq.forEach(p => { p.mor = U.clamp((p.mor == null ? 70 : p.mor) + d, 0, 100); });
+    L.lastAct = L.lastAct || {};
+    const again = L.lastAct[k] != null && S.season * 100 + S.week - L.lastAct[k] < 9;
+    L.lastAct[k] = S.season * 100 + S.week;
+    const morAdd = (d, k, txt, w) => sq.forEach(p => {
+      if (TL.Social) TL.Social.remember(S, p, k, again && d > 0 ? Math.round(d / 2) : d, w, again && d > 0 ? txt + ' (otra vez…)' : txt);
+      else p.mor = U.clamp((p.mor == null ? 70 : p.mor) + d, 0, 100);
+    });
     let extra = '';
     if (k === 'bbq') {
-      morAdd(6);
+      morAdd(5, 'grupo', 'La barbacoa del equipo', 2);
       for (let i = 0; i < 8; i++) { const [x, y] = U.shuffle(sq.slice()).slice(0, 2); if (x && y) bond(S, x.id, y.id, 12); }
       sq.forEach(p => bossAdd(S, p.id, 3));
       const r = Math.random();
@@ -449,7 +455,8 @@
       else if (r < 0.17) { const [x, y] = U.shuffle(sq.slice()).slice(0, 2); bond(S, x.id, y.id, -30); extra = ` ${x.short} y ${y.short} acabaron discutiendo por una tontería.`; }
     } else if (k === 'dayoff') {
       sq.forEach(p => { p.fit = Math.min(100, p.fit + 15); });
-      morAdd(4);
+      if (!(L.boost && L.boost.w === S.week)) L.boost = { w: S.week, v: 0.985 }; // un día sin entrenar: llegan algo menos preparados
+      morAdd(3, 'descanso', 'El día libre', 2);
       sq.forEach(p => bossAdd(S, p.id, 2));
       if (Math.random() < 0.1) {
         const p = U.pick(sq.filter(x => x.age <= 28)) || U.pick(sq);
@@ -461,7 +468,7 @@
     } else if (k === 'retreat') {
       L.boost = { w: S.week, v: 1.03 };
       for (let i = 0; i < 10; i++) { const [x, y] = U.shuffle(sq.slice()).slice(0, 2); if (x && y) bond(S, x.id, y.id, 6); }
-      morAdd(-1);
+      morAdd(-1, 'concentra', 'La concentración (algo de agobio)', 1);
     }
     W().dirty(S);
     return { ok: true, msg: `${a.icon} ${a.name}${cost ? ' · ' + U.money(cost) : ''}.${extra}` };
@@ -559,11 +566,9 @@
       // Relación con el míster: los buenos que no juegan se enfadan contigo
       if (!played.has(p.id) && xi.includes(p.id) && p.inj <= 0 && p.sus <= 0) { bossAdd(S, p.id, -2); if (hasTrait(S, p.id, 'ego')) p.mor = Math.max(0, (p.mor || 70) - 4); }
       if (played.has(p.id)) bossAdd(S, p.id, 0.5);
-      // El vínculo con el míster empuja la moral poco a poco
-      const b = boss(S, p.id);
-      if (b) p.mor = U.clamp((p.mor == null ? 70 : p.mor) + b / 200, 0, 100);
+      // El vínculo con el míster ya cuenta en la moral (vestuario vivo); el padrino arropa
       const m = L.mentor[p.id];
-      if (m != null && S.players[m] && S.players[m].club === S.user) { bond(S, p.id, m, 2); p.mor = Math.min(100, (p.mor || 70) + 0.5); }
+      if (m != null && S.players[m] && S.players[m].club === S.user) { bond(S, p.id, m, 2); if (TL.Social) TL.Social.remember(S, p, 'mentor', 2, 2, gx(S, 'Su padrino le arropa', 'Su madrina la arropa')); }
     }
     // Ganar juntos une
     const won = mine && ((mine.h === S.user && mine.hg > mine.ag) || (mine.a === S.user && mine.ag > mine.hg));
@@ -574,15 +579,18 @@
       if (!p || p.club !== S.user) { L.promises = L.promises.filter(x => x !== pr); continue; }
       if (appsOf(S, p.id) - pr.apps0 >= pr.need) {
         L.promises = L.promises.filter(x => x !== pr);
-        bossAdd(S, p.id, 15); p.mor = Math.min(100, (p.mor || 70) + 6);
+        bossAdd(S, p.id, 15);
+        if (TL.Social) TL.Social.remember(S, p, 'promesa', 6, 8, 'Cumpliste tu promesa de minutos'); else p.mor = Math.min(100, (p.mor || 70) + 6);
         TL.Game.mail(S, `Promesa cumplida con ${p.short}`, `Le prometiste minutos y los ha tenido. ${p.name} confía más en ti.`, 'good');
       } else if (S.week >= pr.until) {
         L.promises = L.promises.filter(x => x !== pr);
-        bossAdd(S, p.id, -25); p.mor = Math.max(0, (p.mor || 70) - 15);
+        bossAdd(S, p.id, -25);
+        if (TL.Social) TL.Social.remember(S, p, 'promesa', -12, 12, 'Rompiste tu promesa de minutos'); else p.mor = Math.max(0, (p.mor || 70) - 15);
         TL.Game.mail(S, `Promesa incumplida con ${p.short}`, `Le prometiste minutos y no los ha tenido. ${p.name} se siente ${gx(S, 'engañado', 'engañada')}: su relación contigo se resiente.`, 'med');
       }
     }
     ignored(S);
+    if (TL.Social) { TL.Social.tick(S, mine, played); TL.Social.spawn(S, mine, played); }
     office(S, sq, played);
   }
 
@@ -595,9 +603,11 @@
       const p = S.players[m.data.pid];
       m.done = true; m.data.ignored = true;
       if (!p || p.club !== S.user) continue;
-      p.mor = Math.max(0, (p.mor == null ? 70 : p.mor) - 10);
       bossAdd(S, p.id, -10);
-      for (const q of W().squad(S, S.user)) if (q.id !== p.id && rel(S, p.id, q.id) >= 40) q.mor = Math.max(0, (q.mor == null ? 70 : q.mor) - 2);
+      if (TL.Social) {
+        TL.Social.remember(S, p, 'ignorado', -8, 8, 'Pidió hablar contigo y no le atendiste');
+        for (const q of W().squad(S, S.user)) if (q.id !== p.id && rel(S, p.id, q.id) >= 40) TL.Social.remember(S, q, 'amigo', -2, 4, `Ignoraste a su amigo ${p.short}`);
+      } else p.mor = Math.max(0, (p.mor == null ? 70 : p.mor) - 10);
       TL.Game.mail(S, `${p.short} se siente ${gx(S, 'ignorado', 'ignorada')}`, `Pidió hablar contigo y no lo has hecho. ${p.name} está ${gx(S, 'dolido y sus amigos', 'dolida y sus amigas')} del vestuario lo han notado: baja su moral y vuestra relación.`, 'med');
     }
   }
@@ -685,7 +695,9 @@
     return W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).filter(r => r[1] <= -30).sort((a, b) => a[1] - b[1]).map(r => r[0])[0] || null;
   }
   function meetOptions(S, p) {
-    const o = [['praise', gx(S, 'Elogiarle', 'Elogiarla'), 'Sube su moral y vuestra relación.'], ['demand', 'Exigirle más', 'Puede picarse para bien… o tomárselo mal.'], ['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente.']];
+    // Los elogios y las broncas «porque sí» ya no valen: van en los momentos, con su contexto
+    const o = [['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente… y te deja ver cómo es.']];
+    if (p.age >= 26 && TL.Social && !TL.Social.hasGalones(S, p) && TL.Social.galonesLeft(S) > 0) o.push(['galones', gx(S, 'Darle galones', 'Darle galones'), 'Más peso en el vestuario. Solo tres por temporada.']);
     const en = enemyOf(S, p);
     if (en) o.push(['reconcile', `Mediar con ${en.short}`, 'Intentar que hagan las paces.']);
     if (hasTrait(S, p.id, 'ego')) o.push(['ego', 'Hablar de su ego', 'Que entienda que el equipo va primero.']);
@@ -693,21 +705,19 @@
   }
   function meet(S, p, k) {
     const L = state(S);
+    // Cada charla gasta un hueco de la agenda de la semana (vestuario vivo)
+    if (TL.Social) {
+      if (TL.Social.agendaLeft(S) <= 0) return { msg: 'Tu agenda de esta semana está llena. Prueba la semana que viene.' };
+      TL.Social.useAgenda(S);
+    }
     L.met = L.met || {};
     L.met[p.id] = S.week;
     const b = boss(S, p.id), m = p.mor == null ? 70 : p.mor;
-    const again = (L.praised || (L.praised = {}))[p.id] != null && S.week - L.praised[p.id] < 8 && S.week >= L.praised[p.id];
-    if (k === 'praise') {
-      L.praised[p.id] = S.week;
-      if (b < -40) { mor(p, 1); return { msg: `${p.short} escucha sin mirarte. "Ya, míster". Vuestra relación necesita algo más que palabras.` }; }
-      if (again) { mor(p, 1); return { msg: `"Gracias, míster… otra vez". Los elogios repetidos pierden fuerza.` }; }
-      mor(p, 7); bossAdd(S, p.id, 6);
-      return { msg: `${p.short} sale del despacho con una sonrisa. "Gracias, míster, no le voy a fallar".`, good: true };
-    }
-    if (k === 'demand') {
-      if (m >= 60 && b >= -10 && Math.random() < 0.6) { mor(p, 4); bossAdd(S, p.id, 2); return { msg: `${p.short} aprieta los dientes: "Tiene razón. Va a ver lo que soy capaz de hacer".`, good: true }; }
-      mor(p, -8); bossAdd(S, p.id, -7);
-      return { msg: `${p.short} se lo toma como algo personal y se marcha dando un portazo.`, bad: true };
+    if (k === 'galones') {
+      const q = { comp: 1, sens: 0, pro: 1, amb: 2, cha: 2, vol: 1 }[TL.Social.charOf(S, p.id)];
+      TL.Social.st(S).galones[p.id] = S.season;
+      const txt = TL.Social.react(S, p, q, 'galones', gx(S, 'Le diste galones en el vestuario', 'Le diste galones en el vestuario'), 8);
+      return { msg: txt + TL.Social.learn(S, p), good: q > 0, bad: q < 0 };
     }
     if (k === 'future') {
       const st = S.stats[p.id] || [0], share = st[0] / Math.max(1, S.week);
@@ -720,13 +730,18 @@
       else if (p.age >= 32) want = 'Piensa en sus últimos años de carrera; le haría ilusión quedarse en el club después, ' + gx(S, 'como técnico.', 'como entrenadora.');
       else want = gx(S, 'Está contento con su papel y con el grupo.', 'Está contenta con su papel y con el grupo.');
       const fr = W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).sort((a, c) => c[1] - a[1])[0];
-      bossAdd(S, p.id, 2);
-      return { msg: `${want}${fr && fr[1] >= 40 ? ` Su mejor amigo en el vestuario es ${fr[0].short}.` : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.` };
+      bossAdd(S, p.id, m < 58 ? 3 : 1);
+      if (TL.Social && m < 58) TL.Social.remember(S, p, 'escuchado', 4, 4, 'Le escuchaste cuando lo necesitaba');
+      const reveal = TL.Social ? TL.Social.learn(S, p) : '';
+      return { msg: `${want}${fr && fr[1] >= 40 ? ` Su mejor amigo en el vestuario es ${fr[0].short}.` : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.${reveal}` };
     }
     if (k === 'reconcile') {
       const en = enemyOf(S, p);
       if (!en) return { msg: 'Ya no hay nada que arreglar.' };
-      if (Math.random() < 0.55 + b / 300) { bond(S, p.id, en.id, 40); mor(p, 3); mor(en, 3); return { msg: `${p.short} y ${en.short} se dan la mano delante de ti. El vestuario lo agradece.`, good: true }; }
+      if (Math.random() < 0.55 + b / 300) {
+        bond(S, p.id, en.id, 40);
+        if (TL.Social) { TL.Social.remember(S, p, 'feud', 4, 5, `Hizo las paces con ${en.short}`); TL.Social.remember(S, en, 'feud', 4, 5, `Hizo las paces con ${p.short}`); }
+        return { msg: `${p.short} y ${en.short} se dan la mano delante de ti. El vestuario lo agradece.`, good: true }; }
       bond(S, p.id, en.id, -8);
       return { msg: `La reunión sube de tono: ${p.short} y ${en.short} siguen sin soportarse.`, bad: true };
     }
@@ -836,6 +851,7 @@
   function init(S) {
     const L = state(S);
     L._fx = null;
+    if (TL.Social) TL.Social.restoreConf(S);
     for (const id in L.tr) if (L.tr[id].includes('dnaTotal') && S.players[id]) S.players[id].anyPos = true;
     if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);
   }
