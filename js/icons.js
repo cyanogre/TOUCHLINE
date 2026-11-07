@@ -1,5 +1,8 @@
 /* TOUCHLINE — iconos propios en SVG (sustituyen a los emojis)
  *
+ * PENDIENTE DE APROBACIÓN: este archivo aún NO se carga en index.html (el juego sigue con emojis).
+ * Para activarlo: añadir <script src="js/icons.js"></script> antes de js/formulas.js y en el CORE de sw.js.
+ *
  * Un único «sprite» con todos los iconos (24×24, trazo fino y redondeado) que se inyecta en la página.
  * - TL.ic('ball') devuelve el <svg> listo para meter en el HTML.
  * - Cualquier emoji que aparezca en la interfaz (también en textos guardados de partidas antiguas)
