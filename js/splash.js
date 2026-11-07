@@ -16,13 +16,14 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   // Coordenadas normalizadas (0–1) sobre cada imagen (887×887): fg = la gente recortada, bg = el estadio.
-  // bones: esqueleto de cada persona. [ax, ay, bx, by, padre, giroº, frecuencia, fase, radio, rebote]
+  // bones: esqueleto de cada persona. [ax, ay, bx, by, padre, giroº, frecuencia, fase, radio, rebote, núcleo]
+  //   «núcleo»: distancia al hueso dentro de la cual todo se mueve como una pieza rígida (la copa).
   //   El hueso gira sobre su articulación (a); sus hijos heredan el movimiento. Movimientos leves:
   //   1-4 grados, como respirar, reír o agitar el puño.
   // ribbons/flags: [x0, y0, x1, y1, ampX, ampY, ondas, velocidad, fase, sujeta(0 arriba/izq, 1 abajo/der)]
   const ART = {
     F: {
-      fg: 'assets/splash/fem-fg.webp', bg: 'assets/splash/fem-bg.webp', focus: [0.5, 0.42],
+      fg: 'assets/splash/fem-fg.webp', bg: 'assets/splash/fem-bg.webp', focus: [0.5, 0.38],
       trophy: [0.538, 0.1], cup: [0.538, 0.1, 0.085, 0.09],
       bones: [
         [0.55, 0.72, 0.53, 0.48, -1, 0.7, 1.7, 0, 0.07, 0.0025],   // 0 capitana: torso (rebota un poco)
@@ -31,7 +32,7 @@
         [0.459, 0.316, 0.519, 0.207, 2, 0.8, 1.3, 0.5, 0.032, 0],  // 3 antebrazo izquierdo
         [0.624, 0.466, 0.617, 0.323, 0, 1.4, 1.3, 0.3, 0.035, 0],  // 4 brazo derecho
         [0.617, 0.323, 0.575, 0.214, 4, 0.8, 1.3, 0.5, 0.032, 0],  // 5 antebrazo derecho
-        [0.545, 0.21, 0.535, 0.03, 3, -1.0, 1.3, 0.2, 0.075, 0],   // 6 la copa (en sus manos)
+        [0.545, 0.2, 0.535, 0.06, 3, -0.8, 1.3, 0.2, 0.025, 0, 0.125], // 6 la copa (pieza rígida, orejas incluidas)
         [0.25, 0.75, 0.3, 0.55, -1, 0.6, 2.0, 1.5, 0.06, 0],       // 7 jugadora del puño: torso
         [0.316, 0.541, 0.33, 0.44, 7, 2.5, 2.0, 2.2, 0.045, 0],    // 8 su cabeza
         [0.21, 0.555, 0.235, 0.43, 7, 2.5, 2.6, 1.0, 0.03, 0],     // 9 brazo en alto
@@ -50,8 +51,8 @@
         [0.94, 0.466, 0.906, 0.41, 21, 2.0, 2.8, 2.3, 0.03, 0],    // 22 su puño
       ],
       ribbons: [
-        [0.33, 0.04, 0.47, 0.29, 0.004, 0, 1.1, 2.0, 0, 0],
-        [0.6, 0.04, 0.71, 0.3, 0.004, 0, 1.2, 2.3, 1.7, 0],
+        [0.33, 0.12, 0.45, 0.3, 0.004, 0, 1.1, 2.0, 0, 0],      // cintas: solo por debajo de las orejas
+        [0.6, 0.12, 0.71, 0.3, 0.004, 0, 1.2, 2.3, 1.7, 0],
       ],
       flags: [
         [0.15, 0.12, 0.32, 0.27, 0, 0.004, 1.1, 2.2, 0, 0],      // banderines en mástil (arriba, izquierda)
@@ -74,7 +75,7 @@
         [0.481, 0.361, 0.556, 0.226, 2, 0.8, 1.2, 0.5, 0.032, 0],   // 3 antebrazo izquierdo
         [0.662, 0.489, 0.647, 0.353, 0, 1.4, 1.2, 0.3, 0.035, 0],   // 4 brazo derecho
         [0.647, 0.353, 0.617, 0.233, 4, 0.8, 1.2, 0.5, 0.032, 0],   // 5 antebrazo derecho
-        [0.59, 0.235, 0.571, 0.03, 3, -1.0, 1.2, 0.2, 0.08, 0],     // 6 la copa
+        [0.59, 0.22, 0.571, 0.06, 3, -0.8, 1.2, 0.2, 0.025, 0, 0.13], // 6 la copa (pieza rígida, orejas incluidas)
         [0.083, 0.669, 0.12, 0.541, -1, 3.0, 2.6, 1.0, 0.03, 0],    // 7 brazo en alto (izquierda)
         [0.12, 0.541, 0.175, 0.447, 7, 2.0, 2.6, 1.3, 0.03, 0],     // 8 su puño
         [0.21, 0.744, 0.2, 0.62, -1, 2.5, 2.1, 2.0, 0.05, 0],       // 9 cabeza (delante, izquierda)
@@ -85,8 +86,8 @@
         [0.925, 0.6, 0.865, 0.504, 13, -2.0, 2.7, 2.7, 0.03, 0],    // 14 su puño
       ],
       ribbons: [
-        [0.32, 0.06, 0.5, 0.36, 0.004, 0, 1.2, 2.1, 0.9, 0],
-        [0.64, 0.08, 0.76, 0.38, 0.004, 0, 1.1, 2.4, 2.9, 0],
+        [0.32, 0.16, 0.49, 0.36, 0.004, 0, 1.2, 2.1, 0.9, 0],   // cintas: solo por debajo de las orejas
+        [0.645, 0.17, 0.76, 0.38, 0.004, 0, 1.1, 2.4, 2.9, 0],
       ],
       flags: [
         [0.02, 0.04, 0.15, 0.32, 0.004, 0, 1.1, 2.0, 0, 0],      // estandartes grandes
@@ -157,7 +158,8 @@ vec2 skin(vec2 p) {
     vec2 ab = sg.zw - sg.xy;
     float h = clamp(dot(p - sg.xy, ab) / dot(ab, ab), 0.0, 1.0);
     vec2 dv = p - sg.xy - ab * h;
-    float w = exp(-dot(dv, dv) / (r0.w * r0.w));
+    float dd = max(0.0, length(dv) - r1.w);          // dentro del núcleo: peso 1 (pieza rígida)
+    float w = exp(-dd * dd / (r0.w * r0.w));
     if (w < 0.003) continue;
     acc += w * vec2(dot(r0.xyz, vec3(p, 1.0)), dot(r1.xyz, vec3(p, 1.0)));
     ws += w;
@@ -354,7 +356,7 @@ void main() {
   function skeleton(A, t, I0, I1) {
     const Wm = [];
     A.bones.forEach((b, i) => {
-      const [ax, ay, , , parent, deg, f, ph, sig, bounce] = b;
+      const [ax, ay, , , parent, deg, f, ph, sig, bounce, core] = b;
       const o = Math.sin(t * f + ph) + 0.25 * Math.sin(2 * (t * f + ph) + 0.8);
       const th = (deg * Math.PI / 180) * o, c = Math.cos(th), sn = Math.sin(th);
       let M = [c, -sn, ax - c * ax + sn * ay, sn, c, ay - sn * ax - c * ay - (bounce || 0) * Math.max(0, o)];
@@ -367,7 +369,7 @@ void main() {
       const det = M[0] * M[4] - M[1] * M[3];
       const ia = M[4] / det, ib = -M[1] / det, id = -M[3] / det, ie = M[0] / det;
       I0.set([ia, ib, -(ia * M[2] + ib * M[5]), sig], i * 4);
-      I1.set([id, ie, -(id * M[2] + ie * M[5]), 0], i * 4);
+      I1.set([id, ie, -(id * M[2] + ie * M[5]), core || 0], i * 4);
     });
   }
 
@@ -461,7 +463,7 @@ void main() {
     let oy = H / 2 - A.focus[1] * ih * s + Math.cos(t * 0.07) * H * 0.01;
     // margen para que el parallax de la gente (1,25×) no enseñe el borde de la imagen
     const mx = W * 0.04, my = H * 0.03;
-    ox = clamp(ox, W - iw * s + mx, -mx); oy = clamp(oy, H - ih * s + my, -my);
+    ox = clamp(ox, W - iw * s + mx, -mx); oy = clamp(oy, H - ih * s + my, H * 0.02); // por arriba solo hay cielo: se deja aire
     const map = [W / (s * iw), H / (s * ih), -ox / (s * iw), -oy / (s * ih)];
     // Parallax: desplazamiento en coordenadas de la imagen por unidad de profundidad
     const par = [st.px * 0.03 * map[0], st.py * 0.022 * map[1]];
