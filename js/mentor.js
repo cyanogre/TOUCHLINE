@@ -217,48 +217,120 @@
     });
   }
 
-  // ------------------------------------------------------------ Doblaje (frases cortas al empezar algunos diálogos)
-  // Archivos en assets/mentor/voice/<clave>.mp3 (voz «Rafael», ElevenLabs). Si no están, suenan los pitidos de siempre.
+  // ------------------------------------------------------------ Doblaje
+  // Frases cortas con voz (voz «Rafael», ElevenLabs) en assets/mentor/voice/<clave>.mp3.
+  // Suenan al empezar algunos diálogos, a mitad, al cerrar y en momentos clave. Si un audio aún no
+  // existe, no pasa nada: suenan los pitidos de siempre. El volumen se nivela solo al cargarlo.
   const VOICE = {
+    // Para abrir
     hola: '¡Hombre, míster!', escucha: 'Escucha, míster.', aver: 'A ver, a ver…', bien: '¡Así se hace!', orgullo: '¡Eso es, chaval!',
-    ay: 'Ay, ay, ay…', tranquilo: 'Tranquilo, míster.', secreto: 'Te voy a contar una cosa…', campeones: '¡Campeones!', mira: 'Mira…', pena: 'Qué le vamos a hacer…'
+    ay: 'Ay, ay, ay…', tranquilo: 'Tranquilo, míster.', secreto: 'Te voy a contar una cosa…', campeones: '¡Campeones!', mira: 'Mira…', pena: 'Qué le vamos a hacer…',
+    // A mitad de conversación
+    fijate: 'Fíjate…', ojo: 'Ojo, ¿eh?', otracosa: 'Y otra cosa…', bueno: 'Bueno, bueno…', hmm: 'Mmm…', porcierto: 'Por cierto…', uf: 'Uf…', madre: '¡Madre mía!',
+    // Para cerrar
+    venga: '¡Venga, a por ellos!', amandar: '¡A mandar!', animo: 'Ánimo, míster.', confio: 'Confío en ti, chaval.', atrabajar: 'Hala, a trabajar.',
+    nofalles: 'Y no me falles, ¿eh?', contaras: 'Ya me contarás.', asi: '¡Así me gusta!',
+    // Momentos de la carrera
+    primera: '¡Primera victoria!', racha: '¡Qué racha, míster!', oler: 'Esto empieza a oler mal…', ascenso: '¡Ascenso, ascenso!', descenso: 'Descenso…',
+    losiento: 'Lo siento, de verdad.', objetivo: '¡Objetivo cumplido!', presidente: 'El presidente está nervioso…', rojos: 'Estamos en números rojos…', mitad: 'Media temporada ya, míster.'
   };
-  const BY_EMO = { neutral: ['escucha', 'mira'], happy: ['bien'], proud: ['orgullo'], worried: ['ay', 'tranquilo'], sad: ['pena'], thinking: ['aver', 'mira'], laugh: ['campeones'], surprised: ['aver'] };
-  const clips = {}, missing = new Set();
-  let lastClip = 0;
-  function clip(key) {
-    if (missing.has(key)) return null;
-    if (!clips[key]) {
-      const a = new Audio(`assets/mentor/voice/${key}.mp3`);
-      a.preload = 'auto';
-      a.addEventListener('error', () => { missing.add(key); delete clips[key]; });
-      clips[key] = a;
+  const BY_EMO = { neutral: ['escucha', 'mira'], happy: ['bien'], proud: ['orgullo'], worried: ['ay', 'tranquilo'], sad: ['pena'], thinking: ['aver', 'mira'], laugh: ['campeones'], surprised: ['aver'], angry: ['ay'] };
+  const MID_BY_EMO = { neutral: ['otracosa', 'porcierto', 'fijate'], thinking: ['hmm', 'fijate', 'bueno'], worried: ['ojo', 'uf'], sad: ['uf'], happy: ['bueno'], proud: ['fijate'], laugh: ['madre'], surprised: ['madre', 'bueno'], angry: ['ojo'] };
+  const END_BY_EMO = { neutral: ['atrabajar', 'contaras', 'nofalles'], thinking: ['contaras', 'atrabajar'], worried: ['animo'], sad: ['animo'], happy: ['venga', 'amandar', 'asi'], proud: ['confio', 'asi'], laugh: ['amandar'], surprised: ['contaras'], angry: ['nofalles'] };
+  const VDIR = 'assets/mentor/voice/', TARGET = 0.14;
+  const clips = {}, missing = new Set(), pending = {};
+  let lastClip = -1e9, voiceOut = null, playing = null, preloaded = false;
+
+  function vctx() {
+    const c = TL.SFX && TL.SFX.ac ? TL.SFX.ac() : null;
+    if (c && !voiceOut) {
+      // Limitador suave: si un audio viene con picos, no satura
+      voiceOut = c.createDynamicsCompressor();
+      voiceOut.threshold.value = -4; voiceOut.knee.value = 2; voiceOut.ratio.value = 16; voiceOut.attack.value = 0.002; voiceOut.release.value = 0.12;
+      voiceOut.connect(c.destination);
     }
-    return clips[key];
+    return c;
   }
-  /** Al empezar un diálogo, a veces el Profe arranca con una frase doblada. Devuelve los ms que dura (o 0). */
-  function dub(job) {
-    if (!TL.SFX || !TL.SFX.on() || job.opts.voice === false) return 0;
-    const now = performance.now();
-    const first = job.lines[0] || {};
-    const key = job.opts.voice || (now - lastClip > 25000 && Math.random() < 0.6 ? U.pick(BY_EMO[first.emo || job.opts.emo || 'neutral'] || BY_EMO.neutral) : null);
-    if (!key) return 0;
-    const a = clip(key);
-    if (!a) return 0;
-    try {
-      a.currentTime = 0; a.volume = 0.9;
-      const p = a.play();
-      if (p && p.catch) p.catch(() => {});
-      lastClip = now;
-      return isFinite(a.duration) && a.duration > 0 ? a.duration * 1000 : 1200;
-    } catch (e) { return 0; }
+  /** Ganancia para que todos los audios suenen igual de alto (RMS de las partes con voz). */
+  function level(b) {
+    const d = b.getChannelData(0), F = 1024;
+    let sum = 0, n = 0;
+    for (let i = 0; i + F <= d.length; i += F) {
+      let e = 0;
+      for (let k = i; k < i + F; k++) e += d[k] * d[k];
+      e /= F;
+      if (e > 1e-4) { sum += e; n++; }
+    }
+    return n ? Math.max(0.6, Math.min(6, TARGET / Math.sqrt(sum / n))) : 1;
+  }
+  function load(key) {
+    if (!key || missing.has(key)) return Promise.resolve(null);
+    if (clips[key]) return Promise.resolve(clips[key]);
+    if (pending[key]) return pending[key];
+    const c = vctx();
+    if (!c || !window.fetch) return Promise.resolve(null);
+    pending[key] = fetch(VDIR + key + '.mp3')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(ab => new Promise((res, rej) => c.decodeAudioData(ab, res, rej)))
+      .then(b => (clips[key] = { b, gain: level(b) }))
+      .catch(() => { missing.add(key); return null; })
+      .then(x => { delete pending[key]; return x; });
+    return pending[key];
+  }
+  /** Carga en segundo plano todos los audios (los que aún no existan se ignoran). */
+  function preloadVoices() {
+    if (preloaded) return;
+    preloaded = true;
+    const keys = Object.keys(VOICE);
+    const step = () => { const k = keys.shift(); if (k) load(k).then(() => setTimeout(step, 120)); };
+    setTimeout(step, 400);
+  }
+  /** Reproduce un audio ya cargado. Devuelve los ms que dura (0 si no estaba). */
+  function play(key) {
+    const it = clips[key];
+    if (!it) { load(key); return 0; }
+    const c = vctx();
+    if (!c) return 0;
+    stopVoice();
+    const src = c.createBufferSource(), g = c.createGain();
+    src.buffer = it.b;
+    g.gain.value = it.gain;
+    src.connect(g).connect(voiceOut);
+    src.start();
+    playing = src;
+    lastClip = performance.now();
+    return it.b.duration * 1000;
+  }
+  function stopVoice() { if (playing) { try { playing.stop(); } catch (e) { /* ya paró */ } playing = null; } }
+  const voiceOn = job => TL.SFX && TL.SFX.on() && job.opts.voice !== false;
+  /** Suena `key` al empezar la frase actual; si aún no estaba cargado, suena en cuanto llegue (si seguimos en ella). */
+  function speak(key) {
+    if (!cur || !key) return;
+    const line = cur.line, t0 = performance.now();
+    const go = () => { const ms = play(key); if (ms && cur) cur.quietUntil = performance.now() + Math.min(2500, ms); };
+    if (clips[key]) { go(); return; }
+    load(key).then(it => { if (it && cur && cur.line === line && performance.now() - t0 < 1200) go(); });
+  }
+  /** ¿Qué dice el Profe al empezar esta frase? (explícito, apertura, o una coletilla a mitad) */
+  function lineVoice(job, i) {
+    const line = job.lines[i] || {};
+    if (line.voice) return line.voice;
+    const emo = line.emo || job.opts.emo || 'neutral', since = performance.now() - lastClip;
+    if (i === 0) return job.opts.voice || (since > 25000 && Math.random() < 0.6 ? U.pick(BY_EMO[emo] || BY_EMO.neutral) : null);
+    if (i < job.lines.length - 1 && since > 12000 && Math.random() < 0.3) return U.pick(MID_BY_EMO[emo] || MID_BY_EMO.neutral);
+    return null;
+  }
+  /** Al terminar la última frase, a veces una despedida. */
+  function closeVoice(job) {
+    const line = job.lines[job.lines.length - 1] || {};
+    if (line.voiceEnd) return line.voiceEnd;
+    if (job.lines.length < 2 || performance.now() - lastClip < 8000 || Math.random() > 0.45) return null;
+    return U.pick(END_BY_EMO[line.emo || job.opts.emo || 'neutral'] || END_BY_EMO.neutral);
   }
 
   function begin(job) {
     const r = root();
-    // Mientras suena la frase doblada, no hay pitidos encima
-    const dubMs = dub(job);
-    job.quietUntil = performance.now() + Math.min(2500, dubMs);
+    preloadVoices();
     r.style.setProperty('--pk', String(dialogScale()));
     cur = { ...job, i: -1, face: cur && cur.face ? cur.face : new Face(r.querySelector('.vn-face'), { scale: dialogScale }) };
     r.classList.toggle('dim', cur.opts.dim !== false);
@@ -295,6 +367,9 @@
     cur.n = 0;
     cur.typing = true;
     cur.line = line;
+    // Mientras suena la frase doblada, no hay pitidos encima
+    cur.quietUntil = 0;
+    if (voiceOn(cur)) speak(lineVoice(cur, cur.i));
     r.querySelector('.vn-choices').innerHTML = '';
     const n = cur.lines.length;
     r.querySelector('.vn-dots').innerHTML = n > 1 && n <= 14 ? cur.lines.map((_, k) => `<i class="${k < cur.i ? 'past' : k === cur.i ? 'on' : ''}"></i>`).join('') : n > 14 ? `${cur.i + 1}/${n}` : '';
@@ -330,12 +405,16 @@
     if (ch && ch.length) {
       r.querySelector('.vn-choices').innerHTML = ch.map((c, k) =>
         `<button class="btn sm ${k === 0 ? 'primary' : ''}" data-act="vn-choice" data-k="${k}">${U.esc(c.label)}</button>`).join('');
-    } else r.classList.add('done');
+    } else {
+      r.classList.add('done');
+      if (cur.i === cur.lines.length - 1 && voiceOn(cur)) speak(closeVoice(cur));
+    }
   }
 
   function finish(skipped) {
     if (!cur) return;
     clearTimeout(cur.timer);
+    if (skipped) stopVoice();
     const job = cur;
     cur.face.stop();
     const r = root();
@@ -437,7 +516,7 @@
   // Eventos que se comprueban tras cada jornada (uno como máximo por jornada).
   const ROUTE = [
     { id: 'firstWin', once: true, when: S => userResults(S).slice(-1)[0] === 'V', trust: 3, lines: [
-      { text: '¡Así se hace! **Primera victoria**. Ahora disfrútala diez minutos… y piensa ya en el siguiente.', emo: 'happy' }] },
+      { text: '¡Así se hace! **Primera victoria**. Ahora disfrútala diez minutos… y piensa ya en el siguiente.', emo: 'happy', voice: 'primera' }] },
     { id: 'firstLoss', once: true, when: S => userResults(S).slice(-1)[0] === 'D', lines: [
       { text: 'La primera derrota escuece. Mírate las notas del partido: ahí suele estar la respuesta.', emo: 'worried' },
       { text: 'Y nada de broncas en caliente. Un vestuario se gana en semanas y se pierde en una frase.', emo: 'neutral' },
@@ -445,7 +524,7 @@
         { label: 'Sí, explícamelo', value: 'yes', fx: () => setTimeout(() => TL.School.play('engine'), 300) },
         { label: 'Ahora no', value: 'no', reply: { text: 'Cuando quieras: está en la escuela, en el botón **?**.', emo: 'neutral' } }] }] },
     { id: 'losingStreak', cooldown: 8, when: S => streak(S, 'D') >= 3, lines: [
-      { id: 'racha', text: 'Tres derrotas seguidas, míster. Esto empieza a oler mal. ¿Qué hacemos?', emo: 'worried', choices: [
+      { id: 'racha', text: 'Tres derrotas seguidas, míster. Esto empieza a oler mal. ¿Qué hacemos?', emo: 'worried', voice: 'oler', choices: [
         { label: 'Cambiar el sistema', value: 'tactics', fx: S => { trust(S, 2); setTimeout(() => { TL.UI.tab = 'tactics'; TL.UI.render(false); }, 300); },
           reply: { text: 'Bien. Busca un sistema que tape tus carencias, no el que más te guste.', emo: 'thinking' } },
         { label: 'Hablar con el vestuario', value: 'talk', fx: S => { trust(S, 2); for (const p of TL.World.squad(S, S.user)) p.mor = Math.min(100, (p.mor || 70) + 3); },
@@ -454,7 +533,7 @@
         { label: 'Seguir igual', value: 'stay', fx: S => trust(S, -1),
           reply: { text: 'Tú mandas. Pero no te enamores de un plan que no funciona.', emo: 'neutral' } }] }] },
     { id: 'winningStreak', cooldown: 10, when: S => streak(S, 'V') >= 4, trust: 2, lines: [
-      { text: '¡Cuatro seguidas! La gente ya canta tu nombre.', emo: 'proud' },
+      { text: '¡Cuatro seguidas! La gente ya canta tu nombre.', emo: 'proud', voice: 'racha' },
       { text: 'Ahora viene lo difícil: que los chavales no se lo crean. Rota a los cansados.', emo: 'thinking' }] },
     { id: 'firstDecision', once: true, when: S => S.inbox.some(m => m.kind === 'decision' && !m.done), lines: [
       { text: 'Te ha llegado tu primer **marrón** al buzón. Bienvenido al fútbol de verdad.', emo: 'thinking' },
@@ -467,13 +546,13 @@
     { id: 'windowClosing', season: true, when: S => S.week === 3, lines: [
       { text: 'Última semana de mercado de verano. Lo que no hagas ahora, tendrá que esperar al invierno.', emo: 'thinking' }] },
     { id: 'boardLow', cooldown: 10, when: S => S.board.conf < 30, lines: [
-      { text: 'El presidente me ha preguntado por ti en el palco. No te voy a mentir: **la confianza está bajo mínimos**.', emo: 'worried' },
+      { text: 'El presidente me ha preguntado por ti en el palco. No te voy a mentir: **la confianza está bajo mínimos**.', emo: 'worried', voice: 'presidente' },
       { text: 'Necesitamos resultados ya. Juega a lo seguro unas semanas.', emo: 'neutral' }] },
     { id: 'cashNegative', cooldown: 12, when: S => S.clubs[S.user].cash < 0, lines: [
-      { text: 'Estamos en **números rojos**. Vende a alguien que no juegue, firma patrocinios o pide un préstamo pequeño.', emo: 'worried' }] },
+      { text: 'Estamos en **números rojos**. Vende a alguien que no juegue, firma patrocinios o pide un préstamo pequeño.', emo: 'worried', voice: 'rojos' }] },
     { id: 'halfSeason', season: true, when: S => S.week === Math.floor(S.fixtures.length / 2), lines: [
       { text: S => { const tab = TL.Season.table(S); const pos = tab.findIndex(r => r.id === S.user) + 1; return pos <= S.board.target
-        ? `Media temporada y vamos **${pos}º**. Vamos por buen camino para el objetivo.` : `Media temporada y vamos **${pos}º**. Hay que apretar: el objetivo es quedar entre los ${S.board.target} primeros.`; } },
+        ? `Media temporada y vamos **${pos}º**. Vamos por buen camino para el objetivo.` : `Media temporada y vamos **${pos}º**. Hay que apretar: el objetivo es quedar entre los ${S.board.target} primeros.`; }, voice: 'mitad' },
       { text: 'Se abre el **mercado de invierno**. Es buen momento para tapar el hueco que más te duela.', emo: 'thinking' }] }
   ];
 
@@ -505,30 +584,30 @@
     if (kind === 'seasonEnd' && sum) {
       if (sum.pos === 1) {
         trust(S, 8);
-        lines.push({ text: '¡¡CAMPEONES!! Mírame, que se me escapa una lágrima y todo.', emo: 'laugh' });
+        lines.push({ text: '¡¡CAMPEONES!! Mírame, que se me escapa una lágrima y todo.', emo: 'laugh', voice: 'campeones' });
         if (m.trust >= 70 && !m.seen.story) {
           m.seen.story = true;
-          lines.push({ text: 'Te voy a contar algo que no sabe nadie. Yo gané mi primera liga con un equipo de chavales… y la perdí al año siguiente por soberbia.', emo: 'sad' },
+          lines.push({ text: 'Te voy a contar algo que no sabe nadie. Yo gané mi primera liga con un equipo de chavales… y la perdí al año siguiente por soberbia.', emo: 'sad', voice: 'secreto' },
             { text: 'Por eso dejé los banquillos y me puse a enseñar. Que no te pase lo mismo, ¿eh?', emo: 'proud' });
         }
-      } else if (sum.moved === 'up') { trust(S, 6); lines.push({ text: '¡**Ascenso**! Esto en mi pueblo se celebra tres días.', emo: 'happy' }); }
-      else if (sum.moved === 'down') { trust(S, -5); lines.push({ text: 'Descenso. Duele, lo sé. Pero los grandes entrenadores se hacen en las caídas.', emo: 'sad' }); }
-      else if (sum.pos <= sum.target) { trust(S, 5); lines.push({ text: `Objetivo cumplido: **${sum.pos}º**. La directiva está contenta, y yo también.`, emo: 'proud' }); }
-      else lines.push({ text: `Acabamos **${sum.pos}º** y el objetivo era el top ${sum.target}. Hay cosas que corregir.`, emo: 'worried' });
+      } else if (sum.moved === 'up') { trust(S, 6); lines.push({ text: '¡**Ascenso**! Esto en mi pueblo se celebra tres días.', emo: 'happy', voice: 'ascenso' }); }
+      else if (sum.moved === 'down') { trust(S, -5); lines.push({ text: 'Descenso. Duele, lo sé. Pero los grandes entrenadores se hacen en las caídas.', emo: 'sad', voice: 'descenso' }); }
+      else if (sum.pos <= sum.target) { trust(S, 5); lines.push({ text: `Objetivo cumplido: **${sum.pos}º**. La directiva está contenta, y yo también.`, emo: 'proud', voice: 'objetivo' }); }
+      else lines.push({ text: `Acabamos **${sum.pos}º** y el objetivo era el top ${sum.target}. Hay cosas que corregir.`, emo: 'worried', voice: 'ay' });
       if (first) {
         m.seen.graduation = true;
         m.chapter = 3;
         lines.push(m.trust >= 60
-          ? { text: 'Y con esto se acaba tu primer año. Ya no necesitas que te lleve de la mano… aunque seguiré por aquí. Llámame con el **?** cuando quieras.', emo: 'proud' }
+          ? { text: 'Y con esto se acaba tu primer año. Ya no necesitas que te lleve de la mano… aunque seguiré por aquí. Llámame con el **?** cuando quieras.', emo: 'proud', voiceEnd: 'confio' }
           : { text: 'Primer año completado. Te queda camino, pero tienes madera. Seguiré cerca: el **?** de arriba sigue funcionando.', emo: 'neutral' });
       }
       if (sum.jobs && sum.jobs.length && !sum.fired) lines.push({ text: 'Por cierto: te llaman de **otros clubes**. Piensa en el proyecto, no solo en el escudo.', emo: 'thinking' });
     } else if (kind === 'fired') {
-      lines = [{ text: 'Me he enterado. Lo siento, de verdad.', emo: 'sad' },
-        { text: 'A mí me echaron tres veces. La cuarta gané la liga. Mira qué clubes te llaman y vuelve más fuerte.', emo: 'proud' }];
+      lines = [{ text: 'Me he enterado. Lo siento, de verdad.', emo: 'sad', voice: 'losiento' },
+        { text: 'A mí me echaron tres veces. La cuarta gané la liga. Mira qué clubes te llaman y vuelve más fuerte.', emo: 'proud', voiceEnd: 'animo' }];
     }
     if (lines.length && on()) say(lines, { dim: true }).then(() => TL.Game.save());
   }
 
-  TL.Mentor = { VOICE, CHAR, EMOTIONS, Face, say, help, check, event, on, setOn, state, trust, active: () => !!cur, HELP, ROUTE };
+  TL.Mentor = { VOICE, voice: { clips, missing, load, play }, CHAR, EMOTIONS, Face, say, help, check, event, on, setOn, state, trust, active: () => !!cur, HELP, ROUTE };
 })();

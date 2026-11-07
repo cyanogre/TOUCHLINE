@@ -993,3 +993,15 @@ details summary { list-style: revert; }
 .tour-mail { padding: 8px 0; border-bottom: 1px solid rgb(255 255 255 / 0.05); }
 .tour-mail p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
 .tour-end h2 { font-family: var(--font-c); }
+
+/* Alineaciones en directo: camiseta del día, quién lleva el balón y leyenda */
+.lu-row { padding: 5px 6px; margin: 0 -6px; font-size: 14px; border-radius: 8px; transition: background 0.15s, box-shadow 0.15s; }
+.lu-row.onball { background: rgb(184 245 61 / 0.12); box-shadow: inset 3px 0 0 #b8f53d; }
+.kit-sw { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgb(255 255 255 / 0.55); box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35); margin: 0 6px 0 2px; }
+.lu-key { margin-top: 10px; line-height: 1.6; }
+.lu-ball { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; background: rgb(184 245 61 / 0.25); box-shadow: inset 3px 0 0 #b8f53d; }
+
+/* Iconos propios (sustituyen a los emojis) */
+.ic { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; flex: none; overflow: visible; }
+button .ic, .btn .ic { margin-right: 0.15em; }
+.ic + .ic { margin-left: 0.08em; }

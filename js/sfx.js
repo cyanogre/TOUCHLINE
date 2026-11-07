@@ -80,7 +80,7 @@
   function tick(vol, delay) { burst(0.014, 'highpass', 3800, vol || 0.16, 0.7, delay); }
 
   const S = {
-    on, setOn, unlock,
+    on, setOn, unlock, ac,
     // Botones: cada tipo suena distinto, agudos y cortos para que se oigan en el altavoz del móvil
     click() { tone(1180, 0.05, 'triangle', 0.2, 640); tick(0.14); },
     press() { tone(560, 0.09, 'sine', 0.3, 280); tone(1480, 0.07, 'triangle', 0.09, 1960, 0.03); tick(0.18); },
