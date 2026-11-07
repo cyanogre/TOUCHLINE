@@ -65,6 +65,7 @@
         `El club presenta a su nuevo técnico con un objetivo claro: ${S.board.text.toLowerCase()}.`, S.user, null, 'pos');
       Game.S = S;
       TL.Cups.newSeason(S);
+      TL.Market.aiListings(S);
       Game.save();
       return S;
     },

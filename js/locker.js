@@ -334,6 +334,9 @@
     });
   }
 
+  /** Foto de sus números al empezar la cesión: así se ve lo que hace en su nuevo club. */
+  function statSnap(S, p) { const st = S.stats[p.id] || []; return [st[0] || 0, st[1] || 0, st[2] || 0, st[3] || 0]; }
+
   function loanOut(S, p) {
     const M = TL.Market;
     if (!M.windowOpen(S)) return { ok: false, msg: 'Las cesiones se cierran con el mercado abierto.' };
@@ -343,7 +346,7 @@
     if (!dest) return { ok: false, msg: 'Ningún club encaja para darle minutos.' };
     const fee = F.roundMoney(W().value(S, p) * U.rand(0.03, 0.08));
     TL.Market.logMove(S, p, S.user, dest.id, fee, 'loan');
-    state(S).loans.push({ pid: p.id, from: S.user, to: dest.id, s: S.season });
+    state(S).loans.push({ pid: p.id, from: S.user, to: dest.id, s: S.season, w: S.week, o0: p.ovr, a0: statSnap(S, p) });
     p.club = dest.id; p.listed = false;
     S.clubs[S.user].cash += fee; dest.cash -= fee;
     S.tactics.slots = (S.tactics.slots || []).map(id => (id === p.id ? -1 : id));
@@ -352,39 +355,177 @@
     TL.Commerce.refreshBudget(S);
     TL.News.add(S, 'fichajes', `${p.short}, cedido al ${dest.name}`, `${S.clubs[S.user].name} cede a ${p.name} hasta final de temporada para que sume minutos. El ${dest.name} paga su ficha${fee ? ' y ' + U.money(fee) : ''}.`, S.user, p.id, 'neu');
     bossAdd(S, p.id, 5); p.mor = Math.min(100, (p.mor || 70) + 6);
-    return { ok: true, msg: `${p.short} cedido al ${dest.name}${fee ? ' · +' + U.money(fee) : ''}` };
+    return { ok: true, msg: `${p.short} ${gx(S, 'cedido', 'cedida')} al ${dest.name}${fee ? ' · +' + U.money(fee) : ''}. ${gx(S, 'Síguele', 'Síguela')} en Mercado → Cesiones.` };
   }
 
-  /** ¿Lo prestaría su club? Solo si no es de los importantes de su plantilla. */
-  function loanable(S, p) {
-    if (p.club < 0 || p.club === S.user || onLoan(S, p.id)) return { ok: false, reason: 'No se puede ceder.' };
+  /** Cuota de partidos jugados esta temporada (null si aún es pronto para saberlo). */
+  function minutesShare(S, p) {
+    // Solo los partidos de tu liga se juegan uno a uno: fuera de ella no hay minutos que contar
+    if (S.week < 4 || p.club < 0 || S.clubs[p.club].league !== S.clubs[S.user].league) return null;
+    return ((S.stats[p.id] || [0])[0]) / Math.max(1, S.week);
+  }
+
+  /**
+   * ¿Por qué dejaría su club que se vaya cedido? (o null si cuenta con él)
+   *  listed: está en venta · unhappy: no juega o no está a gusto · young: joven que necesita minutos · surplus: le sobra
+   */
+  function loanWhy(S, p) {
     const sq = W().squad(S, p.club).sort((a, b) => b.ovr - a.ovr);
     const rank = sq.findIndex(x => x.id === p.id);
-    if (sq.length <= 20) return { ok: false, reason: `${S.clubs[p.club].name} tiene la plantilla corta.` };
-    if (rank < 13 && !p.listed) return { ok: false, reason: `${S.clubs[p.club].name} cuenta con él: no lo cede.` };
+    if (p.sale && p.sale.r === 'unhappy') return 'unhappy';
+    if (p.listed || p.sale) return 'listed';
+    const share = minutesShare(S, p);
+    const unhappy = (p.mor != null && p.mor < 50) || (share != null && share < 0.3 && rank < 16);
+    if (unhappy && rank >= 5) return 'unhappy';
+    if (p.age <= 21 && p.pot >= p.ovr + 5 && rank >= 9) return 'young';
+    if (rank >= 13) return 'surplus';
+    return null;
+  }
+  const LOAN_WHY = {
+    listed: 'Está en venta: su club prefiere que juegue fuera antes que tenerle parado.',
+    unhappy: 'No está a gusto: apenas juega y su club quiere quitarse parte de la ficha.',
+    young: 'Es un talento joven: su club quiere que sume minutos y crezca.',
+    surplus: 'No entra en los planes del míster: le sobra en la plantilla.'
+  };
+
+  const LOAN_MAX = 3; // cedidos a la vez en tu plantilla
+
+  /** Condiciones de su club para dejártelo cedido hasta final de temporada. */
+  function loanTerms(S, p) {
+    if (p.club < 0 || p.club === S.user || onLoan(S, p.id)) return { ok: false, reason: 'No se puede ceder.' };
+    const club = S.clubs[p.club];
+    if (W().squad(S, p.club).length <= 20) return { ok: false, reason: `${club.name} tiene la plantilla corta.` };
+    const why = loanWhy(S, p);
+    if (!why) return { ok: false, reason: `${club.name} cuenta con ${gx(S, 'él', 'ella')}: no ${gx(S, 'lo', 'la')} cede.` };
+    if (why === 'young') {
+      // Nadie presta a su joya para que chupe banquillo: tiene que entrar en tu rotación
+      const line = F.LINE[p.pos];
+      const mine = W().squad(S, S.user).filter(x => F.LINE[x.pos] === line).sort((a, b) => b.ovr - a.ovr);
+      const bar = mine[[1, 4, 4, 2][line]];
+      if (bar && p.ovr < bar.ovr - 1) return { ok: false, reason: `${club.name} quiere que juegue, y contigo no tendría minutos.` };
+    }
+    const ws = why === 'unhappy' || why === 'listed' ? 0.6 : why === 'young' ? 0.8 : 1; // parte de la ficha que pagas tú
+    const fee = why === 'young' ? 0 : F.roundMoney(W().value(S, p) * (why === 'surplus' ? 0.05 : 0.03));
+    return { ok: true, why, ws, fee, wage: F.roundMoney(p.wage * ws), text: LOAN_WHY[why], needsMinutes: why === 'young' };
+  }
+
+  /** Cedido se baja de categoría con gusto si va a jugar; solo dice que no si tu club le queda muy lejos. */
+  function loanWilling(S, p) {
+    const to = S.clubs[S.user];
+    if (p.ovr > to.rep + 11) return { ok: false, reason: `${p.short} no ve a tu club a su nivel.` };
     return { ok: true };
+  }
+
+  /** ¿Lo prestaría su club? */
+  function loanable(S, p) {
+    const t = loanTerms(S, p);
+    return t.ok ? { ok: true } : { ok: false, reason: t.reason };
   }
 
   function loanIn(S, p) {
     const M = TL.Market;
     if (!M.windowOpen(S)) return { ok: false, msg: 'El mercado está cerrado.' };
-    const ok = loanable(S, p);
-    if (!ok.ok) return { ok: false, msg: ok.reason };
-    const w = M.willing(S, p, S.user);
+    const t = loanTerms(S, p);
+    if (!t.ok) return { ok: false, msg: t.reason };
+    if (state(S).loans.filter(l => l.to === S.user).length >= LOAN_MAX) return { ok: false, msg: `Ya tienes ${LOAN_MAX} ${gx(S, 'cedidos', 'cedidas')} en la plantilla: es el máximo.` };
+    const w = loanWilling(S, p);
     if (!w.ok) return { ok: false, msg: w.reason };
-    const fee = F.roundMoney(W().value(S, p) * 0.05);
-    const err = M.canAfford(S, fee, p.wage);
+    const err = M.canAfford(S, t.fee, t.wage);
     if (err) return { ok: false, msg: err };
     const from = p.club;
-    TL.Market.logMove(S, p, from, S.user, fee, 'loan');
-    state(S).loans.push({ pid: p.id, from, to: S.user, s: S.season });
-    S.clubs[from].cash += fee; S.clubs[S.user].cash -= fee; S.fin.buys += fee;
-    p.club = S.user; p.listed = false;
-    p.mor = Math.max(p.mor == null ? 70 : p.mor, 74);
+    TL.Market.logMove(S, p, from, S.user, t.fee, 'loan');
+    state(S).loans.push({ pid: p.id, from, to: S.user, s: S.season, w: S.week, ws: t.ws, why: t.why, o0: p.ovr, a0: statSnap(S, p) });
+    S.clubs[from].cash += t.fee; S.clubs[S.user].cash -= t.fee; S.fin.buys += t.fee;
+    p.club = S.user; p.listed = false; p.sale = null;
+    p.mor = Math.max(p.mor == null ? 70 : p.mor, t.why === 'unhappy' ? 80 : 74);
     W().dirty(S);
     TL.Commerce.refreshBudget(S);
-    TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} se hace con ${p.name}, ${gx(S, 'cedido', 'cedida')}`, `Llega ${gx(S, 'cedido', 'cedida')} desde el ${S.clubs[from].name} hasta final de temporada${fee ? ' por ' + U.money(fee) : ''}. Pagas su ficha (${U.money(p.wage)}/sem).`, S.user, p.id, 'pos');
-    return { ok: true, msg: `${p.short} llega cedido hasta final de temporada.` };
+    const share = t.ws < 1 ? `Pagas el ${Math.round(t.ws * 100)}\u00a0% de su ficha (${U.money(t.wage)}/sem)` : `Pagas su ficha (${U.money(p.wage)}/sem)`;
+    TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} se hace con ${p.name}, ${gx(S, 'cedido', 'cedida')}`, `Llega ${gx(S, 'cedido', 'cedida')} desde el ${S.clubs[from].name} hasta final de temporada${t.fee ? ' por ' + U.money(t.fee) : ''}. ${share}.${t.needsMinutes ? ` Su club exige que juegue: si no, ${gx(S, 'lo repescará', 'la repescará')} en invierno.` : ''}`, S.user, p.id, 'pos');
+    return { ok: true, msg: `${p.short} llega ${gx(S, 'cedido', 'cedida')} hasta final de temporada.` };
+  }
+
+  /**
+   * Una jornada de tus cedidos. En tu liga los partidos se juegan de verdad y se usan sus notas;
+   * el resto de ligas no se juega partido a partido, así que se estima según su rol en el equipo.
+   */
+  function loanWeek(S, results) {
+    const L = state(S);
+    const notes = {};
+    for (const r of results || []) if (r && r.ratings) for (const id in r.ratings) notes[id] = r.ratings[id];
+    const userLeague = S.clubs[S.user].league;
+    for (const l of L.loans) {
+      const p = S.players[l.pid];
+      if (l.from !== S.user || !p) continue;
+      const c = S.clubs[l.to];
+      if (c.league === userLeague) { l.last = { r: notes[p.id] != null ? notes[p.id] : null }; continue; }
+      const line = F.LINE[p.pos], xi = [1, 4, 4, 2][line];
+      const rank = W().squad(S, l.to).filter(x => F.LINE[x.pos] === line && x.inj <= 0).sort((a, b) => b.ovr - a.ovr).findIndex(x => x.id === p.id);
+      const pPlay = p.inj > 0 || rank < 0 ? 0 : rank < xi ? 0.88 : rank < xi + 2 ? 0.45 : 0.12;
+      if (Math.random() >= pPlay) { l.last = { r: null }; continue; }
+      const sim = l.sim || (l.sim = [0, 0, 0, 0]);
+      const rating = Math.round(U.clamp(6.4 + (p.ovr - c.rep) * 0.07 + ((p.mor == null ? 70 : p.mor) - 70) * 0.01 + U.rand(-0.9, 0.9), 4.5, 9.6) * 10) / 10;
+      const gp = [0, 0.03, 0.09, 0.3][line] * U.clamp(1 + (p.ovr - c.rep) * 0.04, 0.5, 1.8), ap = [0, 0.04, 0.1, 0.12][line];
+      const g = Math.random() < gp ? (Math.random() < 0.15 ? 2 : 1) : 0, a = Math.random() < ap ? 1 : 0;
+      sim[0]++; sim[1] += g; sim[2] += a; sim[3] += rating;
+      l.last = { r: rating };
+    }
+  }
+
+  /** Cómo le va a un cedido desde que empezó la cesión. */
+  function loanReport(S, l) {
+    const p = S.players[l.pid];
+    const st = statSnap(S, p), a0 = l.a0 || [0, 0, 0, 0], sim = l.sim || [0, 0, 0, 0];
+    const apps = Math.max(0, st[0] - a0[0]) + sim[0], goals = Math.max(0, st[1] - a0[1]) + sim[1], assists = Math.max(0, st[2] - a0[2]) + sim[2];
+    const avg = apps ? (Math.max(0, st[3] - a0[3]) + sim[3]) / apps : null;
+    const weeks = Math.max(0, S.week - (l.w != null ? l.w : 0));
+    const share = weeks ? apps / weeks : null;
+    const role = weeks < 3 ? ['new', gx(S, 'Recién llegado', 'Recién llegada')] : share >= 0.7 ? ['xi', 'Titular'] : share >= 0.35 ? ['rot', 'Rotación'] : ['bench', 'Apenas juega'];
+    const o0 = l.o0 != null ? l.o0 : p.ovr;
+    return { p, apps, goals, assists, avg, weeks, share, role, dOvr: p.ovr - o0 };
+  }
+
+  /** Los clubes que te dejaron a su joven vigilan sus minutos: aviso y, si no juega, repesca en invierno. */
+  function loanWatch(S) {
+    const L = state(S);
+    const n = S.fixtures ? S.fixtures.length : 38, mid = Math.floor(n / 2);
+    for (const l of L.loans.slice()) {
+      if (l.to !== S.user || l.why !== 'young') continue;
+      const r = loanReport(S, l);
+      if (r.weeks < 5 || r.share >= 0.4) continue;
+      const club = S.clubs[l.from];
+      if (S.week === mid - 3 && !l.warned) {
+        l.warned = true;
+        TL.Game.mail(S, `${club.name}, preocupado por ${r.p.short}`, `"Os ${gx(S, 'lo', 'la')} cedimos para que jugara: ${r.apps} partidos en ${r.weeks} jornadas es muy poco." Si no le das minutos, ${gx(S, 'lo', 'la')} repescarán en el mercado de invierno.`, 'club');
+      } else if (S.week === mid && l.warned) {
+        endLoan(S, l, true);
+        TL.News.add(S, 'fichajes', `${club.name} repesca a ${r.p.name}`, `${gx(S, 'El cedido', 'La cedida')} apenas jugaba en el ${S.clubs[S.user].name} (${r.apps} partidos) y su club rompe la cesión en invierno.`, l.from, r.p.id, 'neg');
+      }
+    }
+    // Informe de tus cedidos cada seis jornadas
+    const out = L.loans.filter(l => l.from === S.user && S.players[l.pid]);
+    if (out.length && S.week >= 4 && S.week % 6 === 4) {
+      const lines = out.map(l => { const r = loanReport(S, l); return `• ${r.p.short} (${S.clubs[l.to].name}): ${r.apps} partidos, ${r.goals} goles, nota ${r.avg != null ? r.avg.toFixed(1) : '—'} · ${r.role[1].toLowerCase()} · media ${r.p.ovr}${r.dOvr ? ` (${r.dOvr > 0 ? '+' : ''}${r.dOvr})` : ''}`; });
+      TL.Game.mail(S, 'Informe de cesiones', lines.join('\n') + '\nTienes el seguimiento completo en Mercado → Cesiones.', 'club');
+    }
+  }
+
+  /** Jugadores de otros clubes que podrías pedir cedidos (los que de verdad te reforzarían). */
+  function loanCandidates(S, f) {
+    f = f || {};
+    const mine = W().squad(S, S.user).sort((a, b) => b.ovr - a.ovr);
+    const floor = mine.length ? mine[Math.min(mine.length - 1, 15)].ovr - 2 : 0;
+    const rep = S.clubs[S.user].rep;
+    const out = [];
+    for (const p of S.players) {
+      if (p.club < 0 || p.club === S.user || p.ovr < floor || p.ovr > rep + 11) continue;
+      if (f.line != null && f.line !== '' && F.LINE[p.pos] !== +f.line) continue;
+      if (onLoan(S, p.id)) continue;
+      const t = loanTerms(S, p);
+      if (!t.ok || (f.why && f.why !== t.why)) continue;
+      out.push([p, t]);
+    }
+    return out.sort((a, b) => b[0].ovr - a[0].ovr || b[0].pot - a[0].pot);
   }
 
   /** Repescar a un cedido (solo con el mercado abierto). */
@@ -516,14 +657,15 @@
     const youthSkill = TL.Manager.B(S).youthGrowth;
     const out = W().squad(S, S.user).concat(L.loans.filter(l => l.from === S.user).map(l => S.players[l.pid]).filter(Boolean));
     for (const p of out) {
-      const r = ratings[p.id];
+      const away = p.club !== S.user;
+      const lw = away ? (loanOf(S, p.id) || {}).last : null; // su jornada en el club donde está cedido
+      const r = away ? (lw ? lw.r : null) : ratings[p.id];
       if (r != null) { const a = L.rh[p.id] || (L.rh[p.id] = []); a.push(r); if (a.length > 12) a.shift(); }
       if (p.age > 27) continue;
-      const away = p.club !== S.user;
-      const on = slots[p.id] != null;
+      const on = away ? r != null : slots[p.id] != null;
       const room = Math.max(0, p.pot - p.ovr);
       const ageF = p.age <= 19 ? 1 : p.age <= 21 ? 0.85 : p.age <= 23 ? 0.65 : p.age <= 25 ? 0.4 : 0.22;
-      const minF = away ? 0.75 : on ? 1 : p.inj > 0 ? 0.08 : 0.35;
+      const minF = on ? 1 : p.inj > 0 ? 0.08 : away ? 0.4 : 0.35;
       const rateF = r == null ? 1 : r >= 7.5 ? 1.45 : r >= 7 ? 1.2 : r >= 6.4 ? 1 : r >= 6 ? 0.75 : 0.5;
       const m = p.mor == null ? 70 : p.mor;
       const morF = m >= 75 ? 1.15 : m >= 55 ? 1 : m >= 40 ? 0.8 : 0.6;
@@ -549,6 +691,7 @@
   function afterRound(S, results) {
     const L = state(S);
     const mine = results.find(r => r.h === S.user || r.a === S.user);
+    loanWeek(S, results);
     growWeek(S, mine);
     const played = new Set();
     if (mine && mine.slots) {
@@ -669,6 +812,7 @@
   /** Semana: ofertas del ojeador y propuestas de los capitanes. */
   function weekly(S) {
     state(S);
+    loanWatch(S);
     scoutOffer(S);
     preMatch(S);
   }
@@ -859,7 +1003,7 @@
   TL.Locker = {
     TRAITS, traitInfo, dnaHint, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
     canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem, scoutOffer,
-    onLoan, loanOf, loanOut, loanIn, loanable, recall, endLoans, activity, actCost, actReady, matchBoost,
+    onLoan, loanOf, loanOut, loanIn, loanable, loanTerms, LOAN_MAX, loanReport, loanCandidates, LOAN_WHY, recall, endLoans, activity, actCost, actReady, matchBoost,
     afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet, grows, pushHist
   };
   if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);

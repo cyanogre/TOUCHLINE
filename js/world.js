@@ -407,7 +407,11 @@
     for (const c of S.clubs) c.rep = repOf((idx[c.id] || []).map(id => S.players[id]));
   }
 
-  function wageBill(S, clubId) { return U.sum(squad(S, clubId), p => p.wage); }
+  function wageBill(S, clubId) {
+    // Cedidos con parte de la ficha pagada por su club de origen
+    const ls = clubId === S.user && S.lk && S.lk.loans && S.lk.loans.length ? new Map(S.lk.loans.filter(l => l.to === clubId && l.ws != null).map(l => [l.pid, l.ws])) : null;
+    return U.sum(squad(S, clubId), p => p.wage * (ls && ls.has(p.id) ? ls.get(p.id) : 1));
+  }
 
   function userLeague(S) { return S.leagues[S.clubs[S.user].league]; }
 
@@ -429,7 +433,7 @@
       coaches: TL.Coach.serialize(S), lastForm: S.lastForm || {}, reviews: S.reviews || [],
       lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [],
       cups: S.cups || [], lastOrder: S.lastOrder || null, titles: S.titles || [], staff: S.staff || [], staffMarket: S.staffMarket || null, hist: S.hist || null,
-      pb, pg,
+      pb, pg, sales: S.players.filter(p => p.sale).map(p => [p.id, p.sale.r, p.sale.d, p.sale.w]),
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
       mgr: S.mgr, com: S.com, news: S.news, newsId: S.newsId, settings: S.settings, log: S.log, leader: S.leader,
@@ -461,6 +465,7 @@
         listed: !!(r[18] & 1), gen: true, base: -1, mor: r[19] != null && r[19] >= 0 ? r[19] : undefined
       });
     }
+    for (const [id, r, d, w] of save.sales || []) if (S.players[id]) S.players[id].sale = { r, d, w };
     Object.assign(S, {
       fixtures: save.fixtures, stats: save.stats, tactics: save.tactics, inbox: save.inbox, msgId: save.msgId,
       neg: save.neg || {}, history: save.history || [], board: save.board, fin: Object.assign(newFin(), save.fin || {}),

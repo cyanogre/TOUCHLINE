@@ -8,6 +8,7 @@
 
   /** Historial de traspasos de la temporada: [jornada, pid, de, a, importe, tipo]. */
   function logMove(S, p, from, to, fee, kind) {
+    p.sale = null;
     S.tlog = S.tlog || [];
     S.tlog.push([S.week, p.id, from, to, Math.round(fee || 0), kind || (fee ? 'fee' : 'free')]);
     if (S.tlog.length > 1500) S.tlog.splice(0, S.tlog.length - 1500);
@@ -30,6 +31,7 @@
     const yl = yearsLeft(S, p);
     if (yl <= 0) f *= 0.6; else if (yl === 1) f *= 0.85;
     if (p.listed) f *= 0.9;
+    if (p.sale) f = Math.min(f, 1.05) * (1 - p.sale.d); // lo quiere vender: sin prima de titular y con rebaja
     f *= 1 + (S.neg[p.id] || 0) * 0.05;
     return F.roundMoney(v * f);
   }
@@ -51,7 +53,7 @@
     const to = S.clubs[clubId];
     const from = p.club >= 0 ? S.clubs[p.club] : null;
     if (p.ovr > to.rep + 11) return { ok: false, reason: `${p.short} no ve a tu club a su nivel.` };
-    if (from && from.rep - to.rep > 7 && p.ovr >= to.rep) return { ok: false, reason: `${p.short} no quiere bajar de categoría de club.` };
+    if (from && from.rep - to.rep > (p.sale && p.sale.r === 'unhappy' ? 11 : 7) && p.ovr >= to.rep) return { ok: false, reason: `${p.short} no quiere bajar de categoría de club.` };
     return { ok: true };
   }
 
@@ -63,7 +65,7 @@
     if (TL.Locker.onLoan(S, p.id)) return { result: 'reject', msg: 'Está cedido: su club de origen no negocia ahora.' };
     const ask = askingPrice(S, p, S.user);
     const seller = W.squad(S, p.club);
-    if (seller.length <= 18) return { result: 'reject', msg: `${S.clubs[p.club].name} no quiere vender: tiene la plantilla corta.` };
+    if (seller.length <= 18 && !p.sale) return { result: 'reject', msg: `${S.clubs[p.club].name} no quiere vender: tiene la plantilla corta.` };
     if (amount >= ask) return { result: 'accept', price: amount };
     S.neg[p.id] = (S.neg[p.id] || 0) + 1;
     if (amount >= ask * 0.8) return { result: 'counter', price: askingPrice(S, p, S.user), msg: `Piden ${U.money(askingPrice(S, p, S.user))}.` };
@@ -203,7 +205,8 @@
     for (const m of S.inbox) {
       if (m.kind === 'offer' && !m.done && m.data.exp < S.week) { m.done = true; m.res = 'Caducada'; }
     }
-    if (!windowOpen(S)) { aiEmergency(S); return; }
+    if (!windowOpen(S)) { clearSales(S); aiEmergency(S); return; }
+    aiListings(S);
     const mine = W.squad(S, S.user);
     const n = S.fixtures ? S.fixtures.length : 38, mid = Math.floor(n / 2);
     const lastWeek = S.week === 3 || S.week === mid + 2; // última semana de la ventana
@@ -279,13 +282,13 @@
         const from = S.clubs[p.club];
         if (from.rep > buyer.rep + 3) continue; // nadie se va a un club mucho menor
         const sq = W.squad(S, p.club);
-        if (sq.length <= 20) continue;
+        if (sq.length <= 20 && !p.sale) continue;
         const better = sq.filter(x => x.ovr > p.ovr).length;
-        if (better < 3 && from.rep >= buyer.rep - 2 && !p.listed) continue; // no venden a su estrella a un igual
+        if (better < 3 && from.rep >= buyer.rep - 2 && !p.listed && !p.sale) continue; // no venden a su estrella a un igual
       }
       const fee = p.club >= 0 ? askingPrice(S, p) : 0;
       if (fee > cap) continue;
-      const v = p.ovr - Math.max(0, p.age - 28) * 1.3 + (p.pot - p.ovr) * 0.15 + (p.listed ? 1.5 : 0) + U.rand(0, 2);
+      const v = p.ovr - Math.max(0, p.age - 28) * 1.3 + (p.pot - p.ovr) * 0.15 + (p.listed || p.sale ? 1.5 + (p.sale ? p.sale.d * 6 : 0) : 0) + U.rand(0, 2);
       if (!pick || v > pick.v) pick = { v, p, fee };
     }
     return pick;
@@ -365,6 +368,91 @@
     }
   }
 
+
+  // ------------------------------------------------------------ La IA pone jugadores en venta
+  /** Motivos deportivos y económicos, con la rebaja inicial que acepta su club. */
+  const SALE = {
+    unhappy: { d: 0.15, eco: false, s: 'Pide salir', t: 'Pide salir: no está a gusto' },
+    coach: { d: 0.2, eco: false, s: 'Fuera de los planes', t: 'No entra en los planes del míster' },
+    surplus: { d: 0.25, eco: false, s: 'Le sobra', t: 'Le sobra a su club' },
+    veteran: { d: 0.3, eco: false, s: 'Veterano', t: 'Veterano: su club renueva la plantilla' },
+    contract: { d: 0.2, eco: false, s: 'Fin de contrato', t: 'Acaba contrato y no renovará' },
+    debt: { d: 0.3, eco: true, s: 'Club en apuros', t: 'Su club está en apuros y necesita vender' },
+    wages: { d: 0.2, eco: true, s: 'Masa salarial', t: 'Su club quiere rebajar la masa salarial' }
+  };
+  const SALE_MAX = 0.45; // rebaja máxima tras semanas sin comprador
+
+  function saleReason(S, c, sq, p, rank) {
+    const R = [];
+    if (c.cash < 0 && p.wage >= sq[Math.min(sq.length - 1, 4)].wage) R.push(['debt', 4]);
+    if (W.wageBill(S, c.id) > c.wageBudget * 1.04 && rank >= 3 && p.wage >= sq[Math.min(sq.length - 1, 8)].wage) R.push(['wages', 3]);
+    if (p.age >= 31 && rank >= 6) R.push(['veteran', 2]);
+    if (p.contract <= S.season + 1 && rank >= 4) R.push(['contract', 1.5]);
+    if (rank >= 5 && rank <= 15 && p.age >= 20 && p.age <= 30) R.push(['unhappy', 1.2]);
+    if (rank >= 11 && rank <= 18) R.push(['coach', 1]);
+    if (rank >= 18) R.push(['surplus', 1.5]);
+    if (!R.length) return null;
+    return U.weighted(R.map(r => ({ k: r[0], w: r[1] })), x => x.w).k;
+  }
+
+  /** Cada semana de mercado algunos clubes ponen a alguien en venta; si no sale, rebajan el precio. */
+  function aiListings(S) {
+    const userLeague = S.clubs[S.user].league;
+    const cap = S.gender === 'M' ? 140 : 60;
+    let n = 0;
+    for (const p of S.players) {
+      if (!p.sale) continue;
+      n++;
+      // Sin comprador: cada semana el club afloja un poco más
+      if (S.week - p.sale.w >= 1) p.sale.d = Math.min(SALE_MAX, Math.round((p.sale.d + 0.05) * 100) / 100);
+    }
+    const clubs = U.shuffle(S.clubs.filter(c => c.id !== S.user && S.leagues[c.league].playable));
+    for (const c of clubs) {
+      if (n >= cap) break;
+      const mineL = c.league === userLeague;
+      const broke = c.cash < 0 || W.wageBill(S, c.id) > c.wageBudget * 1.04;
+      if (!U.chance(mineL ? 0.3 : broke ? 0.2 : 0.045)) continue;
+      const sq = W.squad(S, c.id).sort((a, b) => b.ovr - a.ovr);
+      if (sq.length <= 19 || sq.filter(x => x.sale).length >= 2) continue;
+      const pool = sq.map((p, rank) => [p, rank]).filter(([p]) => !p.sale && !TL.Locker.onLoan(S, p.id));
+      for (let t = 0; t < 4; t++) {
+        const [p, rank] = U.pick(pool);
+        const r = saleReason(S, c, sq, p, rank);
+        if (!r) continue;
+        p.sale = { r, d: SALE[r].d, w: S.week };
+        n++;
+        if (mineL || p.ovr >= 80) TL.News.add(S, 'fichajes', `${c.name} pone en venta a ${p.name}`, `${SALE[r].t}. Escuchará ofertas por debajo de su valor (${U.money(askingPrice(S, p))}).`, c.id, p.id, 'neu');
+        break;
+      }
+    }
+    saleDigest(S);
+  }
+
+  /** Al abrir el mercado, tu director deportivo te señala gangas para tu línea más floja. */
+  function saleDigest(S) {
+    const n = S.fixtures ? S.fixtures.length : 38, mid = Math.floor(n / 2);
+    if (S.week !== 0 && S.week !== mid) return;
+    const need = needOf(S, S.user);
+    const tb = TL.Commerce.transferBudget(S);
+    const picks = S.players.filter(p => p.sale && p.club >= 0 && F.LINE[p.pos] === need.line && p.ovr >= need.weakest && willing(S, p, S.user).ok && askingPrice(S, p, S.user) <= tb)
+      .sort((a, b) => b.ovr - a.ovr).slice(0, 3);
+    if (!picks.length) return;
+    TL.Game.mail(S, 'Oportunidades del mercado', `Hay clubes que venden por debajo de su valor y te vendría bien reforzar ${LINE_NAME[need.line]}:\n` +
+      picks.map(p => `• ${p.name} (${p.ovr}, ${p.age} años, ${S.clubs[p.club].name}): ${SALE[p.sale.r].t.toLowerCase()} · −${Math.round(p.sale.d * 100)}\u00a0%`).join('\n') +
+      '\nLos tienes todos en Mercado → En venta.', 'market');
+  }
+
+  /** Se cierra el mercado: lo que no se vendió deja de estar en venta. */
+  function clearSales(S) { for (const p of S.players) if (p.sale) p.sale = null; }
+
+  /** Jugadores que la IA tiene en venta (para la pestaña del mercado). */
+  function onSale(S, f) {
+    f = f || {};
+    const out = S.players.filter(p => p.sale && p.club >= 0 && p.club !== S.user &&
+      (!f.kind || (f.kind === 'eco') === SALE[p.sale.r].eco) && (f.line == null || f.line === '' || F.LINE[p.pos] === +f.line));
+    return out.sort((a, b) => b.ovr - a.ovr || b.sale.d - a.sale.d);
+  }
+
   // ------------------------------------------------------------ Búsqueda
   function search(S, f) {
     const q = f.q ? U.norm(f.q.trim()) : '';
@@ -377,7 +465,7 @@
       if (f.maxAge && p.age > f.maxAge) continue;
       if (f.league != null && f.league !== '' && (p.club < 0 || S.clubs[p.club].league !== +f.league)) continue;
       if (f.maxValue && W.value(S, p) > f.maxValue) continue;
-      if (f.listed && !p.listed) continue;
+      if (f.listed && !p.listed && !p.sale) continue;
       if (q && !U.norm(p.name).includes(q)) continue;
       out.push(p);
     }
@@ -389,6 +477,6 @@
 
   TL.Market = {
     MAX_SQUAD, windowOpen, logMove, yearsLeft, askingPrice, wageDemand, willing, maxYears, offer, canAfford, sign,
-    quickSell, releaseCost, release, renewDemand, renewOptions, renewEnd, renew, weekly, acceptOffer, search
+    quickSell, releaseCost, release, renewDemand, renewOptions, renewEnd, renew, weekly, acceptOffer, search, SALE, onSale, clearSales, aiListings
   };
 })();
