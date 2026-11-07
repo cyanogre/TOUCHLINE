@@ -3,7 +3,7 @@
 const VERSION = 'touchline-v6-__BUILD__'; // sube el número en cada versión si publicas desde una rama
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
-  'js/icons.js', 'js/i18n.js', 'data/i18n/ui.js', 'data/i18n/ui2.js', 'data/i18n/club.js', 'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/staff.js', 'js/world.js', 'js/engine.js', 'js/coach.js',
+  'js/icons.js', 'js/i18n.js', 'data/i18n/ui.js', 'data/i18n/ui2.js', 'data/i18n/club.js', 'data/i18n/match.js', 'data/i18n/social.js', 'data/i18n/news.js', 'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/staff.js', 'js/world.js', 'js/engine.js', 'js/coach.js',
   'js/season.js', 'js/market.js', 'js/commerce.js', 'js/news.js', 'js/game.js', 'js/charts.js', 'js/ui.js', 'js/matchview.js', 'js/main.js',
   'js/sfx.js', 'js/fx.js', 'js/pitch.js', 'js/tutorial.js', 'js/career.js', 'js/locker.js', 'js/cups.js', 'js/tournament.js', 'js/mentor.js', 'js/school.js',
   'assets/mentor/neutral-talk.png', 'assets/mentor/neutral-idle.png', 'data/game/crests.js', 'data/game/kits.js',
