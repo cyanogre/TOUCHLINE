@@ -787,7 +787,7 @@
       return true;
     }
 
-    _banner(text, color, secs, big) { this.banner = { text, color: color || '#fff', until: this.t + (secs || 1.4), born: this.t, big: !!big }; }
+    _banner(text, color, secs, big) { text = TL.t ? TL.t(text) : text; this.banner = { text, color: color || '#fff', until: this.t + (secs || 1.4), born: this.t, big: !!big }; }
     _focus(x, y, z) { this.cam.tx = x; this.cam.ty = y; this.cam.tz = z || 1.6; }
     _unfocus() { this.cam.tx = null; this.cam.ty = null; this.cam.tz = 1; }
     _icon(pid, icon, secs, color) { this.fx.push({ pid, icon, color, until: this.t + secs }); }
@@ -1826,7 +1826,7 @@
         if (a.state === 'sad' && a.until > this.t) { c.fillStyle = 'rgb(0 0 0 / 0.35)'; c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fill(); }
         if (a.team === this.me) {
           c.font = `800 ${Math.max(9, Math.round(R * 0.95))}px Barlow Condensed, sans-serif`;
-          c.fillStyle = '#b8f53d'; c.fillText('TÚ', x, y - r * 2);
+          c.fillStyle = '#b8f53d'; c.fillText(TL.t ? TL.t('TÚ') : 'TÚ', x, y - r * 2);
         }
         return;
       }

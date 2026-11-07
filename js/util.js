@@ -38,12 +38,12 @@
       const neg = v < 0; v = Math.abs(v);
       let s;
       if (v >= 1e8) s = Math.round(v / 1e6) + 'M';
-      else if (v >= 1e6) s = (v / 1e6).toFixed(1).replace(/\.0$/, '').replace('.', ',') + 'M';
+      else if (v >= 1e6) s = (v / 1e6).toFixed(1).replace(/\.0$/, '').replace('.', TL.I18N && TL.I18N.lang === 'en' ? '.' : ',') + 'M';
       else if (v >= 1e3) s = Math.round(v / 1e3) + 'K';
       else s = Math.round(v) + '';
       return (neg ? '-' : '') + '€' + s;
     },
-    num(v) { return Math.round(v).toLocaleString('es-ES'); },
+    num(v) { return Math.round(v).toLocaleString((TL.I18N ? TL.I18N.locale() : 'es-ES')); },
 
     seasonLabel(season) { return season + '/' + String(season + 1).slice(2); },
     /** Fecha de la jornada (semana) dentro de una temporada. */
@@ -54,7 +54,7 @@
       return d;
     },
     fmtDate(d) {
-      return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+      return d.toLocaleDateString((TL.I18N ? TL.I18N.locale() : 'es-ES'), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
     },
 
     esc(s) {
