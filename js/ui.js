@@ -81,11 +81,11 @@
     const LK = TL.Locker;
     if (LK && S.lk) {
       const l = LK.loanOf(S, p.id);
-      if (l) t.push(`<span class="tag loan">${l.to === S.user ? 'CEDIDO' : 'CEDIDO FUERA'}</span>`);
+      if (l) t.push(`<span class="tag loan">${S.gender === 'F' ? (l.to === S.user ? 'CEDIDA' : 'CEDIDA FUERA') : (l.to === S.user ? 'CEDIDO' : 'CEDIDO FUERA')}</span>`);
       const g = S.lk.gems[p.id];
       if (g && p.club === S.user) t.push(`<span class="tag gem" title="Talento oculto">✨${g.stage >= 2 ? ' ADN' : ''}</span>`);
       const tr = LK.traits(S, p.id);
-      if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.TRAITS[k].name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
+      if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
     }
     return t.join('');
   }
@@ -474,7 +474,7 @@
       .map(([a, b]) => li('🎓', `${pl(b)} apadrina a ${pl(a)}`)).join('');
     const gems = Object.keys(S.lk.gems).map(id => S.players[id]).filter(p => p && p.club === S.user)
       .map(p => { const g = S.lk.gems[p.id]; return li(g.stage >= 2 ? '🌟' : '✨', `${pl(p)} · ${g.stage === 0 ? 'talento oculto' : g.stage === 1 ? 'ADN: ' + LK.DNA[g.dna].name : g.stage === 2 ? 'ADN desbloqueado' : 'superestrella'}`); }).join('');
-    const loans = S.lk.loans.map(l => { const p = S.players[l.pid]; if (!p) return ''; return li('🔁', `${pl(p)} · ${l.from === S.user ? 'cedido al ' + esc(S.clubs[l.to].name) : 'llega cedido del ' + esc(S.clubs[l.from].name)}`); }).join('');
+    const loans = S.lk.loans.map(l => { const p = S.players[l.pid]; if (!p) return ''; return li('🔁', `${pl(p)} · ${l.from === S.user ? (S.gender === 'F' ? 'cedida al ' : 'cedido al ') + esc(S.clubs[l.to].name) : (S.gender === 'F' ? 'llega cedida del ' : 'llega cedido del ') + esc(S.clubs[l.from].name)}`); }).join('');
     const staff = (S.staff || []).map(s => li(TL.Staff.ROLES[s.role].icon, `<b>${esc(s.name)}</b> · ${TL.Staff.ROLES[s.role].name} ${'★'.repeat(s.q)}`)).join('');
     const pending = S.inbox.filter(m => m.kind === 'decision' && !m.done && m.data && /^lk_/.test(m.data.ev || '')).length;
     const block = (t, body) => (body ? `<div class="lk-block"><div class="group-title">${t}</div><ul class="lk-list">${body}</ul></div>` : '');
@@ -482,8 +482,8 @@
       <div class="card-head"><h2>Vestuario</h2><span class="muted">${me} Ambiente ${ml.toLowerCase()}</span></div>
       ${pending ? `<button class="lk-office" data-act="inbox"><span>🚪</span><span><b>${pending} reunión${pending > 1 ? 'es' : ''} pendiente${pending > 1 ? 's' : ''}</b><small>Te esperan en el despacho</small></span><span class="go">›</span></button>` : ''}
       <div class="act-row">${acts}</div>
-      <div class="lk-grid">${block('Relaciones', prs)}${block('Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loans)}${block('Cuerpo técnico', staff)}</div>
-      <p class="note" style="margin:8px 0 0">Toca a un jugador para hablar con él en el despacho, ponerle padrino o un plan de entrenamiento.</p></section>`;
+      <div class="lk-grid">${block('Relaciones', prs)}${block(S.gender === 'F' ? 'Madrinas' : 'Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loans)}${block('Cuerpo técnico', staff)}</div>
+      <p class="note" style="margin:8px 0 0">${S.gender === 'F' ? 'Toca a una jugadora para hablar con ella en el despacho, ponerle madrina o un plan de entrenamiento.' : 'Toca a un jugador para hablar con él en el despacho, ponerle padrino o un plan de entrenamiento.'}</p></section>`;
   }
 
   /** Progresión de la temporada: quién está creciendo y quién se estanca. */
@@ -509,12 +509,12 @@
     if (!LK || !S.lk) return '';
     const out = [];
     const tr = LK.traits(S, p.id);
-    if (tr.length) out.push(`<div class="trait-list">${tr.map(k => `<div class="trait"><span class="ti">${LK.TRAITS[k].icon}</span><span><b>${LK.TRAITS[k].name}</b><small>${esc(LK.TRAITS[k].desc)}</small></span></div>`).join('')}</div>`);
+    if (tr.length) out.push(`<div class="trait-list">${tr.map(k => LK.traitInfo(S, k)).map(T => `<div class="trait"><span class="ti">${T.icon}</span><span><b>${T.name}</b><small>${esc(T.desc)}</small></span></div>`).join('')}</div>`);
     const g = S.lk.gems[p.id];
     if (g) {
       const d = LK.DNA[g.dna];
       const txt = g.stage === 0 ? `<b>✨ Talento oculto.</b> Los técnicos ven algo especial. Dale partidos (${g.apps}/8 en su sitio) para descubrir qué es.`
-        : g.stage === 1 ? `<b>✨ ADN: ${d.name}.</b> ${d.hint} Partidos esta temporada en su sitio: ${g.apps}/15 · entrenamiento: ${S.lk.focus[p.id] === d.focus ? '✅' : '❌ ' + LK.FOCUS[d.focus].name}.`
+        : g.stage === 1 ? `<b>✨ ADN: ${d.name}.</b> ${LK.dnaHint(S, d)} Partidos esta temporada en su sitio: ${g.apps}/15 · entrenamiento: ${S.lk.focus[p.id] === d.focus ? '✅' : '❌ ' + LK.FOCUS[d.focus].name}.`
           : g.stage === 2 ? `<b>🌟 ADN desbloqueado: ${d.name}.</b> Si llega a 80 de media antes de los 23, será una superestrella.` : `<b>🌟 Superestrella.</b> El ${d.name.toLowerCase()} de una generación.`;
       out.push(`<div class="gem-box">${txt}</div>`);
     }
@@ -534,7 +534,7 @@
       if (LK.canBePupil(S, p)) {
         const vets = W.squad(S, S.user).filter(q => LK.canMentor(S, q)).sort((a, c) => (F.LINE[c.pos] === F.LINE[p.pos]) - (F.LINE[a.pos] === F.LINE[p.pos]) || c.ovr - a.ovr);
         const cur = S.lk.mentor[p.id];
-        rows.push(`<label class="lk-field"><span>Padrino</span><select data-change="lk-mentor" data-id="${p.id}"><option value="">Sin padrino</option>${vets.map(q => `<option value="${q.id}" ${cur === q.id ? 'selected' : ''}>${esc(q.short)} (${q.age}, ${F.POS_ES[q.pos]}${LK.hasTrait(S, q.id, 'leader') ? ', líder' : ''})</option>`).join('')}</select></label>`);
+        rows.push(`<label class="lk-field"><span>${S.gender === 'F' ? 'Madrina' : 'Padrino'}</span><select data-change="lk-mentor" data-id="${p.id}"><option value="">${S.gender === 'F' ? 'Sin madrina' : 'Sin padrino'}</option>${vets.map(q => `<option value="${q.id}" ${cur === q.id ? 'selected' : ''}>${esc(q.short)} (${q.age}, ${F.POS_ES[q.pos]}${LK.hasTrait(S, q.id, 'leader') ? ', líder' : ''})</option>`).join('')}</select></label>`);
       }
       const pupils = LK.pupilsOf(S, p.id).map(id => S.players[id]).filter(Boolean);
       if (pupils.length) rows.push(`<p class="note" style="margin:0">🎓 Apadrina a ${pupils.map(q => esc(q.short)).join(' y ')}.</p>`);
