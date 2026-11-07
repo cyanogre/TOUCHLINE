@@ -1037,3 +1037,49 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .lang-pick button.on { border-color: var(--accent); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
 .lang-pick button.on b { color: var(--accent); }
 .card .lang-pick { justify-content: flex-start; }
+
+/* ---------- Portadas vivas: elegir fútbol masculino o femenino (js/splash.js) ---------- */
+.sp-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.sp-slot { perspective: 900px; min-width: 0; }
+.sp-card {
+  position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; padding: 0; margin: 0;
+  border: 0; border-radius: 16px; overflow: hidden; cursor: pointer; isolation: isolate;
+  background: #efe5cf; color: #fff8e6; text-align: left; font: inherit;
+  transform-origin: 50% 60%; will-change: transform;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(242 201 76 / 0.35);
+  transition: box-shadow 0.25s;
+}
+.sp-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+/* viñeta y degradado para que el texto se lea sobre la acuarela */
+.sp-card::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 35%, transparent 55%, rgb(30 18 6 / 0.32)),
+    linear-gradient(to bottom, transparent 46%, rgb(8 17 13 / 0.5) 66%, rgb(8 17 13 / 0.93));
+}
+/* marco dorado interior */
+.sp-card::before {
+  content: ''; position: absolute; inset: 6px; z-index: 3; pointer-events: none;
+  border: 1px solid rgb(255 236 190 / 0.5); border-radius: 11px;
+}
+.sp-glare {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: var(--hov, 0);
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 30%), rgb(255 255 255 / 0.3), transparent 52%);
+  mix-blend-mode: overlay;
+}
+.sp-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; gap: 5px; padding: 0 16px 16px; }
+.sp-info .t {
+  font-family: var(--font-c); font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em;
+  font-size: clamp(21px, 5.6vw, 34px); line-height: 0.95; color: #fff8e6; text-shadow: 0 2px 12px rgb(0 0 0 / 0.65);
+}
+.sp-info .t::before { content: ''; display: block; width: 26px; height: 3px; margin-bottom: 8px; border-radius: 2px; background: var(--gold); box-shadow: 0 0 10px rgb(242 201 76 / 0.6); }
+.sp-info .s { font-size: 12.5px; line-height: 1.25; color: rgb(255 248 230 / 0.8); }
+.sp-card:hover { box-shadow: 0 22px 46px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(242 201 76 / 0.85), 0 0 30px rgb(242 201 76 / 0.3); }
+.sp-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* En móvil, una encima de otra y llenando la pantalla */
+@media (max-width: 600px) {
+  .sp-picks { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sp-card { aspect-ratio: auto; height: clamp(230px, calc((100dvh - 160px - var(--safe-b)) / 2), 440px); }
+  .sp-info { padding: 0 16px 16px; }
+  .sp-info .t { font-size: 30px; }
+}
