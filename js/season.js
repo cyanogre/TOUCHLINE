@@ -110,14 +110,17 @@
       if (cid === S.user) TL.Commerce.weekly(S, round, resLetter);
       else weeklyFinances(S, cid, round);
     }
-    // Forma física y lesiones
+    // Forma física y lesiones. El cansancio se acumula: quien juega todas las semanas no llega a
+    // recuperarse del todo (hay que rotar); quien descansa recupera bastante más.
     const fb = TL.Manager.B(S);
+    const played = new Set();
+    for (const r of results) for (const id in (r.slots || {})) played.add(+id);
     for (const p of S.players) {
       if (p.club < -1) continue;
       if (p.inj > 0) p.inj--;
       if (p.fit < 100) {
-        const rec = 13 + Math.round(p.st[5] / 25);
-        p.fit = Math.min(100, p.fit + (p.club === S.user ? Math.round(rec * (2 - fb.fatigue)) : rec));
+        const rec = 6 + p.st[5] / 20 + (played.has(p.id) ? 0 : 6);
+        p.fit = Math.min(100, p.fit + Math.round(p.club === S.user ? rec * (2 - fb.fatigue) : rec));
       }
     }
     // Directiva, experiencia y avisos propios

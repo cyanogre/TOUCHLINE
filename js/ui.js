@@ -323,6 +323,14 @@
           const oid = fx[0] === S.user ? fx[1] : fx[0], co = TL.Coach.of(S, oid);
           return co ? `<p class="nm-coach">Banquillo rival: <b>${esc(co.name)}</b> · fama de técnico ${TL.Coach.STYLES[co.style].name}. <span>Su once y su sistema, al empezar.</span></p>` : '';
         })()}
+        ${(() => {
+          // Aviso: titulares que llegan cansados (el cansancio se acumula si no rotas)
+          const tired = (S.tactics.slots || []).map(id => S.players[id]).filter(p => p && p.club === S.user && p.fit < 75 && p.inj <= 0);
+          if (!tired.length) return '';
+          const fem = S.gender === 'F';
+          const head = tired.length === 1 ? (fem ? '1 titular llega cansada' : '1 titular llega cansado') : tired.length + (fem ? ' titulares llegan cansadas' : ' titulares llegan cansados');
+          return `<button class="nm-warn" data-act="tab" data-tab="tactics">⚠️ <span><b>${head}</b> (${tired.slice(0, 4).map(p => esc(p.short) + ' ' + p.fit + '%').join(', ')}${tired.length > 4 ? '…' : ''}). <i>Rota o rendirán menos y se lesionarán más.</i></span></button>`;
+        })()}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
         <button class="btn" data-act="play-quick">Resultado rápido</button></div></section>`;
     }

@@ -1095,3 +1095,11 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .tier-n.t2 { background: #cfd8dc; }
 .tier-n.t3 { background: #d39a64; }
 .tier-n.t4 { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); }
+
+/* Aviso de cansancio en el próximo partido */
+.nm-warn {
+  display: flex; gap: 8px; align-items: flex-start; width: 100%; margin: 0 0 12px; padding: 9px 12px; text-align: left;
+  border: 1px solid rgb(255 194 71 / 0.45); border-radius: var(--radius-sm); background: rgb(255 194 71 / 0.1);
+  color: var(--text); font: inherit; font-size: 13px; line-height: 1.35; cursor: pointer;
+}
+.nm-warn b { color: var(--warn); }
