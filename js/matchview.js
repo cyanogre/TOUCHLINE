@@ -275,8 +275,10 @@
         const c = S.clubs[t.club];
         const on = t.onPitch.map(o => {
           const p = S.players[o.pid], r = m.pl[o.pid];
-          return `<div class="row lu-row" data-pid="${o.pid}">${UI.posB(o.slot)}<span class="grow ellipsis">${esc(p.short)}</span>${enBar(m.energy(o.pid))}
-            ${r.g ? `<span title="${r.g} gol${r.g > 1 ? 'es' : ''}">${'⚽'.repeat(r.g)}</span>` : ''}${r.a ? `<span class="faint" title="Asistencia">A</span>` : ''}${r.y ? '<span title="Amarilla">🟨</span>' : ''}${o.hurt ? '<span title="Tocado">🚑</span>' : ''}<b class="num">${p.ovr}</b></div>`;
+          // Los iconos van pegados al nombre: así la barra de energía y la media quedan siempre en columna
+          const ic = (r.g ? `<span title="${r.g} gol${r.g > 1 ? 'es' : ''}">${'⚽'.repeat(r.g)}</span>` : '') + (r.a ? `<span class="faint" title="Asistencia">A</span>` : '') +
+            (r.y ? '<span title="Amarilla">🟨</span>' : '') + (o.hurt ? '<span title="Tocado">🚑</span>' : '');
+          return `<div class="row lu-row" data-pid="${o.pid}">${UI.posB(o.slot)}<span class="grow lu-name"><span class="ellipsis">${esc(p.short)}</span>${ic ? `<span class="lu-ic">${ic}</span>` : ''}</span>${enBar(m.energy(o.pid))}<b class="num lu-ovr">${p.ovr}</b></div>`;
         }).join('');
         const bench = t.bench.map(id => `<span class="faint">${esc(S.players[id].short)}</span>`).join(', ');
         return `<div class="card"><div class="row" style="margin-bottom:6px">${UI.crest(c, 'sm')}<b class="grow ellipsis">${esc(c.name)}</b>${kitSwatch(ti)}<span class="note">${t.formation} · ${UI.MENT[t.mentality]}</span></div>

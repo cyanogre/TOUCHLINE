@@ -328,8 +328,10 @@
       return a;
     }
 
-    /** Mantiene los puntitos al día con los que de verdad están en el campo. */
-    _sync() {
+    /** Mantiene los puntitos al día con los que de verdad están en el campo.
+     *  instant: tras un salto de tiempo el cambio ya pasó hace rato, así que nadie entra
+     *  ni sale andando: los que se fueron desaparecen y los nuevos aparecen en su puesto. */
+    _sync(instant) {
       const on = new Set();
       this.m.teams.forEach((t, i) => t.onPitch.forEach(o => {
         on.add(o.pid);
@@ -337,17 +339,22 @@
           // Entra desde la banda, junto al cuarto árbitro
           const a = this._spawn(i, o.pid, L / 2 + (i === 0 ? -1.5 : 1.5), -0.6);
           a.run = 0.6;
+          if (instant) { const h = this._home(a); a.x = h[0]; a.y = h[1]; }
           this._numbers();
         }
       }));
+      if (instant) this.leaving = [];
       for (const id in this.A) {
         if (on.has(+id) || this.keep.has(+id)) continue;
         const a = this.A[id];
         delete this.A[id];
-        a.leave = true; a.state = a.state === 'down' ? 'down' : 'walk';
-        a.tx = a.red ? TUNNEL.x : L / 2 + (a.team === 0 ? -2.5 : 2.5); a.ty = a.red ? TUNNEL.y : -0.8;
-        this.leaving.push(a);
         if (this.ball.owner === +id) this.ball.owner = null;
+        if (instant) continue;
+        a.leave = true; a.state = a.state === 'down' ? 'down' : 'walk';
+        // Expulsado: al túnel. Cambiado o lesionado: por el punto más cercano de la banda (como manda el reglamento)
+        if (a.red) { a.tx = TUNNEL.x; a.ty = TUNNEL.y; }
+        else { a.tx = clamp(a.x, 1, L - 1); a.ty = a.y < Wd / 2 ? -0.8 : Wd + 0.8; }
+        this.leaving.push(a);
       }
     }
 
@@ -491,7 +498,7 @@
       if (a.until && a.until < this.t && a.state !== 'walk') a.state = null;
       const e = a.kind === 'pl' ? this.energy(a) : 1;
       const top = a.kind === 'pl' ? 7.8 * a.pace * (0.55 + 0.45 * e) : a.kind === 'ref' ? 6.6 : a.kind === 'ar' ? 6 : 4.5;
-      const speed = a.state === 'walk' || a.state === 'sad' ? Math.min(1.6, top) : top * (a.run || 0.5);
+      const speed = a.state === 'walk' || a.state === 'sad' ? Math.min(a.leave ? 2.6 : 1.6, top) : top * (a.run || 0.5);
       const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
       const want = Math.min(speed, d * 1.9);
       const ux = d > 0.01 ? dx / d : 0, uy = d > 0.01 ? dy / d : 0;
@@ -848,20 +855,48 @@
     /** Aplica al instante lo pendiente (saltos de tiempo): solo cambia el estado. */
     flush() {
       this.instant = true;
-      while (this.queue.length) {
-        const e = this.queue.shift();
-        if (e.type === 'goal' || e.type === 'disallowed') { this._placeKickoff(1 - e.team, true); this.ball.owner = this._kickTaker(1 - e.team); }
-        if (e.type === 'ht') { this.dir = [-this.dir[0], -this.dir[1]]; this._placeKickoff(1, true); this.htKick = true; }
-        if (e.type === 'ft') this._finalWhistle(true);
-      }
-      this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1;
+      // Lo que se estaba escenificando ya no vale: el reloj ha saltado
+      this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1; this.fetch = null;
       this.keep.clear();
       this._clearStates();
       this._unfocus();
-      this._sync();
-      // Segunda parte: todos colocados y el saque espera a que reanudes
-      if (this.htKick) { this.htKick = false; this._seq(this._kickoffSeq(1)); }
+      this._sync(true);
+      let placed = false;
+      // Si el descanso se estaba escenificando, el cambio de campo no llegó a hacerse
+      if (this.htPending) { this._flip(); this._placeKickoff(1, true); this.htKick = true; placed = true; }
+      while (this.queue.length) {
+        const e = this.queue.shift();
+        if (e.type === 'goal' || e.type === 'disallowed') { this._placeKickoff(1 - e.team, true); this.ball.owner = this._kickTaker(1 - e.team); placed = true; }
+        if (e.type === 'ht') { this.htPending = true; this._flip(); this._placeKickoff(1, true); this.htKick = true; placed = true; }
+        if (e.type === 'ft') this._finalWhistle(true);
+      }
+      if (!placed && !this.over) this._reseat();
+      // Segunda parte: todos colocados y el saque espera a que reanudes (solo si seguimos en el descanso)
+      if (this.htKick) { this.htKick = false; if (this.m.min <= 45 && !this.over) this._seq(this._kickoffSeq(1)); }
       this.instant = false;
+    }
+
+    /** Cambio de campo del descanso (una sola vez, se escenifique o se salte). */
+    _flip() {
+      if (!this.htPending) return;
+      this.htPending = false;
+      this.dir = [-this.dir[0], -this.dir[1]];
+    }
+
+    /** Tras un salto: cada uno en su sitio según dónde está el balón, sin carreras desde donde estaba. */
+    _reseat() {
+      const b = this.ball;
+      b.path = null; b.roll = null; b.z = 0;
+      if (b.owner == null || !this.A[b.owner]) {
+        const n = this.nearest(this.team(this.poss), b) || this.nearest(Object.values(this.A), b);
+        b.owner = n ? n.pid : null;
+      }
+      this._cut(1);
+      this.cutAt = null; // sin destello: durante el salto esto pasa en cada minuto
+      for (const id in this.A) { const a = this.A[id]; a.vx = a.vy = 0; }
+      const own = b.owner != null && this.A[b.owner];
+      if (own) { b.x = own.x + this.dir[own.team] * 0.5; b.y = own.y; this.poss = own.team; }
+      this.ref.x = this.ref.tx; this.ref.y = this.ref.ty;
     }
 
     _take(pred) {
@@ -1474,6 +1509,7 @@
     }
 
     _halfTime() {
+      this.htPending = true;
       this._seq([
         { d: 2.6, start: () => {
           this._banner('DESCANSO', '#ffffff', 1.8, true);
@@ -1484,7 +1520,7 @@
           this.ball.owner = null; this.ball.roll = null;
           this.refOv = { x: TUNNEL.x, y: -0.8, run: 0.3 };
         } },
-        { d: 0.1, start: () => { this.dir = [-this.dir[0], -this.dir[1]]; this.refOv = null; } },
+        { d: 0.1, start: () => { this._flip(); this.refOv = null; } },
         ...this._kickoffSeq(1)
       ]);
     }
