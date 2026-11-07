@@ -17,22 +17,24 @@
   const TL = window.TL;
   const { F, U } = TL;
   const W = () => TL.World;
+  /** Texto en masculino o femenino según la competición («un chaval» / «una chavala»). */
+  const g = (S, m, f) => (S && S.gender === 'F' ? f : m);
 
   // ------------------------------------------------------------ Rasgos
   // eff: shot (peso para tirar), conv (acierto), assist (peso para asistir), fouled (faltas recibidas),
   //      save (multiplica el acierto rival), mid/att/def (fuerza del equipo), team (multiplicador), any (juega en cualquier puesto)
   const TRAITS = {
-    ego: { name: 'Ego de goleador', icon: '🔥', desc: 'Delantero letal y egoísta: tira siempre. Marca más, asiste menos y se enfada si no juega. Toca reconducirlo.', eff: { shot: 1.7, conv: 1.1, assist: 0.4 } },
+    ego: { name: 'Ego de goleador', icon: '🔥', desc: 'Delantero letal y egoísta: tira siempre. Marca más, asiste menos y se enfada si no juega. Toca reconducirlo.', nameF: 'Ego de goleadora', descF: 'Delantera letal y egoísta: tira siempre. Marca más, asiste menos y se enfada si no juega. Toca reconducirla.', eff: { shot: 1.7, conv: 1.1, assist: 0.4 } },
     egoTeam: { name: 'Ego al servicio del equipo', icon: '👑', desc: 'Sigue teniendo hambre de gol, pero ahora juega para los demás.', eff: { shot: 1.4, conv: 1.08, assist: 1.25 } },
-    vision: { name: 'Visión periférica', icon: '👁️', desc: 'Ve el campo desde arriba. Más asistencias; reconvertido a lateral o pivote, se dispara.', eff: { assist: 1.6, mid: 0.4 } },
+    vision: { name: 'Visión periférica', icon: '👁️', desc: 'Ve el campo desde arriba. Más asistencias; reconvertido a lateral o pivote, se dispara.', descF: 'Ve el campo desde arriba. Más asistencias; reconvertida a lateral o pivote, se dispara.', eff: { assist: 1.6, mid: 0.4 } },
     dribble: { name: 'Regate de ensueño', icon: '🌀', desc: 'Se va de tres como si nada. Recibe muchas faltas y marca goles imposibles.', eff: { fouled: 1.6, conv: 1.04 } },
     tiger: { name: 'Disparo del tigre', icon: '🐯', desc: 'Un cañonazo que deja temblando la red, incluso desde fuera del área.', eff: { conv: 1.07, shot: 1.2 } },
-    cat: { name: 'Reflejos de gato', icon: '🧤', desc: 'Portero de reflejos imposibles. Dicen que no se quita la gorra ni para dormir.', eff: { save: 0.9 } },
-    leader: { name: 'Líder del vestuario', icon: '🎖️', desc: 'Sostiene la moral del grupo y es el mejor padrino para los jóvenes.', eff: { team: 1.008 } },
+    cat: { name: 'Reflejos de gato', icon: '🧤', desc: 'Portero de reflejos imposibles. Dicen que no se quita la gorra ni para dormir.', descF: 'Portera de reflejos imposibles. Dicen que no se quita la gorra ni para dormir.', eff: { save: 0.9 } },
+    leader: { name: 'Líder del vestuario', icon: '🎖️', desc: 'Sostiene la moral del grupo y es el mejor padrino para los jóvenes.', descF: 'Sostiene la moral del grupo y es la mejor madrina para las jóvenes.', eff: { team: 1.008 } },
     dnaTotal: { name: 'ADN: Fútbol total', icon: '🌟', desc: 'Juega en cualquier puesto como si fuera el suyo.', eff: { any: true, mid: 0.5, assist: 1.2 } },
-    dnaLibero: { name: 'ADN: Líbero de época', icon: '🌟', desc: 'Defiende con elegancia y sale jugando como un centrocampista más.', eff: { def: 0.6, mid: 0.5, assist: 1.3 } },
+    dnaLibero: { name: 'ADN: Líbero de época', icon: '🌟', desc: 'Defiende con elegancia y sale jugando como un centrocampista más.', descF: 'Defiende con elegancia y sale jugando como una centrocampista más.', eff: { def: 0.6, mid: 0.5, assist: 1.3 } },
     dnaMagic: { name: 'ADN: Genio del regate', icon: '🌟', desc: 'Regate, pausa y gol. Imparable en el uno contra uno.', eff: { fouled: 1.5, conv: 1.08, shot: 1.2 } },
-    dnaWall: { name: 'ADN: Muro bajo palos', icon: '🌟', desc: 'Un portero de los que ganan ligas.', eff: { save: 0.85 } },
+    dnaWall: { name: 'ADN: Muro bajo palos', icon: '🌟', desc: 'Un portero de los que ganan ligas.', descF: 'Una portera de las que ganan ligas.', eff: { save: 0.85 } },
     dnaNine: { name: 'ADN: Nueve de leyenda', icon: '🌟', desc: 'Huele el gol: siempre está donde cae el balón.', eff: { shot: 1.45, conv: 1.12 } },
     dnaBrain: { name: 'ADN: Cerebro del equipo', icon: '🌟', desc: 'Dirige el juego: todo pasa por sus botas.', eff: { assist: 1.6, mid: 0.8 } }
   };
@@ -43,7 +45,7 @@
     libero: { name: 'Líbero de época', pos: ['CB', 'CDM'], focus: 'tactica', trait: 'dnaLibero', hint: 'Necesita jugar de central o pivote y entrenar la táctica.' },
     magic: { name: 'Genio del regate', pos: ['RW', 'LW', 'CAM', 'ST'], focus: 'tecnica', trait: 'dnaMagic', hint: 'Necesita jugar en banda o de mediapunta y entrenar la técnica.' },
     wall: { name: 'Muro bajo palos', pos: ['GK'], focus: 'porteria', trait: 'dnaWall', hint: 'Necesita jugar en la portería y entrenar específico de porteros.' },
-    nine: { name: 'Nueve de leyenda', pos: ['ST'], focus: 'remate', trait: 'dnaNine', hint: 'Necesita jugar de delantero centro y entrenar el remate.' },
+    nine: { name: 'Nueve de leyenda', pos: ['ST'], focus: 'remate', trait: 'dnaNine', hint: 'Necesita jugar de delantero centro y entrenar el remate.', hintF: 'Necesita jugar de delantera centro y entrenar el remate.' },
     brain: { name: 'Cerebro del equipo', pos: ['CM', 'CDM', 'CAM'], focus: 'tactica', trait: 'dnaBrain', hint: 'Necesita jugar en el centro del campo y entrenar la táctica.' }
   };
 
@@ -58,9 +60,9 @@
 
   // Cuerpo técnico (veteranos retirados)
   const STAFF = {
-    youth: { name: 'Entrenador de juveniles', desc: '+12% de crecimiento de los jóvenes' },
-    assistant: { name: 'Segundo entrenador', desc: 'Mejor moral semanal y charlas más eficaces' },
-    gk: { name: 'Entrenador de porteros', desc: '+20% de crecimiento de los porteros' }
+    youth: { name: 'Entrenador de juveniles', nameF: 'Entrenadora de juveniles', desc: '+12% de crecimiento de los jóvenes' },
+    assistant: { name: 'Segundo entrenador', nameF: 'Segunda entrenadora', desc: 'Mejor moral semanal y charlas más eficaces' },
+    gk: { name: 'Entrenador de porteros', nameF: 'Entrenadora de porteras', desc: '+20% de crecimiento de los porteros', descF: '+20% de crecimiento de las porteras' }
   };
 
   function state(S) {
@@ -75,6 +77,12 @@
   }
 
   // ------------------------------------------------------------ Rasgos: consulta y efectos
+  /** Rasgo con su nombre y descripción en el género de la competición. */
+  function traitInfo(S, k) {
+    const t = TRAITS[k];
+    return t && S && S.gender === 'F' ? Object.assign({}, t, { name: t.nameF || t.name, desc: t.descF || t.desc }) : t;
+  }
+  const dnaHint = (S, d) => g(S, d.hint, d.hintF || d.hint);
   function traits(S, pid) { return (S.lk && S.lk.tr[pid]) || []; }
   function hasTrait(S, pid, t) { return traits(S, pid).includes(t); }
   function addTrait(S, pid, t) {
@@ -152,13 +160,13 @@
   function pupilsOf(S, mid) { return Object.keys(state(S).mentor).filter(k => S.lk.mentor[k] === mid).map(Number); }
   function setMentor(S, pupil, mentor) {
     const L = state(S);
-    if (mentor == null) { delete L.mentor[pupil]; return { ok: true, msg: 'Sin padrino.' }; }
+    if (mentor == null) { delete L.mentor[pupil]; return { ok: true, msg: g(S, 'Sin padrino.', 'Sin madrina.') }; }
     const m = S.players[mentor], p = S.players[pupil];
     if (!m || !p || !canMentor(S, m) || !canBePupil(S, p)) return { ok: false, msg: 'No puede ser.' };
     if (pupilsOf(S, mentor).length >= 2) return { ok: false, msg: `${m.short} ya apadrina a dos jóvenes.` };
     L.mentor[pupil] = mentor;
     bond(S, pupil, mentor, 15);
-    return { ok: true, msg: `${m.short} será el padrino de ${p.short}.` };
+    return { ok: true, msg: `${m.short} será ${g(S, 'el padrino', 'la madrina')} de ${p.short}.` };
   }
   function staffBonus(S) {
     const q = r => (TL.Staff ? TL.Staff.lv(S, r) : 0);
@@ -191,7 +199,7 @@
       if (inh.length && Math.random() < 0.25) {
         const t = U.pick(inh);
         addTrait(S, p.id, t);
-        TL.Game.mail(S, `${p.short} aprende de ${S.players[m].short}`, `Tras una temporada a su lado, ${p.name} ha heredado «${TRAITS[t].name}» de su padrino.`, 'good');
+        TL.Game.mail(S, `${p.short} aprende de ${S.players[m].short}`, `Tras una temporada a su lado, ${p.name} ha heredado «${traitInfo(S, t).name}» de su ${g(S, 'padrino', 'madrina')}.`, 'good');
       }
       // El ego se reconduce con un buen padrino
       if (hasTrait(S, p.id, 'ego') && hasTrait(S, m, 'leader') && Math.random() < 0.4) convertEgo(S, p);
@@ -202,7 +210,7 @@
 
   function convertEgo(S, p) {
     removeTrait(S, p.id, 'ego'); addTrait(S, p.id, 'egoTeam');
-    TL.News.add(S, 'positivo', `${p.short} ya juega para el equipo`, `El delantero que solo pensaba en el gol ahora también asiste. "He entendido que el ego se pone al servicio de todos", dice ${p.name}.`, S.user, p.id, 'pos');
+    TL.News.add(S, 'positivo', `${p.short} ya juega para el equipo`, `${g(S, 'El delantero', 'La delantera')} que solo pensaba en el gol ahora también asiste. "He entendido que el ego se pone al servicio de todos", dice ${p.name}.`, S.user, p.id, 'pos');
     TL.Game.mail(S, `${p.short} ha cambiado`, `${p.name} ha reconducido su ego: sigue teniendo hambre de gol, pero ya no se olvida de sus compañeros.`, 'good');
   }
 
@@ -212,10 +220,10 @@
     const had = pupilsOf(S, p.id).length > 0 || hasTrait(S, p.id, 'leader') || p.ovr >= S.clubs[S.user].rep;
     for (const k of pupilsOf(S, p.id)) delete L.mentor[k];
     if (!had) return;
-    const opts = [['youth', 'Entrenador de juveniles'], ['assistant', 'Segundo entrenador']];
-    if (p.pos === 'GK') opts.unshift(['gk', 'Entrenador de porteros']);
+    const opts = [['youth', g(S, 'Entrenador de juveniles', 'Entrenadora de juveniles')], ['assistant', g(S, 'Segundo entrenador', 'Segunda entrenadora')]];
+    if (p.pos === 'GK') opts.unshift(['gk', g(S, 'Entrenador de porteros', 'Entrenadora de porteras')]);
     opts.push(['farewell', 'Homenaje y despedida']);
-    TL.Game.mail(S, `${p.short} cuelga las botas`, `${p.name} se retira a los ${p.age} años. Conoce la casa y a los chavales. ¿Le ofreces un puesto en tu cuerpo técnico?`, 'decision',
+    TL.Game.mail(S, `${p.short} cuelga las botas`, `${p.name} se retira a los ${p.age} años. Conoce la casa y a ${g(S, 'los chavales', 'las chavalas')}. ¿Le ofreces un puesto en tu cuerpo técnico?`, 'decision',
       { ev: 'lk_staff', pid: p.id, opts });
   }
 
@@ -230,7 +238,7 @@
     p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
     p.mor = 80;
     state(S).gems[p.id] = { dna: dk, stage: 0, hidden: U.int(90, 95), apps: 0 };
-    TL.Game.mail(S, 'En la cantera hay un chaval distinto', `Los técnicos de la cantera no paran de hablar de ${p.name} (${p.age} años, ${F.POS_ES[pos]}). "Tiene algo que no se enseña", dicen. Dale minutos en su sitio y un plan de entrenamiento: puede ser algo muy grande.`, 'good');
+    TL.Game.mail(S, g(S, 'En la cantera hay un chaval distinto', 'En la cantera hay una chavala distinta'), `Los técnicos de la cantera no paran de hablar de ${p.name} (${p.age} años, ${F.POS_ES[pos]}). "Tiene algo que no se enseña", dicen. Dale minutos en su sitio y un plan de entrenamiento: puede ser algo muy grande.`, 'good');
     return p;
   }
 
@@ -245,7 +253,7 @@
       g.stage = 1;
       const p = S.players[pid];
       p.pot = Math.max(p.pot, g.hidden - 6);
-      TL.News.add(S, 'positivo', `${p.short}, la joya de la cantera`, `La prensa ya le compara con las leyendas: "Tiene el ${d.name.toLowerCase()} de los genios de antes". Su techo parece altísimo.`, S.user, pid, 'pos');
+      TL.News.add(S, 'positivo', `${p.short}, la joya de la cantera`, `La prensa ya ${g(S, 'le', 'la')} compara con las leyendas: "Tiene el ${d.name.toLowerCase()} de los genios de antes". Su techo parece altísimo.`, S.user, pid, 'pos');
       TL.Game.mail(S, `✨ Destello de ${p.short}`, `${p.name} empieza a enseñar su ADN: ${d.name}. ${d.hint} Si lo haces, al final de la temporada desbloqueará algo único.`, 'good');
     }
   }
@@ -258,7 +266,7 @@
       g.stage = 2;
       addTrait(S, p.id, d.trait);
       p.pot = Math.max(p.pot, g.hidden);
-      TL.Game.mail(S, `🌟 ${p.short} desbloquea su ADN`, `Ha jugado en su sitio y ha entrenado lo que necesitaba: ${p.name} gana «${TRAITS[d.trait].name}». Su potencial ya no tiene techo.`, 'good');
+      TL.Game.mail(S, `🌟 ${p.short} desbloquea su ADN`, `Ha jugado en su sitio y ha entrenado lo que necesitaba: ${p.name} gana «${traitInfo(S, d.trait).name}». Su potencial ya no tiene techo.`, 'good');
       TL.News.add(S, 'positivo', `Nace una estrella en ${S.clubs[S.user].name}`, `${p.name} se consolida como uno de los talentos del continente.`, S.user, p.id, 'pos');
     } else if (g.stage >= 1 && g.stage < 2 && g.apps < 5) {
       g.hidden = Math.max(p.pot, g.hidden - 2);
@@ -279,11 +287,16 @@
     f: ['Hina', 'Yui', 'Sakura', 'Aoi', 'Rin', 'Mei', 'Nanami', 'Kaede', 'Mio', 'Saki'],
     s: ['Tanaka', 'Sato', 'Kobayashi', 'Yamamoto', 'Nakamura', 'Fujita', 'Morimoto', 'Kurosawa', 'Hayashi', 'Ishikawa', 'Kondo', 'Mizuno'] };
   const SCOUT = [
-    { trait: 'dribble', pos: ['CAM', 'RW', 'LW'], from: 'Japón', title: 'Un regate de dibujos animados', body: n => `Tu ojeador en Japón ha visto a ${n}, un chaval que juega con el balón pegado al pie y que dice que "el balón es su amigo". Se va de tres como si nada.` },
-    { trait: 'cat', pos: ['GK'], from: 'Japón', title: 'Un portero que no se deja meter goles', body: n => `Desde Japón llega el informe de ${n}, un portero de reflejos imposibles que nunca se quita la gorra. Asegura que no encajará ni un gol desde fuera del área.` },
-    { trait: 'ego', pos: ['ST'], from: 'Japón', title: 'El delantero más egoísta', body: n => `${n} sale de un programa experimental japonés que encerró a cientos de delanteros para fabricar al más egoísta. Marca muchísimo, pero no se la pasa a nadie. Habrá que reconducirle.` },
-    { trait: 'vision', pos: ['ST', 'CAM'], from: 'Japón', title: 'Un chaval que lo ve todo', body: n => `${n} juega de delantero en un equipo modesto, pero tu ojeador cree que su visión de juego es de otro planeta. "Quizá rinda aún más de lateral", apunta en el informe.` },
-    { trait: 'tiger', pos: ['ST'], from: null, title: 'Un disparo que asusta', body: n => `Tu ojeador ha encontrado a ${n}, un delantero con un disparo tan potente que los porteros del juvenil se apartan.` }
+    { trait: 'dribble', pos: ['CAM', 'RW', 'LW'], from: 'Japón', title: 'Un regate de dibujos animados', body: n => `Tu ojeador en Japón ha visto a ${n}, un chaval que juega con el balón pegado al pie y que dice que "el balón es su amigo". Se va de tres como si nada.`,
+      bodyF: n => `Tu ojeador en Japón ha visto a ${n}, una chavala que juega con el balón pegado al pie y que dice que "el balón es su amigo". Se va de tres como si nada.` },
+    { trait: 'cat', pos: ['GK'], from: 'Japón', title: 'Un portero que no se deja meter goles', body: n => `Desde Japón llega el informe de ${n}, un portero de reflejos imposibles que nunca se quita la gorra. Asegura que no encajará ni un gol desde fuera del área.`,
+      titleF: 'Una portera que no se deja meter goles', bodyF: n => `Desde Japón llega el informe de ${n}, una portera de reflejos imposibles que nunca se quita la gorra. Asegura que no encajará ni un gol desde fuera del área.` },
+    { trait: 'ego', pos: ['ST'], from: 'Japón', title: 'El delantero más egoísta', body: n => `${n} sale de un programa experimental japonés que encerró a cientos de delanteros para fabricar al más egoísta. Marca muchísimo, pero no se la pasa a nadie. Habrá que reconducirle.`,
+      titleF: 'La delantera más egoísta', bodyF: n => `${n} sale de un programa experimental japonés que encerró a cientos de delanteras para fabricar a la más egoísta. Marca muchísimo, pero no se la pasa a nadie. Habrá que reconducirla.` },
+    { trait: 'vision', pos: ['ST', 'CAM'], from: 'Japón', title: 'Un chaval que lo ve todo', body: n => `${n} juega de delantero en un equipo modesto, pero tu ojeador cree que su visión de juego es de otro planeta. "Quizá rinda aún más de lateral", apunta en el informe.`,
+      titleF: 'Una chavala que lo ve todo', bodyF: n => `${n} juega de delantera en un equipo modesto, pero tu ojeador cree que su visión de juego es de otro planeta. "Quizá rinda aún más de lateral", apunta en el informe.` },
+    { trait: 'tiger', pos: ['ST'], from: null, title: 'Un disparo que asusta', body: n => `Tu ojeador ha encontrado a ${n}, un delantero con un disparo tan potente que los porteros del juvenil se apartan.`,
+      bodyF: n => `Tu ojeador ha encontrado a ${n}, una delantera con un disparo tan potente que las porteras del juvenil se apartan.` }
   ];
 
   function scoutOffer(S) {
@@ -301,7 +314,8 @@
     if (sc.from === 'Japón') { const nm = `${U.pick(S.gender === 'F' ? JP.f : JP.m)} ${U.pick(JP.s)}`; p.name = nm; p.short = nm.split(' ')[1]; }
     addTrait(S, p.id, sc.trait);
     const fee = F.roundMoney(W().value(S, p) * 0.6);
-    TL.Game.mail(S, `Informe del ojeador: ${sc.title.toLowerCase()}`, sc.body(p.name) + ` Puedes traerle por ${U.money(fee)}.`, 'decision', { ev: 'lk_scout', pid: p.id, fee, opts: [['sign', `Ficharle (${U.money(fee)})`], ['pass', 'Dejarlo pasar']] });
+    const fem = S.gender === 'F';
+    TL.Game.mail(S, `Informe del ojeador: ${((fem && sc.titleF) || sc.title).toLowerCase()}`, ((fem && sc.bodyF) || sc.body)(p.name) + ` Puedes ${g(S, 'traerle', 'traerla')} por ${U.money(fee)}.`, 'decision', { ev: 'lk_scout', pid: p.id, fee, opts: [['sign', `${g(S, 'Ficharle', 'Ficharla')} (${U.money(fee)})`], ['pass', 'Dejarlo pasar']] });
   }
 
   // ------------------------------------------------------------ Cesiones
@@ -369,15 +383,15 @@
     p.mor = Math.max(p.mor == null ? 70 : p.mor, 74);
     W().dirty(S);
     TL.Commerce.refreshBudget(S);
-    TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} se hace con ${p.name}, cedido`, `Llega cedido desde el ${S.clubs[from].name} hasta final de temporada${fee ? ' por ' + U.money(fee) : ''}. Pagas su ficha (${U.money(p.wage)}/sem).`, S.user, p.id, 'pos');
+    TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} se hace con ${p.name}, ${g(S, 'cedido', 'cedida')}`, `Llega ${g(S, 'cedido', 'cedida')} desde el ${S.clubs[from].name} hasta final de temporada${fee ? ' por ' + U.money(fee) : ''}. Pagas su ficha (${U.money(p.wage)}/sem).`, S.user, p.id, 'pos');
     return { ok: true, msg: `${p.short} llega cedido hasta final de temporada.` };
   }
 
   /** Repescar a un cedido (solo con el mercado abierto). */
   function recall(S, p) {
     const l = loanOf(S, p.id);
-    if (!l || l.from !== S.user) return { ok: false, msg: 'No está cedido por ti.' };
-    if (!TL.Market.windowOpen(S)) return { ok: false, msg: 'Solo puedes repescarle con el mercado abierto.' };
+    if (!l || l.from !== S.user) return { ok: false, msg: g(S, 'No está cedido por ti.', 'No está cedida por ti.') };
+    if (!TL.Market.windowOpen(S)) return { ok: false, msg: g(S, 'Solo puedes repescarle con el mercado abierto.', 'Solo puedes repescarla con el mercado abierto.') };
     endLoan(S, l, true);
     return { ok: true, msg: `${p.short} vuelve a tu plantilla.` };
   }
@@ -565,7 +579,7 @@
       } else if (S.week >= pr.until) {
         L.promises = L.promises.filter(x => x !== pr);
         bossAdd(S, p.id, -25); p.mor = Math.max(0, (p.mor || 70) - 15);
-        TL.Game.mail(S, `Promesa incumplida con ${p.short}`, `Le prometiste minutos y no los ha tenido. ${p.name} se siente engañado: su relación contigo se resiente.`, 'med');
+        TL.Game.mail(S, `Promesa incumplida con ${p.short}`, `Le prometiste minutos y no los ha tenido. ${p.name} se siente ${g(S, 'engañado', 'engañada')}: su relación contigo se resiente.`, 'med');
       }
     }
     office(S, sq, played);
@@ -595,13 +609,14 @@
     L.lastOffice = S.week;
     const D = {
       minutes: [`${p.short} pide una reunión`, `${p.name} entra en tu despacho: "Míster, quiero jugar más. Así no puedo demostrar nada".`,
-        [['promise', 'Prometerle minutos'], ['patience', 'Pedirle paciencia'], open ? ['list', 'Ponerle en venta'] : ['talk', 'Explicarle su papel']]],
-      loan: [`${p.short} quiere salir cedido`, `${p.name}, de ${p.age} años, te pide salir cedido para jugar: "Aquí no tengo sitio y necesito minutos".`,
-        [[open ? 'loan' : 'loanLater', open ? 'Buscarle una cesión' : 'Cederle en el próximo mercado'], ['promise', 'Prometerle minutos'], ['refuse', 'Negarte']]],
+        [['promise', 'Prometerle minutos'], ['patience', 'Pedirle paciencia'], open ? ['list', g(S, 'Ponerle en venta', 'Ponerla en venta')] : ['talk', 'Explicarle su papel']]],
+      loan: [`${p.short} quiere salir ${g(S, 'cedido', 'cedida')}`, `${p.name}, de ${p.age} años, te pide salir ${g(S, 'cedido', 'cedida')} para jugar: "Aquí no tengo sitio y necesito minutos".`,
+        [[open ? 'loan' : 'loanLater', open ? 'Buscarle una cesión' : g(S, 'Cederle en el próximo mercado', 'Cederla en el próximo mercado')], ['promise', 'Prometerle minutos'], ['refuse', 'Negarte']]],
       raise: [`${p.short} quiere renovar`, `${p.name} está rindiendo a gran nivel y su agente pide sentarse a hablar de una renovación.`,
-        [['renew', 'Renovarle ya'], ['later', 'Hablarlo en verano'], ['no', 'No hay renovación']]],
-      ego: [`${p.short} no la pasa nunca`, `Varios jugadores se quejan en tu despacho: ${p.name} solo piensa en marcar y no da un pase. Él dice que "un delantero tiene que ser egoísta".`,
-        [['talk', 'Hablar con él'], ['let', 'Dejarle ser'], ['bench', 'Mandarle al banquillo']]]
+        [['renew', g(S, 'Renovarle ya', 'Renovarla ya')], ['later', 'Hablarlo en verano'], ['no', 'No hay renovación']]],
+      ego: [`${p.short} no la pasa nunca`, g(S, `Varios jugadores se quejan en tu despacho: ${p.name} solo piensa en marcar y no da un pase. Él dice que "un delantero tiene que ser egoísta".`,
+        `Varias jugadoras se quejan en tu despacho: ${p.name} solo piensa en marcar y no da un pase. Ella dice que "una delantera tiene que ser egoísta".`),
+        [['talk', g(S, 'Hablar con él', 'Hablar con ella')], ['let', g(S, 'Dejarle ser', 'Dejarla ser')], ['bench', g(S, 'Mandarle al banquillo', 'Mandarla al banquillo')]]]
     };
     const [title, body, opts] = D[kind];
     if (kind === 'raise') (L.asked || (L.asked = {}))[p.id] = S.season;
@@ -620,7 +635,7 @@
     if (!actReady(S, 'bbq') && !actReady(S, 'dayoff')) return;
     L.lastAsk = S.week;
     const cap = W().squad(S, S.user).filter(p => hasTrait(S, p.id, 'leader')).sort((a, b) => b.ovr - a.ovr)[0] || W().squad(S, S.user).sort((a, b) => b.age - a.age)[0];
-    TL.Game.mail(S, `Los capitanes proponen algo antes del ${S.clubs[opp].name}`, `${cap ? cap.short : 'El capitán'} viene de parte del grupo: "Míster, se viene un partido gordo. ¿Hacemos algo para unirnos?"`, 'decision',
+    TL.Game.mail(S, `Los capitanes proponen algo antes del ${S.clubs[opp].name}`, `${cap ? cap.short : g(S, 'El capitán', 'La capitana')} viene de parte del grupo: "Míster, se viene un partido gordo. ¿Hacemos algo para unirnos?"`, 'decision',
       { ev: 'lk_act', pid: cap ? cap.id : null, opts: [['bbq', `Barbacoa (${U.money(actCost(S, 'bbq'))})`], ['dayoff', 'Día libre'], ['retreat', `Concentración (${U.money(actCost(S, 'retreat'))})`], ['no', 'A entrenar']] });
   }
 
@@ -653,7 +668,7 @@
     return W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).filter(r => r[1] <= -30).sort((a, b) => a[1] - b[1]).map(r => r[0])[0] || null;
   }
   function meetOptions(S, p) {
-    const o = [['praise', 'Elogiarle', 'Sube su moral y vuestra relación.'], ['demand', 'Exigirle más', 'Puede picarse para bien… o tomárselo mal.'], ['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente.']];
+    const o = [['praise', g(S, 'Elogiarle', 'Elogiarla'), 'Sube su moral y vuestra relación.'], ['demand', 'Exigirle más', 'Puede picarse para bien… o tomárselo mal.'], ['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente.']];
     const en = enemyOf(S, p);
     if (en) o.push(['reconcile', `Mediar con ${en.short}`, 'Intentar que hagan las paces.']);
     if (hasTrait(S, p.id, 'ego')) o.push(['ego', 'Hablar de su ego', 'Que entienda que el equipo va primero.']);
@@ -683,10 +698,10 @@
       let want;
       if (onLoan(S, p.id)) want = 'Está a gusto, pero sabe que en verano vuelve a su club.';
       else if (m < 40) want = 'No es feliz aquí. Si no cambia algo, pedirá salir.';
-      else if (share < 0.35 && r < 16 && S.week >= 4) want = p.age <= 22 ? 'Quiere jugar. Si no hay sitio, prefiere salir cedido.' : 'Quiere más minutos: cree que merece jugar.';
+      else if (share < 0.35 && r < 16 && S.week >= 4) want = p.age <= 22 ? 'Quiere jugar. Si no hay sitio, prefiere salir ' + g(S, 'cedido.', 'cedida.') : 'Quiere más minutos: cree que merece jugar.';
       else if (p.contract <= S.season + 1) want = 'Le gustaría renovar antes de que acabe su contrato.';
-      else if (p.age >= 32) want = 'Piensa en sus últimos años de carrera; le haría ilusión quedarse en el club después, como técnico.';
-      else want = 'Está contento con su papel y con el grupo.';
+      else if (p.age >= 32) want = 'Piensa en sus últimos años de carrera; le haría ilusión quedarse en el club después, ' + g(S, 'como técnico.', 'como entrenadora.');
+      else want = g(S, 'Está contento con su papel y con el grupo.', 'Está contenta con su papel y con el grupo.');
       const fr = W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).sort((a, c) => c[1] - a[1])[0];
       bossAdd(S, p.id, 2);
       return { msg: `${want}${fr && fr[1] >= 40 ? ` Su mejor amigo en el vestuario es ${fr[0].short}.` : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.` };
@@ -701,7 +716,7 @@
     if (k === 'ego') {
       if (Math.random() < (b >= 10 ? 0.45 : 0.22)) { convertEgo(S, p); return { msg: `${p.short} se queda pensativo: "Si el equipo gana, yo gano". Algo ha cambiado.`, good: true }; }
       mor(p, -3);
-      return { msg: `"Un delantero tiene que ser egoísta, míster". No le convences… todavía. Un padrino con galones podría ayudar.` };
+      return { msg: g(S, `"Un delantero tiene que ser egoísta, míster". No le convences… todavía. Un padrino con galones podría ayudar.`, `"Una delantera tiene que ser egoísta, míster". No la convences… todavía. Una madrina con galones podría ayudar.`) };
     }
     return { msg: '' };
   }
@@ -712,22 +727,22 @@
     lk_minutes: { opts: [
       ['promise', 'Prometerle minutos', (S, p) => { state(S).promises.push({ pid: p.id, apps0: appsOf(S, p.id), need: 2, until: S.week + 4 }); mor(p, 10); bossAdd(S, p.id, 4); return 'Le prometes jugar al menos 2 de los próximos 4 partidos. No le falles.'; }],
       ['patience', 'Pedirle paciencia', (S, p) => { if (boss(S, p.id) >= 20) { mor(p, 3); return 'Confía en ti y lo acepta.'; } mor(p, -6); bossAdd(S, p.id, -5); return 'Sale del despacho de morros.'; }],
-      ['list', 'Ponerle en venta', (S, p) => { p.listed = true; mor(p, 5); return 'Lo pones en la lista de transferibles.'; }],
-      ['talk', 'Explicarle su papel', (S, p) => { if (Math.random() < 0.55) { mor(p, 4); bossAdd(S, p.id, 4); return 'Entiende su papel en el equipo.'; } mor(p, -4); return 'No le convences.'; }]
+      ['list', 'Ponerle en venta', (S, p) => { p.listed = true; mor(p, 5); return g(S, 'Lo pones en la lista de transferibles.', 'La pones en la lista de transferibles.'); }],
+      ['talk', 'Explicarle su papel', (S, p) => { if (Math.random() < 0.55) { mor(p, 4); bossAdd(S, p.id, 4); return 'Entiende su papel en el equipo.'; } mor(p, -4); return g(S, 'No le convences.', 'No la convences.'); }]
     ] },
     lk_loan: { opts: [
       ['loan', 'Buscarle una cesión', (S, p) => { const r = loanOut(S, p); return r.msg; }],
       ['loanLater', 'Cederle en el próximo mercado', (S, p) => { mor(p, 3); (state(S).loanLater || (S.lk.loanLater = [])).push(p.id); return 'Le buscarás equipo en cuanto abra el mercado.'; }],
       ['promise', 'Prometerle minutos', (S, p) => { state(S).promises.push({ pid: p.id, apps0: appsOf(S, p.id), need: 2, until: S.week + 4 }); mor(p, 8); return 'Le prometes minutos en las próximas 4 jornadas.'; }],
-      ['refuse', 'Negarte', (S, p) => { mor(p, -10); bossAdd(S, p.id, -10); return 'Se queda, pero muy molesto.'; }]
+      ['refuse', 'Negarte', (S, p) => { mor(p, -10); bossAdd(S, p.id, -10); return g(S, 'Se queda, pero muy molesto.', 'Se queda, pero muy molesta.'); }]
     ] },
     lk_raise: { opts: [
       ['renew', 'Renovarle ya', (S, p) => { const y = TL.Market.renewOptions(S, p); if (!y.length) return 'Ya tiene contrato largo.'; const r = TL.Market.renew(S, p, y[Math.min(1, y.length - 1)]); bossAdd(S, p.id, 10); return r.msg; }],
       ['later', 'Hablarlo en verano', (S, p) => { mor(p, -4); return 'Lo aplazas. Su agente no está contento.'; }],
-      ['no', 'No hay renovación', (S, p) => { mor(p, -10); bossAdd(S, p.id, -12); return 'Se siente infravalorado.'; }]
+      ['no', 'No hay renovación', (S, p) => { mor(p, -10); bossAdd(S, p.id, -12); return g(S, 'Se siente infravalorado.', 'Se siente infravalorada.'); }]
     ] },
     lk_ego: { opts: [
-      ['talk', 'Hablar con él', (S, p) => { const ch = boss(S, p.id) >= 10 ? 0.5 : 0.25; if (Math.random() < ch) { convertEgo(S, p); return '¡Lo entiende! A partir de ahora juega para el equipo.'; } mor(p, -3); return 'Te escucha, pero sigue a lo suyo. Quizá un buen padrino le ayude.'; }],
+      ['talk', 'Hablar con él', (S, p) => { const ch = boss(S, p.id) >= 10 ? 0.5 : 0.25; if (Math.random() < ch) { convertEgo(S, p); return '¡Lo entiende! A partir de ahora juega para el equipo.'; } mor(p, -3); return g(S, 'Te escucha, pero sigue a lo suyo. Quizá un buen padrino le ayude.', 'Te escucha, pero sigue a lo suyo. Quizá una buena madrina la ayude.'); }],
       ['let', 'Dejarle ser', (S, p) => { W().squad(S, S.user).forEach(q => { if (q !== p) bond(S, p.id, q.id, -4); }); mor(p, 4); return 'Sigue tirando a puerta… y el vestuario murmura.'; }],
       ['bench', 'Mandarle al banquillo', (S, p) => { mor(p, -12); bossAdd(S, p.id, -10); if (Math.random() < 0.3) { convertEgo(S, p); return 'Le duele, pero aprende la lección.'; } return 'Se lo toma fatal.'; }]
     ] },
@@ -740,14 +755,14 @@
     lk_scout: { opts: [
       ['sign', 'Ficharle', (S, p, q, data) => {
         const fee = data.fee || 0;
-        if (TL.Commerce.transferBudget(S) < fee) return 'No tienes presupuesto para traerle.';
+        if (TL.Commerce.transferBudget(S) < fee) return g(S, 'No tienes presupuesto para traerle.', 'No tienes presupuesto para traerla.');
         const c = S.clubs[S.user];
         TL.Market.logMove(S, p, -1, S.user, fee);
         p.club = S.user; p.contract = S.season + 4; p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
         c.cash -= fee; S.fin.buys += fee; p.mor = 82;
         W().dirty(S); TL.Commerce.refreshBudget(S);
-        TL.News.add(S, 'fichajes', `${c.name} ficha a la promesa ${p.name}`, `Llega con ${p.age} años y fama de jugador especial.`, S.user, p.id, 'pos');
-        return `${p.name} ya es tuyo. Mira su ficha: tiene un rasgo especial.`;
+        TL.News.add(S, 'fichajes', `${c.name} ficha a la promesa ${p.name}`, `Llega con ${p.age} años y fama de ${g(S, 'jugador', 'jugadora')} especial.`, S.user, p.id, 'pos');
+        return `${p.name} ya es ${g(S, 'tuyo', 'tuya')}. Mira su ficha: tiene un rasgo especial.`;
       }],
       ['pass', 'Dejarlo pasar', (S, p) => {
         const L = TL.World.userLeague(S);
@@ -755,8 +770,8 @@
         TL.Market.logMove(S, p, -1, rival.id, 0);
         p.club = rival.id; p.contract = S.season + 3; p.wage = F.wageFor(p.ovr, p.age, S.leagues[rival.league].wealth, S.econ.wage);
         W().dirty(S);
-        TL.News.add(S, 'fichajes', `${rival.name} ficha a la promesa ${p.name}`, `Un rival de tu liga se adelanta y se lleva al chaval del que hablaba tu ojeador.`, rival.id, p.id, 'neu');
-        return `Se lo lleva el ${rival.name}. Ya lo verás enfrente.`;
+        TL.News.add(S, 'fichajes', `${rival.name} ficha a la promesa ${p.name}`, g(S, 'Un rival de tu liga se adelanta y se lleva al chaval del que hablaba tu ojeador.', 'Un rival de tu liga se adelanta y se lleva a la chavala de la que hablaba tu ojeador.'), rival.id, p.id, 'neu');
+        return g(S, `Se lo lleva el ${rival.name}. Ya lo verás enfrente.`, `Se la lleva el ${rival.name}. Ya la verás enfrente.`);
       }]
     ] },
     lk_staff: { opts: [
@@ -809,8 +824,8 @@
   }
 
   TL.Locker = {
-    TRAITS, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
-    canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem,
+    TRAITS, traitInfo, dnaHint, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
+    canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem, scoutOffer,
     onLoan, loanOf, loanOut, loanIn, loanable, recall, endLoans, activity, actCost, actReady, matchBoost,
     afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet, grows, pushHist
   };
