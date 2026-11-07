@@ -127,7 +127,8 @@ TL_I18N_ADD([
   ['Pedir préstamo', 'Take a loan', 'Demander un prêt', 'Kredit aufnehmen', 'Chiedi un prestito'],
   ['Recibirás {} y pagarás {} cada semana durante {} semanas (total {}).', 'You will receive {} and pay {} every week for {} weeks (total {}).', 'Vous recevrez {} et paierez {} chaque semaine pendant {} semaines (total {}).', 'Du erhältst {} und zahlst {} pro Woche für {} Wochen (insgesamt {}).', 'Riceverai {} e pagherai {} ogni settimana per {} settimane (totale {}).'],
   ['Firmar', 'Sign', 'Signer', 'Unterschreiben', 'Firma'],
-  ['Nivel {} · {}/{} XP · {} punto{} disponible{}', 'Level {} · {}/{} XP · {} point{} available', 'Niveau {} · {}/{} XP · {} point{} disponible{}', 'Stufe {} · {}/{} XP · {} Punkt{} verfügbar', 'Livello {} · {}/{} XP · {} punt{} disponibil{}'],
+  ['Nivel {} · {}/{} XP · {} punto disponible', 'Level {} · {}/{} XP · {} point available', 'Niveau {} · {}/{} XP · {} point disponible', 'Stufe {} · {}/{} XP · {} Punkt verfügbar', 'Livello {} · {}/{} XP · {} punto disponibile'],
+  ['Nivel {} · {}/{} XP · {} puntos disponibles', 'Level {} · {}/{} XP · {} points available', 'Niveau {} · {}/{} XP · {} points disponibles', 'Stufe {} · {}/{} XP · {} Punkte verfügbar', 'Livello {} · {}/{} XP · {} punti disponibili'],
   ['Ganas experiencia con cada partido (más con victorias y contra rivales mejores) y al cumplir objetivos, ganar títulos o ascender.', 'You gain experience with every match (more for wins and against stronger opponents) and by meeting targets, winning titles or getting promoted.', 'Vous gagnez de l’expérience à chaque match (plus avec les victoires et contre des adversaires plus forts) et en remplissant vos objectifs, en gagnant des titres ou en montant.', 'Du sammelst Erfahrung mit jedem Spiel (mehr bei Siegen und gegen stärkere Gegner) und durch erreichte Ziele, Titel oder Aufstiege.', 'Guadagni esperienza a ogni partita (di più con le vittorie e contro avversari migliori) e raggiungendo obiettivi, vincendo titoli o venendo promosso.'],
   ['Partida guardada', 'Game saved', 'Partie sauvegardée', 'Spielstand gespeichert', 'Partita salvata'],
   ['No se pudo guardar (almacenamiento lleno)', 'Could not save (storage full)', 'Sauvegarde impossible (stockage plein)', 'Speichern fehlgeschlagen (Speicher voll)', 'Impossibile salvare (memoria piena)'],
@@ -231,7 +232,13 @@ TL_I18N_ADD([
   ['Formando los equipos…', 'Building the teams…', 'Composition des équipes…', 'Teams werden gebildet…', 'Formazione delle squadre…'],
   ['Elige equipo', 'Choose team', 'Choisissez une équipe', 'Team wählen', 'Scegli la squadra'],
   ['No se pudo preparar el torneo', 'Could not set up the tournament', 'Impossible de préparer le tournoi', 'Turnier konnte nicht vorbereitet werden', 'Impossibile preparare il torneo'],
-  ['📩 {} oferta{} por tus jugadores · Mercado → Mis ventas', '📩 {} offer{} for your players · Transfers → My sales', '📩 {} offre{} pour vos joueurs · Mercato → Mes ventes', '📩 {} Angebot{} für deine Spieler · Transfermarkt → Meine Verkäufe', '📩 {} offert{} per i tuoi giocatori · Mercato → Le mie cessioni'],
+  ['📩 {} oferta por tus jugadores · Mercado → Mis ventas', '📩 {} offer for your players · Transfers → My sales', '📩 {} offre pour vos joueurs · Mercato → Mes ventes', '📩 {} Angebot für deine Spieler · Transfermarkt → Meine Verkäufe', '📩 {} offerta per i tuoi giocatori · Mercato → Le mie cessioni'],
+  ['📩 {} ofertas por tus jugadores · Mercado → Mis ventas', '📩 {} offers for your players · Transfers → My sales', '📩 {} offres pour vos joueurs · Mercato → Mes ventes', '📩 {} Angebote für deine Spieler · Transfermarkt → Meine Verkäufe', '📩 {} offerte per i tuoi giocatori · Mercato → Le mie cessioni'],
+  ['{} punto por gastar', '{} point to spend', '{} point à dépenser', '{} Punkt zu vergeben', '{} punto da spendere'],
+  ['{} temporada', '{} season', '{} saison', '{} Saison', '{} stagione'],
+  ['{} temporadas', '{} seasons', '{} saisons', '{} Saisons', '{} stagioni'],
+  ['Hasta {} (+{} temporada)', 'Until {} (+{} season)', 'Jusqu’en {} (+{} saison)', 'Bis {} (+{} Saison)', 'Fino al {} (+{} stagione)'],
+  ['Hasta {} (+{} temporadas)', 'Until {} (+{} seasons)', 'Jusqu’en {} (+{} saisons)', 'Bis {} (+{} Saisons)', 'Fino al {} (+{} stagioni)'],
   ['¡Nivel {} de mánager! Tienes puntos de habilidad.', 'Manager level {}! You have skill points.', 'Niveau {} d’entraîneur ! Vous avez des points de compétence.', 'Manager-Stufe {}! Du hast Fähigkeitspunkte.', 'Livello {} da manager! Hai punti abilità.'],
   ['Comercial', 'Commercial', 'Commercial', 'Kommerz', 'Commerciale'],
   ['Resumen', 'Overview', 'Résumé', 'Übersicht', 'Riepilogo'],
@@ -258,5 +265,6 @@ TL_I18N_ADD([
   ['· fama de técnico defensivo.', '· known as a defensive coach.', '· réputé entraîneur défensif.', '· gilt als defensiver Trainer.', '· fama di tecnico difensivo.'],
   ['· fama de técnico de posesión.', '· known as a possession coach.', '· réputé entraîneur de possession.', '· gilt als Ballbesitz-Trainer.', '· fama di tecnico del possesso.'],
   ['· fama de técnico pragmático.', '· known as a pragmatic coach.', '· réputé entraîneur pragmatique.', '· gilt als pragmatischer Trainer.', '· fama di tecnico pragmatico.'],
-  ['· fama de técnico de contragolpe.', '· known as a counter-attacking coach.', '· réputé entraîneur de contre-attaque.', '· gilt als Konter-Trainer.', '· fama di tecnico da contropiede.']
+  ['· fama de técnico de contragolpe.', '· known as a counter-attacking coach.', '· réputé entraîneur de contre-attaque.', '· gilt als Konter-Trainer.', '· fama di tecnico da contropiede.'],
+  ['· fama de técnico equilibrado.', '· known as a balanced coach.', '· réputé entraîneur équilibré.', '· gilt als ausgewogener Trainer.', '· fama di tecnico equilibrato.']
 ]);

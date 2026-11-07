@@ -67,6 +67,9 @@
       // La misma frase sin su emoji (los emojis se cambian por iconos y quedan en otro nodo)
       const e2 = stripEmoji(es);
       if (e2 !== es && tr) add(e2, stripEmoji(tr));
+      // …y sin el separador inicial («· fama de técnico…» llega como «fama de técnico…»)
+      const lead = /^[·•|]\s+/;
+      if (lead.test(es) && tr) add(es.replace(lead, ''), tr.replace(lead, ''));
     }
     // Las frases largas primero: «{} de {}» no debe ganar a «{} renueva hasta {}»
     for (const list of buckets.values()) list.sort((a, b) => b.len - a.len);
@@ -87,7 +90,15 @@
   function sub(x) {
     if (!x || depth > 3 || !/\p{L}{3}/u.test(x)) return x;
     depth++;
-    try { const r = lookup(x) ?? seq(x); return r == null ? x : r; } finally { depth--; }
+    try {
+      let r = lookup(x) ?? seq(x);
+      // «terminar entre los 7 primeros» (en minúscula dentro de una frase)
+      if (r == null && /^\p{Ll}/u.test(x)) {
+        const up = x[0].toUpperCase() + x.slice(1), r2 = lookup(up) ?? seq(up);
+        if (r2 != null) r = r2[0].toLowerCase() + r2.slice(1);
+      }
+      return r == null ? x : r;
+    } finally { depth--; }
   }
   function candidates(s) {
     const out = [], seen = new Set();
@@ -104,7 +115,8 @@
     if (!exact) build();
     const e = exact.get(s);
     if (e != null) return e;
-    for (const p of candidates(s)) {
+    // La frase más larga es la más concreta: «Hasta {} (+{} temporadas)» antes que «Hasta {}»
+    for (const p of candidates(s).sort((a, b) => b.len - a.len)) {
       const m = p.re.exec(s);
       if (m) return fill(p, m);
     }
