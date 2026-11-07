@@ -41,10 +41,15 @@
     return f;
   }
 
-  /** Rendimiento de un jugador en un puesto: media × adaptación × forma física × moral. */
-  function eff(p, slot) {
+  /** Cuánto corre cada puesto en un partido (1 = la media). */
+  const POS_LOAD = { CB: 0.86, RB: 1.12, LB: 1.12, CDM: 1.04, CM: 1.12, CAM: 0.98, RM: 1.1, LM: 1.1, RW: 1.04, LW: 1.04, ST: 0.92 };
+
+  /** Rendimiento de un jugador en un puesto: media × adaptación × forma física × moral.
+   *  `en`: energía en el partido (0-100); si no se da, la forma física con la que llega. */
+  function eff(p, slot, en) {
     const mor = p.mor == null ? 70 : p.mor;
-    return p.ovr * fit(p, slot) * (0.75 + 0.25 * p.fit / 100) * (0.97 + 0.06 * mor / 100);
+    const f = en == null ? p.fit : en;
+    return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * (0.97 + 0.06 * mor / 100);
   }
 
   function available(p) { return p.inj <= 0 && p.sus <= 0; }
@@ -288,7 +293,7 @@
   function teamStrength(onPitch, mult) {
     mult = mult || 1;
     const lines = [[], [], [], []];
-    for (const o of onPitch) lines[F.LINE[o.slot]].push(eff(o.p, o.slot) * (o.hurt ? 0.6 : 1));
+    for (const o of onPitch) lines[F.LINE[o.slot]].push(eff(o.p, o.slot, o.en) * (o.hurt ? 0.6 : 1));
     const avg = a => (a.length ? U.sum(a) / a.length : null);
     let gk = avg(lines[0]), def = avg(lines[1]), mid = avg(lines[2]), att = avg(lines[3]);
     const any = avg(lines.flat()) || 40;
@@ -381,6 +386,7 @@
         if (pid < 0) return;
         onPitch.push({ pid, slot: slots[i][0], idx: i });
         this.pl[pid] = this._rec(idx, slots[i][0], 0);
+        this.pl[pid].en = this.P(pid).fit;
       });
       const bench = pickBench(players, ids, 9);
       return {
@@ -431,7 +437,7 @@
         }
         if (t.isUser) tm *= LK.matchBoost(this.S);
       }
-      const st = teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt })), mult * tm);
+      const st = teamStrength(t.onPitch.map(o => ({ p: this.P(o.pid), slot: o.slot, hurt: o.hurt, en: this.pl[o.pid] && this.pl[o.pid].en })), mult * tm);
       // Choque de sistemas: puntas contra centrales, bandas, centro del campo
       const c = TL.Coach.clash(t.formation, this.teams[1 - i].formation);
       st.attack += c.attack + extra.att + extra.mid * 0.3; st.mid += c.mid + extra.mid; st.defense += extra.def + extra.mid * 0.3;
@@ -548,9 +554,11 @@
           t.lateCall = true;
           this._ev('late', i, null, null, say('late', { t: this.S.clubs[t.club].name }));
         }
+        this._tire(i, possI);
         if (Math.random() < 0.22 / 90 * this.bonus[i].injury) this._injury(i);
-        if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 3 && Math.random() < 0.09) this._fatigueSub(i);
+        if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
       }
+      if (m % 5 === 0) this._str = null; // el cansancio va pesando
       if (m === 45) {
         this._halfTime();
         if (this.detail) this._ev('ht', -1, null, null, `Descanso. ${this.score[0]}-${this.score[1]}.`);
@@ -839,7 +847,7 @@
     _injury(i) {
       const t = this.teams[i];
       if (!t.onPitch.length) return;
-      const o = U.weighted(t.onPitch, o => 115 - this.P(o.pid).fit);
+      const o = U.weighted(t.onPitch, o => 125 - this.energy(o.pid));
       const p = this.P(o.pid);
       const rec = this.pl[p.id];
       if (!rec || rec.inj) return;
@@ -870,13 +878,46 @@
       return this.substitute(i, out.pid, best);
     }
 
+    /** Energía actual de un jugador en el partido (0-100). */
+    energy(pid) {
+      const r = this.pl[pid];
+      return r && r.en != null ? r.en : this.P(pid).fit;
+    }
+
+    /** Desgaste de un minuto. No todos se cansan igual: cuenta el puesto (un lateral corre más que un
+     *  central), el físico, la edad, el «motor» de cada uno, la mentalidad, si tu equipo va detrás del
+     *  balón y el cuerpo técnico. */
+    _tire(i, possI) {
+      const t = this.teams[i];
+      const press = 0.92 + 0.16 * (1 - (possI == null ? 0.5 : possI));
+      const ment = [0.95, 1, 1.08][t.mentality] * (t.desperate ? 1.08 : 1) * (this.bonus[i].fatigue || 1) * press;
+      for (const o of t.onPitch) {
+        const r = this.pl[o.pid], p = this.P(o.pid);
+        if (!r) continue;
+        if (r.en == null) r.en = p.fit;
+        const base = o.slot === 'GK' ? 0.07 : 0.3 * (POS_LOAD[o.slot] || 1);
+        const phys = 1.25 - (p.st[5] || 60) / 200;
+        const age = p.age >= 32 ? 1.12 : p.age <= 21 ? 0.95 : 1;
+        const motor = 0.86 + (F.hash(p.name) % 1000) / 1000 * 0.28; // pulmones de cada uno (0,86-1,14)
+        const swing = 0.8 + Math.random() * 0.4;                    // hay minutos y minutos
+        r.en = Math.max(15, r.en - base * phys * age * motor * ment * swing * (o.hurt ? 1.6 : 1));
+        // Aviso en directo cuando uno de los tuyos está fundido (una vez por jugador)
+        if (this.detail && t.isUser && !r.tiredMsg && r.en < 52 && this.min >= 55 && o.slot !== 'GK') {
+          r.tiredMsg = true;
+          this._ev('tired', i, o.pid, null, U.pick([`${p.short} está fundido: ya no llega a las ayudas.`,
+            `${p.short} pide aire. Las piernas ya no le responden.`, `${p.short} se lleva las manos a las rodillas. Va justo de fuerzas.`]));
+        }
+      }
+    }
+
     _fatigueSub(i) {
       const t = this.teams[i];
       const cands = t.onPitch.filter(o => o.slot !== 'GK');
       if (!cands.length || !t.bench.length) return;
-      const tired = o => this.P(o.pid).fit - this.min * 0.1 * (1 - this.P(o.pid).st[5] / 200) - (this.pl[o.pid].y ? 8 : 0);
+      const tired = o => this.energy(o.pid) - (this.pl[o.pid].y ? 8 : 0);
       const out = cands.reduce((a, b) => (tired(a) < tired(b) ? a : b));
-      const cur = eff(this.P(out.pid), out.slot) * (1 - this.min / 600);
+      if (this.energy(out.pid) > 85 && !this.pl[out.pid].y) return; // nadie lo necesita todavía
+      const cur = eff(this.P(out.pid), out.slot, this.energy(out.pid));
       const best = t.bench.map(pid => this.P(pid)).filter(p => p.pos !== 'GK')
         .sort((a, b) => eff(b, out.slot) - eff(a, out.slot))[0];
       if (best && eff(best, out.slot) >= cur * 0.88) this.substitute(i, out.pid, best.id);
@@ -892,6 +933,7 @@
       t.bench.splice(bi, 1);
       this.pl[outPid].off = this.min;
       this.pl[inPid] = this._rec(i, o.slot, this.min);
+      this.pl[inPid].en = this.P(inPid).fit;
       o.pid = inPid; o.hurt = false;
       t.subs++;
       this._str = null;
@@ -962,6 +1004,12 @@
     }
 
     _halfTime() {
+      // En el vestuario se recupera un poco el aliento (nunca por encima de cómo llegaron)
+      for (const i of [0, 1]) for (const o of this.teams[i].onPitch) {
+        const r = this.pl[o.pid];
+        if (r && r.en != null) r.en = Math.min(this.P(o.pid).fit, r.en + 6);
+      }
+      this._str = null;
       for (const i of [0, 1]) {
         const t = this.teams[i];
         if (t.isUser && this.detail) continue; // el usuario elige su charla
