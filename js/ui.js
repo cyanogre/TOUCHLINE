@@ -77,6 +77,7 @@
     if (p.inj > 0) t.push(`<span class="tag inj">LES ${p.inj}s</span>`);
     if (p.sus > 0) t.push('<span class="tag sus">SANC</span>');
     if (p.listed) t.push('<span class="tag list">EN VENTA</span>');
+    else if (p.sale) t.push(`<span class="tag list" title="${esc(TL.Market.SALE[p.sale.r].t)}">EN VENTA −${Math.round(p.sale.d * 100)}%</span>`);
     if (p.club === S.user && p.contract <= S.season + 1) t.push(`<span class="tag exp">FIN ${p.contract}</span>`);
     const LK = TL.Locker;
     if (LK && S.lk) {
@@ -98,7 +99,7 @@
     const sub = o.sub != null ? o.sub : `${flag(S, p)} ${p.age} años · ${U.money(W.value(S, p))}`;
     return `<button class="prow ${o.cls || ''}" data-act="${o.act || 'player'}" data-id="${p.id}"${o.attrs || ''}>
       ${posB(p.pos)}
-      <span class="pmain"><span class="pname">${esc(p.name)}${playerTags(S, p)}</span><span class="psub">${sub}</span></span>
+      <span class="pmain"><span class="pname">${esc(p.name)}${o.tags === false ? '' : playerTags(S, p)}</span><span class="psub">${sub}</span></span>
       ${o.cols ? `<span class="pcols">${o.cols}</span>` : ''}
       ${o.right || ''}
       ${ovrB(p.ovr)}
@@ -332,6 +333,7 @@
   UI.render = render;
   UI.refresh = () => render(true);
   A.tab = el => { UI.tab = el.dataset.tab; TL.SFX && TL.SFX.tab(); render(false); };
+  A['go-loans'] = () => { closeSheet(); UI.tab = 'market'; UI.market.tab = 'loans'; UI.market.limit = 40; render(false); };
 
   function pageTitle(t, sub, right) {
     return `<div class="page-title"><div><h1>${t}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${right || ''}</div>`;
@@ -574,6 +576,7 @@
     const gems = Object.keys(S.lk.gems).map(id => S.players[id]).filter(p => p && p.club === S.user)
       .map(p => { const g = S.lk.gems[p.id]; return li(g.stage >= 2 ? '🌟' : '✨', `${pl(p)} · ${g.stage === 0 ? 'talento oculto' : g.stage === 1 ? 'ADN: ' + LK.DNA[g.dna].name : g.stage === 2 ? 'ADN desbloqueado' : 'superestrella'}`); }).join('');
     const loans = S.lk.loans.map(l => { const p = S.players[l.pid]; if (!p) return ''; return li('🔁', `${pl(p)} · ${l.from === S.user ? (S.gender === 'F' ? 'cedida al ' : 'cedido al ') + esc(S.clubs[l.to].name) : (S.gender === 'F' ? 'llega cedida del ' : 'llega cedido del ') + esc(S.clubs[l.from].name)}`); }).join('');
+    const loansAll = loans ? loans + li('📊', `<button class="link" data-act="go-loans">Seguimiento de cesiones →</button>`) : '';
     const staff = (S.staff || []).map(s => li(TL.Staff.ROLES[s.role].icon, `<b>${esc(s.name)}</b> · ${TL.Staff.ROLES[s.role].name} ${'★'.repeat(s.q)}`)).join('');
     const pending = S.inbox.filter(m => m.kind === 'decision' && !m.done && m.data && /^lk_/.test(m.data.ev || '')).length;
     const block = (t, body) => (body ? `<div class="lk-block"><div class="group-title">${t}</div><ul class="lk-list">${body}</ul></div>` : '');
@@ -597,7 +600,7 @@
       ${pending ? `<button class="lk-office" data-act="inbox"><span>🚪</span><span><b>${pending > 1 ? pending + ' reuniones pendientes' : '1 reunión pendiente'}</b><small>Te esperan en el despacho</small></span><span class="go">›</span></button>` : ''}
       ${alive}
       <div class="act-row">${acts}</div>
-      <div class="lk-grid">${block('Relaciones', prs)}${block(S.gender === 'F' ? 'Madrinas' : 'Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loans)}${block('Cuerpo técnico', staff)}</div>
+      <div class="lk-grid">${block('Relaciones', prs)}${block(S.gender === 'F' ? 'Madrinas' : 'Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loansAll)}${block('Cuerpo técnico', staff)}</div>
       <p class="note" style="margin:8px 0 0">${S.gender === 'F' ? 'Toca a una jugadora para hablar con ella en el despacho, ponerle madrina o un plan de entrenamiento.' : 'Toca a un jugador para hablar con él en el despacho, ponerle padrino o un plan de entrenamiento.'}</p></section>`;
   }
 
@@ -1036,6 +1039,103 @@
   }
   A['tl-f'] = el => { UI.market.log = el.dataset.k; UI.refresh(); };
 
+  // ------------------------------------------------------------ En venta: lo que la IA quiere vender
+  function saleView(S) {
+    const f = UI.saleF || (UI.saleF = { kind: '', line: '', cash: false });
+    const chips = [['', 'Todos'], ['sport', 'Motivos deportivos'], ['eco', 'Motivos económicos']]
+      .map(([k, l]) => `<button class="chip ${f.kind === k ? 'on' : ''}" data-act="sf-kind" data-k="${k}">${l}</button>`).join('') +
+      `<button class="chip ${f.cash ? 'on' : ''}" data-act="sf-cash">Lo que puedo pagar</button>`;
+    const lines = [['', 'Todas las líneas'], ['0', 'Porteros'], ['1', 'Defensas'], ['2', 'Medios'], ['3', 'Delanteros']]
+      .map(([k, l]) => `<option value="${k}" ${f.line === k ? 'selected' : ''}>${l}</option>`).join('');
+    const open = M.windowOpen(S);
+    return `<section class="card"><p class="note">Clubes que quieren vender: por motivos deportivos (no juega, le sobra, es veterano, acaba contrato) o económicos (deudas, masa salarial). Aceptan menos de lo que valen y, si nadie compra, cada semana bajan un poco más.${open ? '' : ' <b>Con el mercado cerrado no hay nadie en venta: vuelve cuando abra.</b>'}</p>
+      <div class="chips mt">${chips}</div>
+      <select class="mt" data-change="sf-line" aria-label="Línea">${lines}</select>
+      <div id="sale-res" class="mt"></div></section>`;
+  }
+  function renderSale(S) {
+    const box = document.getElementById('sale-res');
+    if (!box) return;
+    const f = UI.saleF || { kind: '', line: '', cash: false };
+    // Solo los que vendrían a tu club: los demás no son una oportunidad para ti
+    let res = M.onSale(S, { kind: f.kind, line: f.line }).filter(p => M.willing(S, p, S.user).ok);
+    const tb = TL.Commerce.transferBudget(S);
+    if (f.cash) res = res.filter(p => M.askingPrice(S, p, S.user) <= tb);
+    const shown = res.slice(0, UI.market.limit);
+    box.innerHTML = `<div class="group-title">${U.num(res.length)} en venta que vendrían a tu club</div><div class="plist">${shown.map(p => {
+      const club = S.clubs[p.club], ask = M.askingPrice(S, p, S.user), was = F.roundMoney(ask / (1 - p.sale.d));
+      const sub = `<span class="sale-why ${M.SALE[p.sale.r].eco ? 'eco' : ''}">${M.SALE[p.sale.r].s}</span> · ${crest(club, 'sm')} ${esc(club.short || club.name)} · ${p.age} años`;
+      return playerRow(S, p, { sub, tags: false, right: `<span class="sale-price"><i>−${Math.round(p.sale.d * 100)}%</i><s>${U.money(was)}</s><b>${U.money(ask)}</b></span>` });
+    }).join('') || '<div class="empty">Nadie en venta con estos filtros.</div>'}</div>
+      ${res.length > shown.length ? `<button class="btn block mt" data-act="sale-more">Mostrar más</button>` : ''}`;
+  }
+  A['sf-kind'] = el => { (UI.saleF || (UI.saleF = { kind: '', line: '', cash: false })).kind = el.dataset.k; UI.market.limit = 40; UI.refresh(); };
+  A['sf-cash'] = () => { const f = UI.saleF || (UI.saleF = { kind: '', line: '', cash: false }); f.cash = !f.cash; UI.market.limit = 40; UI.refresh(); };
+  C['sf-line'] = el => { (UI.saleF || (UI.saleF = { kind: '', line: '', cash: false })).line = el.value; UI.market.limit = 40; renderSale(G.S); };
+  A['sale-more'] = () => { UI.market.limit += 40; renderSale(G.S); };
+
+  // ------------------------------------------------------------ Cesiones: seguimiento y peticiones
+  const fem = S => S.gender === 'F';
+  function loanCard(S, l, out) {
+    const LK = TL.Locker, r = LK.loanReport(S, l), p = r.p;
+    const club = S.clubs[out ? l.to : l.from], lg = S.leagues[club.league];
+    const kpi = (k, v) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+    const d = r.dOvr ? ` <span class="${r.dOvr > 0 ? 'ok' : 'bad'}">${r.dOvr > 0 ? '+' : ''}${r.dOvr}</span>` : '';
+    let foot = '';
+    if (out) foot = M.windowOpen(S) ? `<button class="btn sm" data-act="loan-recall" data-id="${p.id}">${fem(S) ? 'Repescarla' : 'Repescarle'}</button>` : '';
+    else {
+      const pay = l.ws != null && l.ws < 1 ? `Pagas el ${Math.round(l.ws * 100)}\u00a0% de su ficha (${U.money(F.roundMoney(p.wage * l.ws))}/sem)` : `Pagas su ficha (${U.money(p.wage)}/sem)`;
+      const short = l.why === 'young' && r.weeks >= 3 && r.share < 0.4;
+      foot = `<p class="note">${pay}.${l.why === 'young' && !short ? ' Su club exige minutos.' : ''}</p>${short ? '<p class="note bad"><b>Su club exige minutos y ahora mismo no los tiene.</b></p>' : ''}`;
+    }
+    return `<div class="loan-card">
+      <button class="loan-head" data-act="player" data-id="${p.id}">${posB(p.pos)}<span class="grow"><b>${esc(p.name)}</b>
+        <span class="note">${p.age} años · ${out ? (fem(S) ? 'cedida en el ' : 'cedido en el ') : 'viene del '}${crest(club, 'xs')} ${esc(club.name)}${lg ? ' · ' + esc(lg.name) : ''}</span></span>
+        <span class="loan-role ${r.role[0]}">${r.role[1]}</span></button>
+      <div class="kpis four">${kpi('Partidos', r.apps)}${kpi('Goles', r.goals)}${kpi('Nota media', r.avg != null ? r.avg.toFixed(1) : '—')}${kpi('Media', p.ovr + d)}</div>
+      <div class="row between wrap loan-foot"><span class="note">Vuelve en verano, al acabar la temporada.</span>${foot}</div></div>`;
+  }
+  function loansView(S) {
+    const LK = TL.Locker, L = S.lk || { loans: [] };
+    const out = L.loans.filter(l => l.from === S.user && S.players[l.pid]);
+    const inn = L.loans.filter(l => l.to === S.user && S.players[l.pid]);
+    // Los tuyos que necesitan minutos: jóvenes que apenas juegan
+    const sq = W.squad(S, S.user);
+    const idle = sq.filter(p => p.age <= 23 && p.pot > p.ovr + 3 && !LK.onLoan(S, p.id) && (S.stats[p.id] || [0])[0] <= Math.max(1, S.week) * 0.35)
+      .sort((a, b) => b.pot - a.pot).slice(0, 5);
+    const f = UI.loanF || (UI.loanF = { why: '', line: '' });
+    const chips = [['', 'Todos'], ['young', 'Jóvenes talentos'], ['unhappy', 'A disgusto'], ['listed', 'En venta'], ['surplus', 'Descartes']]
+      .map(([k, l]) => `<button class="chip ${f.why === k ? 'on' : ''}" data-act="lf-why" data-k="${k}">${l}</button>`).join('');
+    const lines = [['', 'Todas las líneas'], ['0', 'Porteros'], ['1', 'Defensas'], ['2', 'Medios'], ['3', 'Delanteros']]
+      .map(([k, l]) => `<option value="${k}" ${f.line === k ? 'selected' : ''}>${l}</option>`).join('');
+    return `<section class="card"><div class="card-head"><h2>${fem(S) ? 'Tus cedidas' : 'Tus cedidos'} · ${out.length}</h2></div>
+        ${out.length ? out.map(l => loanCard(S, l, true)).join('') : `<div class="empty">${fem(S) ? 'No tienes ninguna jugadora cedida. Cede desde la ficha de una jugadora con el mercado abierto: las jóvenes que no juegan crecen más jugando fuera.' : 'No tienes a nadie cedido. Cede desde la ficha de un jugador con el mercado abierto: los jóvenes que no juegan crecen más jugando fuera.'}</div>`}
+        ${idle.length ? `<div class="group-title mt">Necesitan minutos</div><div class="plist">${idle.map(p => playerRow(S, p, { sub: `${p.age} años · pot. ${p.pot} · ${(S.stats[p.id] || [0])[0]} partidos` })).join('')}</div>` : ''}</section>
+      ${inn.length ? `<section class="card mt"><div class="card-head"><h2>${fem(S) ? 'Cedidas en tu plantilla' : 'Cedidos en tu plantilla'} · ${inn.length}</h2></div>${inn.map(l => loanCard(S, l, false)).join('')}</section>` : ''}
+      <section class="card mt"><div class="card-head"><h2>Pedir ${fem(S) ? 'cedidas' : 'cedidos'}</h2></div>
+        <p class="note">Talentos jóvenes que su club quiere que jueguen y ${fem(S) ? 'jugadoras' : 'jugadores'} que no están a gusto: refuerzan tu equipo hasta final de temporada sin pagar traspaso y, a veces, su club paga parte de la ficha.${M.windowOpen(S) ? '' : ' <b>Con el mercado cerrado puedes mirar, pero no cerrar la cesión.</b>'}</p>
+        <div class="chips mt">${chips}</div>
+        <select class="mt" data-change="lf-line" aria-label="Línea">${lines}</select>
+        <div id="loan-cands" class="mt"></div></section>`;
+  }
+  function renderLoanCands(S) {
+    const box = document.getElementById('loan-cands');
+    if (!box) return;
+    const f = UI.loanF || { why: '', line: '' };
+    const res = TL.Locker.loanCandidates(S, f);
+    const shown = res.slice(0, UI.market.limit);
+    const tag = { young: 'Joven talento', unhappy: 'A disgusto', listed: 'En venta', surplus: 'Descarte' };
+    box.innerHTML = `<div class="group-title">${U.num(res.length)} ${fem(S) ? 'disponibles' : 'disponibles'}</div><div class="plist">${shown.map(([p, t]) => {
+      const club = S.clubs[p.club];
+      const sub = `${crest(club, 'sm')} ${esc(club.name)} · ${p.age} años · <span class="loan-why ${t.why}">${tag[t.why]}</span> · pagas ${U.money(t.wage)}/sem${t.fee ? ' + ' + U.money(t.fee) : ''}`;
+      return playerRow(S, p, { sub, cols: `<span class="w-s">${p.pot > p.ovr ? '↑' + p.pot : ''}</span>` });
+    }).join('') || '<div class="empty">Nadie encaja con estos filtros ahora mismo.</div>'}</div>
+      ${res.length > shown.length ? `<button class="btn block mt" data-act="lc-more">Mostrar más</button>` : ''}`;
+  }
+  A['lf-why'] = el => { (UI.loanF || (UI.loanF = { why: '', line: '' })).why = el.dataset.k; UI.market.limit = 40; UI.refresh(); };
+  C['lf-line'] = el => { (UI.loanF || (UI.loanF = { why: '', line: '' })).line = el.value; UI.market.limit = 40; renderLoanCands(G.S); };
+  A['lc-more'] = () => { UI.market.limit += 40; renderLoanCands(G.S); };
+
   VIEWS.market = S => {
     const open = M.windowOpen(S);
     const t = UI.market.tab;
@@ -1045,10 +1145,12 @@
       <div class="row between wrap"><div><b style="color:${open ? 'var(--accent2)' : 'var(--warn)'}">${open ? '● Mercado abierto' : '● Mercado cerrado'}</b>
       <div class="note">${open ? (S.week <= 3 ? 'Cierra tras la jornada 3' : `Cierra tras la jornada ${mid + 2}`) : (S.week < mid ? `Reabre en la jornada ${mid}` : 'Reabre en verano')} · Los agentes libres se pueden fichar siempre.</div></div>
       <div class="num" style="text-align:right"><div style="font-size:20px;font-weight:700">${U.money(TL.Commerce.transferBudget(S))}</div><div class="note">para fichajes · salarios ${U.money(W.wageBill(S, S.user))} / ${U.money(c.wageBudget)}</div></div></div></div>`;
-    const seg = `<div class="seg" style="margin-bottom:12px">${[['search', 'Buscar'], ['free', 'Libres'], ['mine', 'Mis ventas'], ['log', 'Historial']]
+    const seg = `<div class="seg" style="margin-bottom:12px">${[['search', 'Buscar'], ['sale', 'En venta'], ['free', 'Libres'], ['loans', 'Cesiones'], ['mine', 'Mis ventas'], ['log', 'Historial']]
       .map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-act="mk-tab" data-k="${k}">${l}</button>`).join('')}</div>`;
     let body;
     if (t === 'log') body = transferLog(S);
+    else if (t === 'loans') body = loansView(S);
+    else if (t === 'sale') body = saleView(S);
     else if (t === 'mine') {
       const listed = W.squad(S, S.user).filter(p => p.listed);
       const offers = S.inbox.filter(m => m.kind === 'offer' && !m.done);
@@ -1080,7 +1182,7 @@
     }
     return pageTitle('Mercado', '') + banner + seg + body;
   };
-  VIEWS.marketAfter = S => { if (UI.market.tab !== 'mine') renderMarketResults(S); };
+  VIEWS.marketAfter = S => { const t = UI.market.tab; if (t === 'loans') renderLoanCands(S); else if (t === 'sale') renderSale(S); else if (t !== 'mine' && t !== 'log') renderMarketResults(S); };
 
   function renderMarketResults(S) {
     const box = document.getElementById('m-results');
@@ -1458,8 +1560,7 @@
     let actions = '';
     const loan = TL.Locker.loanOf(S, p.id);
     if (loan && loan.from === S.user) {
-      actions = `<div class="nego"><p class="note">Cedido por ti al <b>${esc(S.clubs[loan.to].name)}</b> hasta final de temporada. Vuelve en verano.</p>
-        ${M.windowOpen(S) ? `<button class="btn sm" data-act="loan-recall" data-id="${p.id}">Repescarle ahora</button>` : ''}</div>`;
+      actions = `<div class="group-title">Su cesión</div>${loanCard(S, loan, true)}`;
     } else if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
     if (mine || (loan && loan.from === S.user)) actions = lockerSection(S, p) + actions;
@@ -1520,25 +1621,39 @@
       <button class="btn sm danger" data-act="release" data-id="${p.id}">Rescindir</button></div>${renew}`;
   }
 
+  /** Cesión: por qué su club le dejaría salir y en qué condiciones. */
+  function loanBox(S, p) {
+    if (p.club < 0) return '';
+    const t = TL.Locker.loanTerms(S, p);
+    if (!t.ok) return `<div class="nego mt loan-box"><b>Cesión</b><p class="note">${esc(t.reason)}</p></div>`;
+    const pay = t.ws < 1 ? `pagas el ${Math.round(t.ws * 100)}\u00a0% de su ficha (${U.money(t.wage)}/sem)` : `pagas su ficha (${U.money(t.wage)}/sem)`;
+    const open = M.windowOpen(S);
+    return `<div class="nego mt loan-box"><b>Cesión hasta final de temporada</b>
+      <p class="note">${esc(t.text)}</p>
+      <p class="note">Sin traspaso${t.fee ? ` (solo ${U.money(t.fee)} por la cesión)` : ''}: ${pay}.</p>
+      ${t.needsMinutes ? '<p class="note"><b>Su club exige que juegue:</b> si no le das minutos, se lo llevará en invierno.</p>' : ''}
+      ${open ? `<button class="btn block mt" data-act="loan-in" data-id="${p.id}">🔁 ${S.gender === 'F' ? 'Pedirla cedida' : 'Pedirlo cedido'}</button>` : '<p class="note">Podrás pedir la cesión cuando abra el mercado.</p>'}</div>`;
+  }
+
   function transferPanel(S, p) {
     const free = p.club === -1;
     const open = M.windowOpen(S);
     const w = M.willing(S, p, S.user);
     if (!w.ok) return `<div class="nego"><p class="note bad">${esc(w.reason)}</p></div>`;
-    if (!free && !open) return `<div class="nego"><p class="note">El mercado está cerrado. Podrás negociar en la próxima ventana de fichajes.</p></div>`;
+    if (!free && !open) return `<div class="nego"><p class="note">El mercado está cerrado. Podrás negociar en la próxima ventana de fichajes.</p></div>${loanBox(S, p)}`;
     if (!free && W.squad(S, p.club).length <= 18) return `<div class="nego"><p class="note">${esc(S.clubs[p.club].name)} no vende: tiene la plantilla corta.</p></div>`;
     let n = UI.nego && UI.nego.pid === p.id ? UI.nego : null;
     if (!n) {
-      n = UI.nego = { pid: p.id, stage: free ? 'contract' : 'offer', fee: free ? 0 : F.roundMoney(W.value(S, p)), years: Math.min(3, M.maxYears(p)) };
+      n = UI.nego = { pid: p.id, stage: free ? 'contract' : 'offer', fee: free ? 0 : p.sale ? M.askingPrice(S, p, S.user) : F.roundMoney(W.value(S, p)), years: Math.min(3, M.maxYears(p)) };
     }
     if (n.stage === 'offer') {
       const step = F.roundMoney(Math.max(W.value(S, p) * 0.05, 10000 * S.econ.value));
-      return `<div class="nego"><div class="row between"><b>Hacer oferta</b><span class="note">Valor ${U.money(W.value(S, p))}</span></div>
+      const sale = p.sale ? `<p class="note sale-note">🏷️ <b>En venta:</b> ${esc(M.SALE[p.sale.r].t)}. Su club acepta un ${Math.round(p.sale.d * 100)}\u00a0% menos: pide unos ${U.money(M.askingPrice(S, p, S.user))}.</p>` : '';
+      return `<div class="nego"><div class="row between"><b>Hacer oferta</b><span class="note">Valor ${U.money(W.value(S, p))}</span></div>${sale}
         <div class="stepper mt"><button class="btn" data-act="fee" data-d="${-step}" aria-label="Bajar">−</button>
         <input class="num" value="${U.money(n.fee)}" readonly aria-label="Oferta"><button class="btn" data-act="fee" data-d="${step}" aria-label="Subir">+</button></div>
         <button class="btn primary block mt" data-act="bid" data-id="${p.id}">Ofertar ${U.money(n.fee)}</button>
-        ${TL.Locker.loanable(S, p).ok ? `<button class="btn block mt" data-act="loan-in" data-id="${p.id}">🔁 Pedirlo cedido · pagas su ficha (${U.money(p.wage)}/sem)</button>` : ''}
-        ${n.msg ? `<p class="note ${n.ok ? 'ok' : 'bad'}">${esc(n.msg)}</p>` : ''}</div>`;
+        ${n.msg ? `<p class="note ${n.ok ? 'ok' : 'bad'}">${esc(n.msg)}</p>` : ''}</div>${loanBox(S, p)}`;
     }
     const wage = M.wageDemand(S, p, S.user);
     const err = M.canAfford(S, n.fee, wage);

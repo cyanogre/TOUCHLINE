@@ -421,6 +421,7 @@
     TL.Game.mail(S, `Temporada ${U.seasonLabel(S.season)}`,
       `Objetivo de la directiva: ${S.board.text}. Presupuesto salarial: ${U.money(S.clubs[S.user].wageBudget)}/sem. ` +
       'El mercado de verano está abierto hasta la jornada 3.', 'board');
+    TL.Market.aiListings(S);
   }
 
   /** Elimina del array a los jugadores generados ya retirados (y reasigna ids). */
