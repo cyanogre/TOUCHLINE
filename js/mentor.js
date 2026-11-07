@@ -569,6 +569,11 @@
       { text: 'Necesitamos resultados ya. Juega a lo seguro unas semanas.', emo: 'neutral' }] },
     { id: 'cashNegative', cooldown: 12, when: S => S.clubs[S.user].cash < 0, lines: [
       { text: 'Estamos en **números rojos**. Vende a alguien que no juegue, firma patrocinios o pide un préstamo pequeño.', emo: 'worried', voice: 'rojos' }] },
+    { id: 'tiredXI', cooldown: 12, when: S => (S.tactics.slots || []).map(id => S.players[id]).filter(p => p && p.club === S.user && p.fit < 75 && p.inj <= 0).length >= 3, lines: [
+      { text: 'Míster, el once **llega fundido**. El cansancio se acumula: si juegan siempre los mismos, rinden menos y se lesionan más.', emo: 'worried' },
+      { text: 'Rota a los que estén por debajo del 75 % y dales una semana de descanso: quien descansa recupera mucho más.', emo: 'thinking', choices: [
+        { label: 'Ir a la alineación', value: 'go', fx: () => setTimeout(() => { TL.UI.tab = 'tactics'; TL.UI.render(false); }, 300) },
+        { label: 'Luego lo miro', value: 'no', reply: { text: 'Tú verás. Pero los partidos se pierden en las piernas antes que en la pizarra.', emo: 'neutral' } }] }] },
     { id: 'halfSeason', season: true, when: S => S.week === Math.floor(S.fixtures.length / 2), lines: [
       { text: S => { const tab = TL.Season.table(S); const pos = tab.findIndex(r => r.id === S.user) + 1; return pos <= S.board.target
         ? `Media temporada y vamos **${pos}º**. Vamos por buen camino para el objetivo.` : `Media temporada y vamos **${pos}º**. Hay que apretar: el objetivo es quedar entre los ${S.board.target} primeros.`; }, voice: 'mitad' },

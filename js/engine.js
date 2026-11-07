@@ -49,7 +49,7 @@
   function eff(p, slot, en) {
     const mor = p.mor == null ? 70 : p.mor;
     const f = en == null ? p.fit : en;
-    return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * (0.97 + 0.06 * mor / 100);
+    return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * (0.916 + 0.12 * mor / 100);
   }
 
   function available(p) { return p.inj <= 0 && p.sus <= 0; }
@@ -555,7 +555,7 @@
           this._ev('late', i, null, null, say('late', { t: this.S.clubs[t.club].name }));
         }
         this._tire(i, possI);
-        if (Math.random() < 0.22 / 90 * this.bonus[i].injury) this._injury(i);
+        if (Math.random() < 0.22 / 90 * this.bonus[i].injury * this._tiredRisk(i)) this._injury(i);
         if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
       }
       if (m % 5 === 0) this._str = null; // el cansancio va pesando
@@ -842,6 +842,15 @@
         const ot = this.teams[1 - i].onPitch;
         if (ot.length && Math.random() < 0.5) this._yellow(1 - i, this.P(U.pick(ot).pid));
       }
+    }
+
+    /** Un equipo fundido se lesiona más: ×1 descansado, ×2 hacia el 50 % de energía. */
+    _tiredRisk(i) {
+      const on = this.teams[i].onPitch;
+      if (!on.length) return 1;
+      let s = 0;
+      for (const o of on) s += this.energy(o.pid);
+      return 1 + Math.max(0, 72 - s / on.length) / 22;
     }
 
     _injury(i) {
