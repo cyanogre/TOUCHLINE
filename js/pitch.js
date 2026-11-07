@@ -1019,7 +1019,7 @@
           this.slowT = 1;
           const big = e.big || type === 'header' || epic;
           if (big) this._banner('¡PARADÓN!', '#5db8ff', 1.3, true);
-          if (!this.instant && TL.SFX) TL.SFX.chance();
+          if (!this.instant && TL.SFX) { TL.SFX.chance(); if (big) TL.SFX.save(); }
           const catchIt = Math.random() < 0.5;
           if (gk && catchIt) { this._receive(gk.pid); this.ball.z = 0.5; }
           else {

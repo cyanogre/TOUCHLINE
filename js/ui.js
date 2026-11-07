@@ -1423,7 +1423,7 @@
     const r = M.sign(S, p, n.fee, M.wageDemand(S, p, S.user), n.years);
     if (r.ok) {
       G.save(); closeSheet(); toast(`¡${p.short} es nuevo jugador del club!`); UI.refresh();
-      TL.FX.confetti(); TL.SFX.success(); setTimeout(() => TL.SFX.coin(), 200);
+      TL.FX.confetti(); TL.SFX.signing();
     } else { n.msg = r.msg; n.ok = false; openPlayer(p.id); }
   };
   A.renew = el => {
@@ -1507,7 +1507,7 @@
     UI.seasonSum = sum;
     const champ = S.clubs[sum.champion];
     const ok = sum.pos <= sum.target;
-    if (fresh && (ok || sum.moved === 'up')) setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); TL.SFX.ovation(sum.pos === 1 ? 1.5 : 1); }, 300);
+    if (fresh && (ok || sum.moved === 'up')) setTimeout(() => { TL.FX.confetti({ palette: sum.pos === 1 ? 'gold' : undefined }); TL.SFX.levelUp(); if (sum.pos === 1) TL.SFX.title(); else TL.SFX.ovation(1); }, 300);
     if (fresh && !sum.fired) setTimeout(() => TL.Mentor.event(S, 'seasonEnd', sum), 900);
     const moved = sum.moved === 'up' ? '<p class="pos-ok" style="font-weight:700">¡Ascenso conseguido!</p>' :
       sum.moved === 'down' ? '<p class="neg" style="font-weight:700">Descenso de categoría.</p>' : '';
@@ -1777,7 +1777,7 @@
         <h2 style="font-size:26px;margin:6px 0">${won ? `¡${esc(S.clubs[S.user].name)}, campeón!` : `Campeón: ${esc(S.clubs[cup.champ].name)}`}</h2>
         <p class="muted">${won ? `Has ganado el ${esc(cup.name)}. Leyenda.` : 'El torneo ha terminado. ¿Otra vez?'}</p></div>
         <div class="nm-actions"><button class="btn primary" data-act="tour-new">🏆 Nuevo torneo</button><button class="btn" data-act="tour-exit">Menú principal</button></div></section>`;
-      if (won && !UI.tourParty) { UI.tourParty = true; setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); TL.SFX.ovation(1.5); }, 300); }
+      if (won && !UI.tourParty) { UI.tourParty = true; setTimeout(() => { TL.FX.confetti({ palette: 'gold' }); TL.SFX.levelUp(); TL.SFX.title(); }, 300); }
     } else if (cp) {
       const h = S.clubs[cp.home], a = S.clubs[cp.away];
       main = `<section class="card next-match cup span2" style="--cup:${cup.color}">
