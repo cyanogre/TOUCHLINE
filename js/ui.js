@@ -205,7 +205,7 @@
         <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
     } else {
     const L = W.userLeague(S);
-    const d = U.dateOf(S.season, S.week).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const d = U.dateOf(S.season, S.week).toLocaleDateString((TL.I18N ? TL.I18N.locale() : 'es-ES'), { day: 'numeric', month: 'short', timeZone: 'UTC' });
     const wk = S.over ? 'Fin de temporada' : `J${Math.min(S.week + 1, S.fixtures.length)} · ${d}`;
     document.getElementById('topbar').innerHTML = `
       ${crest(c)}
@@ -1076,6 +1076,7 @@
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-mentor">${profeIc()} Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
+        <div class="mt">${TL.I18N.picker()}</div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
     </div>`;
   }
@@ -1577,6 +1578,7 @@
         <button class="btn" data-act="tour-new">🏆 Modo torneo · Mundial y Champions</button>
         <button class="btn ghost" data-act="import">Importar partida</button>
       </div>
+      ${TL.I18N.picker()}
       <div class="title-toggles">
         <button data-act="title-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
         <button data-act="title-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
@@ -1585,6 +1587,7 @@
     </div>`;
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
+  A.lang = el => TL.I18N.set(el.dataset.l);
   A['title-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); renderTitle(); };
   UI.renderTitle = renderTitle;
 

@@ -301,7 +301,8 @@
     return it.b.duration * 1000;
   }
   function stopVoice() { if (playing) { try { playing.stop(); } catch (e) { /* ya paró */ } playing = null; } }
-  const voiceOn = job => TL.SFX && TL.SFX.on() && job.opts.voice !== false;
+  // La voz grabada está en castellano: en otros idiomas, solo los pitidos
+  const voiceOn = job => TL.SFX && TL.SFX.on() && job.opts.voice !== false && (!TL.I18N || TL.I18N.lang === 'es');
   /** Suena `key` al empezar la frase actual; si aún no estaba cargado, suena en cuanto llegue (si seguimos en ella). */
   function speak(key) {
     if (!cur || !key) return;
@@ -361,7 +362,8 @@
     const emo = line.emo || cur.opts.emo || 'neutral';
     cur.face.setEmotion(emo);
     cur.mood = MOOD_VOICE[emo] || 0;
-    const text = typeof line.text === 'function' ? line.text(TL.Game.S) : line.text;
+    const raw = typeof line.text === 'function' ? line.text(TL.Game.S) : line.text;
+    const text = TL.t ? TL.t(raw) : raw; // traducido antes de escribirse
     cur.tk = tokens(text);
     cur.n = 0;
     cur.typing = true;
