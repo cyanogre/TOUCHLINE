@@ -1585,6 +1585,7 @@
       </div>
       <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Música: “Strategic Swing”. · v${TL.VERSION || '3'}</p>
     </div>`;
+    setTimeout(() => TL.Splash && TL.Splash.preload(), 1200); // portadas de «Nueva partida»
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
   A.lang = el => TL.I18N.set(el.dataset.l);
@@ -1621,10 +1622,13 @@
     const z = UI.wz;
     let html = '';
     if (z.step === 0) {
-      html = wizHead('Competición', 0) + `<div class="pick-list">
-        <button class="pick big-pick" data-act="wz-gender" data-g="M"><span class="flag">⚽</span><span class="grow"><div class="t">Fútbol masculino</div><div class="s">17.849 jugadores · 34 ligas jugables</div></span>${icon('next')}</button>
-        <button class="pick big-pick" data-act="wz-gender" data-g="F"><span class="flag">⚽</span><span class="grow"><div class="t">Fútbol femenino</div><div class="s">1.940 jugadoras · 5 ligas jugables</div></span>${icon('next')}</button>
-      </div>`;
+      // Portadas vivas en acuarela (js/splash.js): se animan al montar la pantalla
+      html = wizHead('Competición', 0) + `<div class="sp-picks">${[
+        ['M', 'Fútbol masculino', '17.849 jugadores · 34 ligas jugables'],
+        ['F', 'Fútbol femenino', '1.940 jugadoras · 5 ligas jugables'],
+      ].map(([g, t, sub]) => `<div class="sp-slot"><button class="sp-card" data-act="wz-gender" data-g="${g}" data-splash="${g}">
+          <canvas class="sp-art" aria-hidden="true"></canvas><span class="sp-glare" aria-hidden="true"></span>
+          <span class="sp-info"><span class="t">${t}</span><span class="s">${sub}</span></span></button></div>`).join('')}</div>`;
     } else if (z.step === 1) {
       if (!z.data) html = wizHead('Elige liga', 1) + '<div class="spinner"></div>';
       else {
@@ -1659,6 +1663,7 @@
     }
     app().innerHTML = `<div class="wizard">${html}</div>`;
     window.scrollTo(0, 0);
+    if (z.step === 0 && TL.Splash) app().querySelectorAll('[data-splash]').forEach((b, i) => TL.Splash.mount(b, b.dataset.splash, i * 220));
   }
 
   A['wz-back'] = () => {
@@ -1669,10 +1674,19 @@
   };
   A['wz-gender'] = async el => {
     const z = UI.wz;
+    if (z.busy) return;
+    const load = G.loadData(el.dataset.g); // carga mientras la portada celebra la elección
+    load.catch(() => {});
+    if (TL.Splash && TL.Splash.burst(el)) {
+      z.busy = true;
+      await new Promise(r => setTimeout(r, 650));
+      z.busy = false;
+      if (UI.wz !== z || z.step !== 0) return;
+    }
     z.gender = el.dataset.g; z.step = 1; z.data = null;
     renderWizard();
     try {
-      z.data = await G.loadData(z.gender);
+      z.data = await load;
       z.prev = G.preview(z.data);
       if (UI.wz === z && z.step === 1) renderWizard();
     } catch (e) {
