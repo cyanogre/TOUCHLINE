@@ -94,6 +94,20 @@
     el('mv-prog').style.width = Math.min(100, m.min / 90 * 100) + '%';
   }
 
+  /** La grada canta: más cuando su equipo gana o tras un gol; la afición visitante, menos y desde un lado. */
+  function crowdSongs(evs) {
+    const m = MV.m;
+    if (!TL.SFX.on() || MV.skip || (MV.pitch && MV.pitch.speed > 4)) return;
+    const goal = evs.find(e => e.type === 'goal');
+    const pick = () => U.pick(['lolo', 'lolo', 'ohe', 'ale', 'clap']);
+    if (goal) { MV.songAt = m.min + 1; MV.songAway = goal.team === 1; return; } // después de celebrar
+    if (MV.songAt != null && m.min >= MV.songAt) { TL.SFX.chant(MV.songAway ? 'ale' : pick(), { away: MV.songAway, vol: 0.55 }); MV.songAt = null; return; }
+    const lead = m.score[0] - m.score[1];
+    const p = 0.035 + (lead > 0 ? 0.035 : 0) + (m.min >= 75 && lead > 0 ? 0.04 : 0);
+    if (Math.random() < p) TL.SFX.chant(pick(), { vol: 0.45 });
+    else if (Math.random() < 0.012 + (lead < 0 ? 0.015 : 0)) TL.SFX.chant('ale', { away: true, vol: 0.5 });
+  }
+
   /** ¿Este evento merece detener el partido para que decidas? */
   function pauseReason(e) {
     const P = settings().pause;
@@ -117,6 +131,7 @@
     if (MV.pitch) MV.pitch.push(evs, !!MV.skip);
     if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
+    crowdSongs(evs);
     if (MV.tab !== 'feed') renderTab();
     if (m.min === 45 && !MV.htDone) {
       MV.htDone = true;
@@ -551,7 +566,7 @@
     const body = el('mv-body');
     const letter = UI.resultLetter(S, res);
     const inc = (m.incidents || []).length;
-    if (letter === 'V') { TL.FX.confetti(); TL.SFX.goal(true); }
+    if (letter === 'V') { TL.FX.confetti(); TL.SFX.ovation(1.2); }
     else if (letter === 'D') TL.SFX.groan();
     body.innerHTML = `<div class="card center" style="margin-bottom:12px"><div style="font-family:var(--font-c);font-weight:800;font-size:28px;color:${letter === 'V' ? 'var(--accent2)' : letter === 'D' ? 'var(--danger)' : 'var(--muted)'}">
         ${letter === 'V' ? 'Victoria' : letter === 'D' ? 'Derrota' : 'Empate'}</div>

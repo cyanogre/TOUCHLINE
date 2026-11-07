@@ -14,7 +14,10 @@
       ctx = new C();
       master = ctx.createGain();
       master.gain.value = 0.55;
-      master.connect(ctx.destination);
+      // Limitador suave: aunque coincidan gol, ovación y cántico, nunca satura
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = 0.003; lim.release.value = 0.25;
+      master.connect(lim); lim.connect(ctx.destination);
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
@@ -79,8 +82,184 @@
   /** Chasquido corto (el "clic" físico del botón). */
   function tick(vol, delay) { burst(0.014, 'highpass', 3800, vol || 0.16, 0.7, delay); }
 
+
+  // ------------------------------------------------------------ Público: aplausos, silbidos, ovaciones y cánticos
+  // Todo sintetizado (sin archivos): cientos de palmadas, silbidos de dedos y un coro de grada con reverberación.
+  let clapBuf = null, revBuf = null, chantNow = null;
+  const live = new Set(); // nodos del público que hay que poder parar al salir del partido
+  function track(n, until) { live.add(n); setTimeout(() => live.delete(n), Math.max(0, (until - ctx.currentTime) * 1000) + 300); }
+  function panner(v) { if (!ctx.createStereoPanner) return null; const p = ctx.createStereoPanner(); p.pan.value = v; return p; }
+
+  /** Tres segundos de aplauso: cada palmada con su propio timbre (unas manos suenan graves, otras secas). */
+  function clapBuffer() {
+    if (clapBuf) return clapBuf;
+    const sr = ctx.sampleRate, len = sr * 3, b = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = b.getChannelData(ch);
+      for (let k = 0; k < 300; k++) {
+        const at = Math.floor(Math.random() * (len - 1200)), L = 260 + Math.floor(Math.random() * 520);
+        const amp = 0.25 + Math.random() * 0.75, tone = 0.25 + Math.random() * 0.55;
+        let lp = 0;
+        for (let i = 0; i < L; i++) {
+          const w = Math.random() * 2 - 1;
+          lp += (w - lp) * tone;
+          d[at + i] += (w - lp * 0.55) * amp * Math.exp(-i / (L * 0.2));
+        }
+      }
+      let mx = 0;
+      for (let i = 0; i < len; i++) mx = Math.max(mx, Math.abs(d[i]));
+      for (let i = 0; i < len; i++) d[i] /= mx || 1;
+    }
+    return (clapBuf = b);
+  }
+  /** Reverberación de estadio (ruido que se apaga en ~2,4 s). */
+  function reverb() {
+    if (revBuf) return revBuf;
+    const sr = ctx.sampleRate, len = Math.floor(sr * 2.4), b = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.4) * 0.6; }
+    return (revBuf = b);
+  }
+
+  // Vocales del coro (formantes F1, F2)
+  const VOWEL = { o: [470, 860], e: [560, 1750], a: [760, 1220], u: [340, 800] };
+  // Cánticos propios y sencillos, de los de grada: [semitonos sobre la tónica, duración en pulsos]
+  const CHANTS = {
+    lolo: { vowel: 'o', bpm: 136, reps: 2, notes: [[0, .5], [0, .5], [4, .5], [2, .5], [0, 1], [-3, .5], [-1, .5], [0, 2]] },
+    ohe: { vowel: 'o', bpm: 116, reps: 2, notes: [[7, 1], [5, .5], [4, .5], [2, 1], [4, 1], [0, 2]] },
+    ale: { vowel: 'e', bpm: 144, reps: 2, notes: [[0, .5], [2, .5], [4, 1], [4, .5], [5, .5], [4, 1], [2, .5], [0, 1.5]] },
+    uoh: { vowel: 'o', bpm: 100, reps: 1, notes: [[0, 1.5], [3, 1.5], [7, 3]] },
+    clap: { claps: true, bpm: 128 }
+  };
+
+  function crowdClaps(t0, beat) {
+    // «clap clap · clap clap clap» tres veces y un «¡eh!»
+    const at = [0, 0.5, 1.5, 1.75, 2.0];
+    let n = 0;
+    for (let r = 0; r < 3; r++) for (const x of at) {
+      const t = t0 + (r * 3 + x) * beat;
+      for (let k = 0; k < 7; k++) { // muchas manos a la vez, nunca exactamente juntas
+        const src = ctx.createBufferSource(); src.buffer = clapBuffer();
+        const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 500 + Math.random() * 700;
+        const g = ctx.createGain(), tt = t + Math.random() * 0.035;
+        g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(1.6, tt + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.11);
+        src.connect(f).connect(g).connect(master);
+        src.start(tt, Math.random() * 2.8, 0.12); n++;
+      }
+    }
+    return 9 * beat;
+  }
+
+  /** Un cántico de la grada. o: { away: afición visitante (más baja y a un lado), vol }. Devuelve los segundos que dura. */
+  function chant(name, o) {
+    const c = ac(); if (!c || !on()) return 0;
+    o = o || {};
+    if (!o.force && chantNow && chantNow > c.currentTime) return 0; // uno cada vez
+    const C = CHANTS[name] || CHANTS.lolo, beat = 60 / C.bpm, t0 = c.currentTime + 0.05;
+    if (C.claps) { const d = crowdClaps(t0, beat); chantNow = t0 + d; S.crowdSwell(0.6); setTimeout(() => chant('uoh', { vol: (o.vol || 0.5) * 0.8, force: true }), d * 1000 - 300); return d; }
+    const root = (o.away ? 207 : 196) * Math.pow(2, (Math.random() - 0.5) * 2 / 12);
+    const seq = [];
+    let tt = 0;
+    for (let r = 0; r < C.reps; r++) for (const [s2, d] of C.notes) { seq.push([tt, d * beat, s2]); tt += d * beat; }
+    const total = tt, vol = (o.vol || 0.5) * (o.away ? 0.5 : 1);
+    // voces → formantes de la vocal → (seco + reverberación) → panorama → volumen
+    const [F1, F2] = VOWEL[C.vowel];
+    const sum = c.createGain();
+    const f1 = c.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = F1; f1.Q.value = 4.5;
+    const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = F2; f2.Q.value = 6;
+    const g2 = c.createGain(); g2.gain.value = 0.5;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t0); out.gain.exponentialRampToValueAtTime(vol, t0 + 0.35);
+    out.gain.setValueAtTime(vol, t0 + total - 0.25); out.gain.exponentialRampToValueAtTime(0.0001, t0 + total + 0.9);
+    const rv = c.createConvolver(); rv.buffer = reverb();
+    const wet = c.createGain(); wet.gain.value = 0.6;
+    sum.connect(f1); sum.connect(f2); f2.connect(g2); f1.connect(lp); g2.connect(lp);
+    lp.connect(out); lp.connect(rv); rv.connect(wet); wet.connect(out);
+    const p = panner(o.away ? -0.7 : (Math.random() - 0.5) * 0.3);
+    if (p) { out.connect(p); p.connect(master); } else out.connect(master);
+    // la «l» de cada «lo»: el primer formante cae un instante al empezar la sílaba
+    for (const [st] of seq) { f1.frequency.setValueAtTime(F1 * 0.55, t0 + st); f1.frequency.linearRampToValueAtTime(F1, t0 + st + 0.07); }
+    const N = 14;
+    for (let v = 0; v < N; v++) {
+      const osc = c.createOscillator(); osc.type = 'sawtooth';
+      const oct = Math.random() < 0.18 ? 2 : 1, det = 1 + (Math.random() - 0.5) * 0.035, lag = Math.random() * 0.07;
+      const vg = c.createGain(); vg.gain.value = 0;
+      const vib = c.createOscillator(), vd = c.createGain();
+      vib.frequency.value = 4.2 + Math.random() * 2.4; vd.gain.value = 2 + Math.random() * 5;
+      vib.connect(vd).connect(osc.frequency);
+      osc.frequency.setValueAtTime(root * oct * Math.pow(2, seq[0][2] / 12) * det, t0);
+      const peak = (0.55 + Math.random() * 0.45) / N * 3.6;
+      for (const [st, du, s2] of seq) {
+        const a = t0 + st + lag;
+        osc.frequency.setTargetAtTime(root * oct * Math.pow(2, s2 / 12) * det, a, 0.018);
+        vg.gain.setTargetAtTime(0.0001, a - 0.01, 0.008);
+        vg.gain.setTargetAtTime(peak, a + 0.03, 0.03);
+        vg.gain.setTargetAtTime(peak * 0.7, a + du * 0.65, 0.08);
+      }
+      vg.gain.setTargetAtTime(0, t0 + total + lag, 0.2);
+      osc.connect(vg).connect(sum);
+      const end = t0 + total + 1.4;
+      osc.start(t0); vib.start(t0); osc.stop(end); vib.stop(end);
+      track(osc, end); track(vib, end);
+    }
+    chantNow = t0 + total + 0.6;
+    return total;
+  }
+
+  /** Aplauso de `dur` segundos. */
+  function applause(dur, vol, pan) {
+    const c = ac(); if (!c || !on()) return;
+    dur = dur || 2.5; vol = vol == null ? 0.5 : vol;
+    const src = c.createBufferSource(); src.buffer = clapBuffer(); src.loop = true;
+    src.playbackRate.value = 0.92 + Math.random() * 0.16;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 420;
+    const g = c.createGain(), t = c.currentTime;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.22);
+    g.gain.setValueAtTime(vol, t + dur * 0.55); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const p = panner(pan || 0);
+    src.connect(hp).connect(g);
+    if (p) g.connect(p).connect(master); else g.connect(master);
+    src.start(t, Math.random() * 2.5); src.stop(t + dur + 0.1);
+    track(src, t + dur + 0.1);
+  }
+  /** Silbidos de dedos repartidos por la grada (fiuuu, fiu-fiuuu…). */
+  function whistles(n, vol) {
+    const c = ac(); if (!c || !on()) return;
+    for (let k = 0; k < n; k++) {
+      const t = c.currentTime + Math.random() * 1.6, dur = 0.35 + Math.random() * 0.65;
+      const f = 2200 + Math.random() * 1300, kind = Math.random();
+      const o = c.createOscillator(), lfo = c.createOscillator(), lg = c.createGain(), g = c.createGain();
+      o.type = 'sine';
+      if (kind < 0.4) { o.frequency.setValueAtTime(f * 0.8, t); o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur); }
+      else if (kind < 0.75) { o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.16, t + dur * 0.3); o.frequency.exponentialRampToValueAtTime(f * 0.76, t + dur); }
+      else { o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.92, t + dur); }
+      lfo.frequency.value = 5 + Math.random() * 5; lg.gain.value = 20 + Math.random() * 45;
+      lfo.connect(lg).connect(o.frequency);
+      env(g, t, 0.03, (vol || 0.05) * (0.6 + Math.random() * 0.7), dur);
+      const p = panner(Math.random() * 1.6 - 0.8);
+      o.connect(g);
+      if (p) g.connect(p).connect(master); else g.connect(master);
+      o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+      track(o, t + dur + 0.05);
+    }
+  }
+  /** Ovación: rugido, aplauso largo y silbidos. k: intensidad (0,5 – 1,5). */
+  function ovation(k) {
+    const c = ac(); if (!c || !on()) return;
+    k = k || 1;
+    const r = burst(2.8 + k, 'bandpass', 760, 0.28 * k, 0.6, 0, 0.25);
+    if (r) { r.f.frequency.setValueAtTime(520, r.t); r.f.frequency.linearRampToValueAtTime(1050, r.t + 0.9); }
+    applause(3.2 + k * 1.8, Math.min(0.85, 0.5 * k));
+    whistles(Math.round(5 + 5 * k), 0.06 * Math.min(1.3, k));
+    S.crowdSwell(1);
+  }
+  function stopFans() {
+    for (const n of live) { try { n.stop(); } catch (e) { /* ya parado */ } }
+    live.clear(); chantNow = null;
+  }
+
   const S = {
-    on, setOn, unlock, ac,
+    on, setOn, unlock, ac, applause, whistles, ovation, chant, CHANTS,
     // Botones: cada tipo suena distinto, agudos y cortos para que se oigan en el altavoz del móvil
     click() { tone(1180, 0.05, 'triangle', 0.2, 640); tick(0.14); },
     press() { tone(560, 0.09, 'sine', 0.3, 280); tone(1480, 0.07, 'triangle', 0.09, 1960, 0.03); tick(0.18); },
@@ -145,6 +324,8 @@
       if (r) { r.f.frequency.setValueAtTime(500, r.t); r.f.frequency.linearRampToValueAtTime(1100, r.t + 0.8); }
       if (mine) [262, 330, 392].forEach((f, i) => tone(f, 1.1, 'sawtooth', 0.04, null, 0.05 + i * 0.01));
       S.crowdSwell(1);
+      if (mine) { applause(4.5, 0.7); whistles(10, 0.075); }
+      else applause(2.2, 0.22, -0.6);
     },
     groan() {
       const r = burst(1.0, 'bandpass', 420, 0.22, 0.8, 0, 0.12);
@@ -175,6 +356,7 @@
     }
   };
   function stopCrowd() {
+    stopFans();
     if (!crowd || !ctx) return;
     const c = crowd; crowd = null;
     const t = ctx.currentTime;
