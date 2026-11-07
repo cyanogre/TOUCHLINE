@@ -1005,3 +1005,15 @@ details summary { list-style: revert; }
 .ic { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; flex: none; overflow: visible; }
 button .ic, .btn .ic { margin-right: 0.15em; }
 .ic + .ic { margin-left: 0.08em; }
+
+/* Tarjetas de elección (asistente de partida y modo torneo): flecha e icono con tamaño propio */
+.pick > svg { width: 20px; height: 20px; flex: none; color: var(--faint); transition: transform 0.2s, color 0.2s; }
+.pick:hover > svg { color: var(--accent); transform: translateX(3px); }
+.big-pick { gap: 16px; }
+.big-pick .flag {
+  flex: none; width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center;
+  font-size: 26px; color: var(--accent); background: rgb(184 245 61 / 0.08); border: 1px solid rgb(184 245 61 / 0.2);
+}
+.big-pick .flag .ic { width: 28px; height: 28px; vertical-align: 0; }
+.big-pick .s { margin-top: 4px; font-size: 13.5px; }
+@media (max-width: 480px) { .big-pick .t { font-size: 22px; } }
