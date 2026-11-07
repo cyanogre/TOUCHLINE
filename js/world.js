@@ -159,14 +159,16 @@
         if (parent < 0 || clubs.length < L.k * 2 + 2) continue;
         if (clubs.length % 2) clubs.pop(); // calendario par
         const lid = out.leagues.length;
-        out.leagues.push([L.name, L.country, L.flag, 1, L.wealth]);
+        const pl = out.leagues[parent];
+        // Base nueva: hereda asociación y confederación de la liga de arriba, una división más abajo
+        out.leagues.push(pl.length > 5 ? [L.name, L.country, L.flag, 1, L.wealth, (pl[5] || 1) + 1, pl[6], pl[7], pl[8], pl[9]] : [L.name, L.country, L.flag, 1, L.wealth]);
         out.promotion.push([parent, lid, L.k]);
         const local = nationIdx(L.country);
         const foreign = out.players.filter(r => out.clubs[r[2]] && out.clubs[r[2]][1] === parent).map(r => r[3]);
-        clubs.forEach(([name, c1, c2], j) => {
+        clubs.forEach(([name, c1, c2, crestId, ini, kitP], j) => {
           taken.add(norm(name));
           const cid = out.clubs.length;
-          out.clubs.push([name, lid]);
+          out.clubs.push(crestId ? [name, lid, c1, c2, crestId, ini, 0, kitP || ''] : [name, lid]);
           if (c1 && window.TL_KITS && !window.TL_KITS[name]) window.TL_KITS[name] = [[c1, c2 || '#ffffff', ''], [c2 === '#ffffff' ? '#ffffff' : c2 || '#ffffff', c1, '']];
           // Los primeros de la lista, algo más fuertes
           const strength = L.rep + 3 - 6 * (j / Math.max(1, clubs.length - 1)) + (rng() - 0.5) * 2 + 0.5;
@@ -221,11 +223,20 @@
       econ: data.econ,
       source: data.source,
       nations: data.nations,
+      db: data.db || 'legacy',
       leagues: data.leagues.map((l, i) => ({
-        id: i, name: l[0], country: l[1], flag: l[2], playable: !!l[3], wealth: l[4], clubs: []
+        id: i, name: l[0], country: l[1], flag: l[2], playable: !!l[3], wealth: l[4], clubs: [],
+        // Base nueva: división, asociación, confederación, ranking UEFA y región AFC (para las competiciones)
+        div: l[5] || 0, assoc: l[6] || '', conf: l[7] || '', rank: l[8] || 0, region: l[9] || ''
       })),
       promotion: data.promotion, pyr: data.pyr || 0,
       clubs: data.clubs.map((c, i) => {
+        if (c[4]) {
+          // Base nueva: colores, escudo (spritesheet), iniciales, coeficiente y equipación de la base de datos
+          const c1 = c[2], c2 = c[3] && c[3] !== c[2] ? c[3] : '#ffffff';
+          return { id: i, name: c[0], league: c[1], code: c[5] || U.clubCode(c[0]), c1, c2, crest: c[4], coef: c[6] || 0,
+            kit: [[c1, c2, c[7] || ''], [c2, c1, '']] };
+        }
         const [c1, c2] = U.clubColors(c[0]);
         return { id: i, name: c[0], league: c[1], code: U.clubCode(c[0]), c1, c2, logo: U.crestUrl(data.gender, c[0]) };
       }),
@@ -442,7 +453,7 @@
         p.st.join(','), p.contract, p.wage, p.fit, p.inj, p.sus, flags, mor]);
     }
     return {
-      v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager, pyr: S.pyr || 0,
+      v: S.v, db: S.db || 'legacy', gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager, pyr: S.pyr || 0,
       leagues: S.leagues.map(l => l.clubs),
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,

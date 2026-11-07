@@ -1,7 +1,18 @@
 # TOUCHLINE — Football Manager
 
-Juego de gestión de fútbol para móvil (de momento en HTML responsive) con los
-jugadores reales del dataset **EA SPORTS FC 27** (19.789 jugadores, 702 clubes).
+Juego de gestión de fútbol para móvil (de momento en HTML responsive) con una
+**base de datos sin licencias**: 27.244 jugadores y 1.039 clubes inventados, con sus escudos.
+
+## Base de datos
+
+- **`data/db/`**: la base de datos sin licencias (jugadores, clubes, ligas y especificación de competiciones).
+  `node tools/build-db.js` genera los datos del juego (`data/game/`), las divisiones inferiores inventadas
+  y sus escudos.
+- **`assets/escudos/`**: un SVG por club, para retocarlo a mano. `node tools/build-crest-sprite.js` los
+  empaqueta en las spritesheets que carga el juego (ver `assets/escudos/LEEME.md`).
+- **`data/legacy/`**: la base de datos anterior (dataset EA SPORTS FC 27), con su script en `tools/legacy/`.
+  Se conserva para abrir las partidas guardadas con ella: el juego cambia solo de base al cargarlas.
+  Las partidas nuevas usan siempre la base nueva.
 
 ## Jugar online (GitHub Pages)
 

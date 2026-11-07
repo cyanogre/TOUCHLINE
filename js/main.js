@@ -2,10 +2,15 @@
 (function () {
   'use strict';
   const TL = window.TL;
-  TL.VERSION = '3.6';
+  TL.VERSION = '3.7';
 
   function boot() {
     TL.UI.renderTitle();
+    // Tras cambiar de base de datos (recarga), sigue con lo que se iba a hacer
+    let then = null;
+    try { then = sessionStorage.getItem('touchline.then'); sessionStorage.removeItem('touchline.then'); } catch (e) { /* nada */ }
+    if (then === 'load') TL.UI.actions.continue();
+    else if (then === 'new') TL.UI.actions['new-game']();
     // Guarda al salir o al pasar la app a segundo plano (móvil)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && TL.Game.S && !document.getElementById('match')) TL.Game.save();
