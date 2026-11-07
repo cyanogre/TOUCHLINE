@@ -23,6 +23,13 @@
     return loading[gender];
   }
 
+  /** Datos de una carrera: los del juego más las divisiones inferiores de esa versión (0 = sin ellas,
+      para las partidas guardadas antes de que existieran). */
+  async function careerData(gender, pyr) {
+    const data = await loadData(gender);
+    return pyr ? W.pyramid(data, pyr) : data;
+  }
+
   /** Vista previa de clubes para elegir equipo (sin crear la partida aún). */
   function preview(data) {
     const S = { players: [], clubs: [], leagues: [] };
@@ -39,6 +46,7 @@
   const Game = {
     S: null,
     loadData,
+    careerData,
     preview,
 
     newGame(data, clubId, manager) {
@@ -69,7 +77,7 @@
       let save;
       try { save = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { save = null; }
       if (!save) throw new Error('No hay partida guardada');
-      const data = await loadData(save.gender);
+      const data = await careerData(save.gender, save.pyr || 0);
       Game.S = W.restore(data, save);
       return Game.S;
     },
@@ -103,7 +111,7 @@
     async importSave(text) {
       const save = JSON.parse(text);
       if (!save || !save.pb || !save.gender) throw new Error('Archivo de partida no válido');
-      const data = await loadData(save.gender);
+      const data = await careerData(save.gender, save.pyr || 0);
       Game.S = W.restore(data, save);
       Game.save();
       return Game.S;

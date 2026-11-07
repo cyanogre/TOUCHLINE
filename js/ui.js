@@ -1632,22 +1632,30 @@
     } else if (z.step === 1) {
       if (!z.data) html = wizHead('Elige liga', 1) + '<div class="spinner"></div>';
       else {
-        const leagues = z.data.leagues.map((l, i) => ({ i, name: l[0], country: l[1], flag: l[2], playable: l[3] })).filter(l => l.playable);
+        // Por países, y dentro de cada país de primera hacia abajo (para empezar desde abajo y subir)
+        const parent = {};
+        for (const [up, down] of z.data.promotion) parent[down] = up;
+        const tier = i => (parent[i] != null ? 1 + tier(parent[i]) : 1);
+        const leagues = z.data.leagues.map((l, i) => ({ i, name: l[0], country: l[1], flag: l[2], playable: l[3], tier: tier(i) })).filter(l => l.playable);
         const byLeague = {};
         z.data.clubs.forEach((c, ci) => { (byLeague[c[1]] || (byLeague[c[1]] = [])).push(ci); });
-        html = wizHead('Elige liga', 1) + `<div class="pick-list two">${leagues.map(l => {
-          const clubs = byLeague[l.i] || [];
-          const avg = U.sum(clubs, ci => z.prev.reps[ci]) / clubs.length;
-          return `<button class="pick" data-act="wz-league" data-l="${l.i}"><span class="flag">${flagImg(l.flag, l.country) || '🌎'}</span>
-            <span class="grow"><div class="t ellipsis">${esc(l.name)}</div><div class="s">${esc(l.country)} · ${clubs.length} clubes · ${stars(avg)}</div></span></button>`;
-        }).join('')}</div>`;
+        const countries = [];
+        for (const l of leagues) { let g = countries.find(c => c.name === l.country); if (!g) countries.push(g = { name: l.country, flag: l.flag, leagues: [] }); g.leagues.push(l); }
+        html = wizHead('Elige liga', 1) + `<p class="note" style="margin:-6px 0 12px">Empieza arriba o desde las categorías inferiores y asciende poco a poco.</p>` +
+          countries.map(g => `<div class="wz-country"><div class="group-title">${flagImg(g.flag, g.name) || '🌎'} ${esc(g.name)}</div><div class="pick-list two">${g.leagues.sort((a, b) => a.tier - b.tier).map(l => {
+            const clubs = byLeague[l.i] || [];
+            const avg = U.sum(clubs, ci => z.prev.reps[ci]) / clubs.length;
+            return `<button class="pick" data-act="wz-league" data-l="${l.i}"><span class="tier-n t${Math.min(l.tier, 4)}">${l.tier}</span>
+              <span class="grow"><div class="t ellipsis">${esc(l.name)}</div><div class="s">${l.tier}ª división · ${clubs.length} clubes · ${stars(avg)}</div></span></button>`;
+          }).join('')}</div></div>`).join('');
       }
     } else if (z.step === 2) {
       const clubs = z.data.clubs.map((c, i) => ({ i, name: c[0], league: c[1] })).filter(c => c.league === z.league)
         .sort((a, b) => z.prev.reps[b.i] - z.prev.reps[a.i]);
       const n = clubs.length;
       html = wizHead('Elige club', 2) + `<p class="note" style="margin:-6px 0 12px">${esc(z.data.leagues[z.league][0])} · ordenados por nivel</p><div class="pick-list two">${clubs.map((c, k) => {
-        const exp = k < 2 ? 'Favorito al título' : k < Math.ceil(n / 3) ? 'Aspirante' : k < Math.ceil(n * 0.66) ? 'Media tabla' : 'Lucha por la permanencia';
+        const up = z.data.promotion.some(p => p[1] === z.league);
+        const exp = k < 2 ? (up ? 'Favorito al ascenso' : 'Favorito al título') : k < Math.ceil(n / 3) ? 'Aspirante' : k < Math.ceil(n * 0.66) ? 'Media tabla' : 'Lucha por la permanencia';
         return `<button class="pick" data-act="wz-club" data-c="${c.i}">${crestFor(c.name)}
           <span class="grow"><div class="t ellipsis">${esc(c.name)}</div><div class="s">${stars(z.prev.reps[c.i])} · ${exp}</div></span>
           <span class="num" style="font-size:20px;font-weight:700">${z.prev.reps[c.i].toFixed(0)}</span></button>`;
@@ -1675,7 +1683,7 @@
   A['wz-gender'] = async el => {
     const z = UI.wz;
     if (z.busy) return;
-    const load = G.loadData(el.dataset.g); // carga mientras la portada celebra la elección
+    const load = G.careerData(el.dataset.g, W.PYR); // carga mientras la portada celebra la elección
     load.catch(() => {});
     if (TL.Splash && TL.Splash.burst(el)) {
       z.busy = true;

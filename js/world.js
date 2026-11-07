@@ -110,16 +110,9 @@
     CAM: ['CM', 'ST'], RM: ['RW', 'RB'], LM: ['LW', 'LB'], RW: ['RM', 'ST'], LW: ['LM', 'ST'], ST: ['CAM']
   };
 
-  /** Crea un jugador ficticio. */
-  function makePlayer(S, opt) {
-    const nat = opt.nat;
-    const [name, short] = genName(S.nations[nat][0], S.gender);
-    const pos = opt.pos;
-    const ovr = U.clamp(Math.round(opt.ovr), 35, 92);
-    const age = opt.age;
-    const pot = opt.pot != null ? Math.max(ovr, Math.min(95, Math.round(opt.pot))) : F.potentialFor(ovr, age, Math.random());
-    const isGK = pos === 'GK';
-    const st = [];
+  /** Las seis estadísticas de un jugador generado, coherentes con su puesto. */
+  function genStats(pos, ovr) {
+    const isGK = pos === 'GK', st = [];
     for (let i = 0; i < 6; i++) {
       let base = ovr + U.int(-9, 9);
       if (isGK && i === 4) base = U.int(30, 60); // velocidad del portero
@@ -131,6 +124,83 @@
       }
       st.push(U.clamp(base, 20, 97));
     }
+    return st;
+  }
+
+  // ------------------------------------------------------------ Divisiones inferiores
+  /**
+   * Añade a los datos base las divisiones inferiores de data/game/pyramid.js (clubes reales con
+   * plantillas generadas). Es determinista: con la misma versión salen siempre los mismos jugadores,
+   * así que la partida guarda solo sus cambios, como con los jugadores reales.
+   */
+  const pyrCache = {};
+  function pyramid(data, ver) {
+    const P = window.TL_PYRAMID && window.TL_PYRAMID[ver] && window.TL_PYRAMID[ver][data.gender];
+    if (!ver || !P) return data;
+    const key = data.gender + ver;
+    if (pyrCache[key] && pyrCache[key].src === data) return pyrCache[key].out;
+    // Azar con semilla fija mientras se genera (nombres, edades, medias…)
+    let seed = 0x9e3779b9 ^ (ver * 7919) ^ (data.gender === 'F' ? 0x5bd1e995 : 0);
+    const rng = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const out = Object.assign({}, data, {
+      leagues: data.leagues.slice(), clubs: data.clubs.slice(), players: data.players.slice(), promotion: data.promotion.slice(), pyr: ver
+    });
+    const norm = n => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const taken = new Set(out.clubs.map(c => norm(c[0])));
+    const nationIdx = name => out.nations.findIndex(n => n[0] === name);
+    const real = Math.random;
+    Math.random = rng;
+    try {
+      const gauss = () => { let a = 0; for (let i = 0; i < 4; i++) a += rng(); return (a - 2) * 1.73; };
+      const ageOf = () => U.weighted([[17, 20, 20], [21, 25, 35], [26, 30, 30], [31, 35, 15]], a => a[2]);
+      for (const L of P) {
+        const parent = out.leagues.findIndex(l => l[0] === L.under);
+        const clubs = L.clubs.filter(c => !taken.has(norm(c[0])));
+        if (parent < 0 || clubs.length < L.k * 2 + 2) continue;
+        if (clubs.length % 2) clubs.pop(); // calendario par
+        const lid = out.leagues.length;
+        out.leagues.push([L.name, L.country, L.flag, 1, L.wealth]);
+        out.promotion.push([parent, lid, L.k]);
+        const local = nationIdx(L.country);
+        const foreign = out.players.filter(r => out.clubs[r[2]] && out.clubs[r[2]][1] === parent).map(r => r[3]);
+        clubs.forEach(([name, c1, c2], j) => {
+          taken.add(norm(name));
+          const cid = out.clubs.length;
+          out.clubs.push([name, lid]);
+          if (c1 && window.TL_KITS && !window.TL_KITS[name]) window.TL_KITS[name] = [[c1, c2 || '#ffffff', ''], [c2 === '#ffffff' ? '#ffffff' : c2 || '#ffffff', c1, '']];
+          // Los primeros de la lista, algo más fuertes
+          const strength = L.rep + 3 - 6 * (j / Math.max(1, clubs.length - 1)) + (rng() - 0.5) * 2 + 0.5;
+          const plan = ['GK', 'GK', 'GK'].concat(Array.from({ length: 7 }, () => U.pick(LINE_POS[1])), Array.from({ length: 7 }, () => U.pick(LINE_POS[2])),
+            Array.from({ length: 5 }, () => U.pick(LINE_POS[3])));
+          for (const pos of plan) {
+            const nat = local >= 0 && (rng() < 0.85 || !foreign.length) ? local : U.pick(foreign);
+            const [pname, short] = genName(out.nations[nat][0], data.gender);
+            const [lo, hi] = ageOf(), age = U.int(lo, hi);
+            const ovr = U.clamp(Math.round(strength - 2 + gauss() * 3.5 + (age <= 20 ? -3 : 0)), 40, 88);
+            const pot = F.potentialFor(ovr, age, rng());
+            const st = genStats(pos, ovr);
+            const alt = rng() < 0.5 && ALT_SUGGEST[pos].length ? U.pick(ALT_SUGGEST[pos]) : '';
+            const wage = F.wageFor(ovr, age, L.wealth, data.econ.wage);
+            out.players.push([pname, short, cid, nat, pos, alt, age, ovr, pot, rng() < 0.25 ? 0 : 1, pos === 'GK' ? 1 : U.int(2, 4), U.int(2, 4),
+              st[0], st[1], st[2], st[3], st[4], st[5], data.season + U.int(1, 3), wage, -1]);
+          }
+        });
+      }
+    } finally { Math.random = real; }
+    pyrCache[key] = { src: data, out };
+    return out;
+  }
+
+  /** Crea un jugador ficticio. */
+  function makePlayer(S, opt) {
+    const nat = opt.nat;
+    const [name, short] = genName(S.nations[nat][0], S.gender);
+    const pos = opt.pos;
+    const ovr = U.clamp(Math.round(opt.ovr), 35, 92);
+    const age = opt.age;
+    const pot = opt.pot != null ? Math.max(ovr, Math.min(95, Math.round(opt.pot))) : F.potentialFor(ovr, age, Math.random());
+    const isGK = pos === 'GK';
+    const st = genStats(pos, ovr);
     const p = {
       id: S.players.length, name, short, club: opt.club, nat, pos,
       alt: U.chance(0.5) && ALT_SUGGEST[pos].length ? [U.pick(ALT_SUGGEST[pos])] : [],
@@ -154,7 +224,7 @@
       leagues: data.leagues.map((l, i) => ({
         id: i, name: l[0], country: l[1], flag: l[2], playable: !!l[3], wealth: l[4], clubs: []
       })),
-      promotion: data.promotion,
+      promotion: data.promotion, pyr: data.pyr || 0,
       clubs: data.clubs.map((c, i) => {
         const [c1, c2] = U.clubColors(c[0]);
         return { id: i, name: c[0], league: c[1], code: U.clubCode(c[0]), c1, c2, logo: U.crestUrl(data.gender, c[0]) };
@@ -352,7 +422,7 @@
         p.st.join(','), p.contract, p.wage, p.fit, p.inj, p.sus, flags, mor]);
     }
     return {
-      v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager,
+      v: S.v, gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager, pyr: S.pyr || 0,
       leagues: S.leagues.map(l => l.clubs),
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
@@ -369,7 +439,7 @@
 
   function restore(data, save) {
     const S = buildBase(data);
-    S.season = save.season; S.week = save.week; S.user = save.user; S.manager = save.manager;
+    S.season = save.season; S.week = save.week; S.user = save.user; S.manager = save.manager; S.pyr = save.pyr || 0;
     S.leagues.forEach((l, i) => { l.clubs = save.leagues[i]; });
     S.clubs.forEach((c, i) => {
       const r = save.clubs[i];
@@ -427,6 +497,7 @@
   }
 
   TL.World = {
+    PYR: window.TL_PYRAMID_V || 0, pyramid,
     migrate,
     create, restore, serialize, makePlayer, maintainSquads, genName, squad, dirty, value, repOf, wageBill, userLeague,
     revenueCurve, newFin, LINE_POS

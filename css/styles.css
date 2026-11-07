@@ -1083,3 +1083,15 @@ button .ic, .btn .ic { margin-right: 0.15em; }
   .sp-info { padding: 0 16px 16px; }
   .sp-info .t { font-size: 30px; }
 }
+
+/* ---------- Asistente: ligas por país y división ---------- */
+.wz-country { margin-bottom: 14px; }
+.wz-country .group-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.wz-country .group-title .flag-img, .wz-country .group-title img { width: 22px; height: 16px; border-radius: 3px; object-fit: cover; }
+.tier-n {
+  flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px;
+  font-family: var(--font-c); font-weight: 800; font-size: 18px; color: var(--accent-ink); background: var(--gold);
+}
+.tier-n.t2 { background: #cfd8dc; }
+.tier-n.t3 { background: #d39a64; }
+.tier-n.t4 { background: var(--surface2); color: var(--muted); border: 1px solid var(--line); }
