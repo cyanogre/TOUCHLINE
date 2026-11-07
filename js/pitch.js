@@ -1772,13 +1772,12 @@
           const inkCol = gk ? this.colors[i].gkInk : this.colors[i].ink, dark = inkCol === '#111';
           c.fillStyle = inkCol;
           c.font = `700 ${Math.round(r * 1.05)}px Barlow Condensed, sans-serif`;
-          c.shadowColor = dark ? 'rgb(255 255 255 / 0.55)' : 'rgb(0 0 0 / 0.7)'; c.shadowBlur = 2;
-          // En camisetas con dibujo (rayas, cuadros…) el dorsal lleva contorno para que se lea
-          if (!gk && this.colors[i].p) {
-            c.lineJoin = 'round'; c.lineWidth = Math.max(1.6, r * 0.3);
-            c.strokeStyle = dark ? 'rgb(255 255 255 / 0.85)' : 'rgb(0 0 0 / 0.75)';
-            c.strokeText(String(this.num[a.pid] || ''), x, y + 0.5);
-          }
+          c.shadowColor = dark ? 'rgb(255 255 255 / 0.65)' : 'rgb(0 0 0 / 0.8)'; c.shadowBlur = 3;
+          // Halo del dorsal: un contorno suave en todos, algo más marcado en camisetas con dibujo (rayas, cuadros…)
+          const patt = !gk && this.colors[i].p;
+          c.lineJoin = 'round'; c.lineWidth = Math.max(patt ? 1.9 : 1.4, r * (patt ? 0.36 : 0.26));
+          c.strokeStyle = dark ? `rgb(255 255 255 / ${patt ? 0.9 : 0.7})` : `rgb(0 0 0 / ${patt ? 0.8 : 0.6})`;
+          c.strokeText(String(this.num[a.pid] || ''), x, y + 0.5);
           c.fillText(String(this.num[a.pid] || ''), x, y + 0.5);
           c.shadowBlur = 0;
         }
