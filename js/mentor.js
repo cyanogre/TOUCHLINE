@@ -196,8 +196,7 @@
       <div class="vn-box" data-act="vn-next" role="dialog" aria-live="polite" aria-label="${U.esc(CHAR.short)}">
         <div class="vn-stage" aria-hidden="true"><i class="vn-glow"></i><i class="vn-ledge"></i><div class="vn-face"></div></div>
         <div class="vn-tag"><b>${U.esc(CHAR.short)}</b><span>${U.esc(CHAR.role)}</span></div>
-        <div class="vn-text"></div>
-        <div class="vn-choices"></div>
+        <div class="vn-body"><div class="vn-text"></div><div class="vn-choices"></div></div>
         <div class="vn-foot"><span class="vn-dots"></span><span class="vn-next" aria-hidden="true">Toca para seguir ▼</span></div>
         <button class="vn-skip" data-act="vn-skip">Saltar ⏭</button>
       </div>`;
@@ -370,7 +369,17 @@
     // Mientras suena la frase doblada, no hay pitidos encima
     cur.quietUntil = 0;
     if (voiceOn(cur)) speak(lineVoice(cur, cur.i));
-    r.querySelector('.vn-choices').innerHTML = '';
+    // Altura de la caja: la fija, salvo que esta frase (con sus respuestas) necesite más. Se decide
+    // ahora, antes de escribir, para que la caja no crezca mientras el Profe habla.
+    const body = r.querySelector('.vn-body'), textEl = r.querySelector('.vn-text'), chEl = r.querySelector('.vn-choices');
+    body.style.height = '';
+    chEl.className = 'vn-choices wait';
+    chEl.innerHTML = (line.choices || []).map((c, k) =>
+      `<button class="btn sm ${k === 0 ? 'primary' : ''}" data-act="vn-choice" data-k="${k}" tabindex="-1">${U.esc(c.label)}</button>`).join('');
+    textEl.innerHTML = renderTokens(cur.tk, cur.tk.length);
+    if (body.scrollHeight > body.clientHeight + 1) body.style.height = body.scrollHeight + 'px';
+    textEl.innerHTML = '';
+    body.scrollTop = 0;
     const n = cur.lines.length;
     r.querySelector('.vn-dots').innerHTML = n > 1 && n <= 14 ? cur.lines.map((_, k) => `<i class="${k < cur.i ? 'past' : k === cur.i ? 'on' : ''}"></i>`).join('') : n > 14 ? `${cur.i + 1}/${n}` : '';
     r.classList.remove('done');
@@ -386,12 +395,19 @@
     if (!t) { endLine(); return; }
     cur.n++;
     r.querySelector('.vn-text').innerHTML = renderTokens(cur.tk, cur.n);
+    keepEnd(r);
     cur.face.say(t.ch);
     if (TL.SFX && TL.SFX.voice && !(cur.quietUntil > performance.now())) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
     let ms = 28;
     if ('.!?…'.includes(t.ch)) ms = 230;
     else if (',;:'.includes(t.ch)) ms = 120;
     cur.timer = setTimeout(type, ms);
+  }
+
+  /** La caja tiene altura fija: si un texto no cabe, se desplaza para que siempre se vea lo último. */
+  function keepEnd(r) {
+    const b = r.querySelector('.vn-body');
+    if (b && b.scrollHeight > b.clientHeight + 1) b.scrollTop = b.scrollHeight;
   }
 
   function endLine() {
@@ -403,8 +419,9 @@
     cur.face.stop();
     const ch = cur.line.choices;
     if (ch && ch.length) {
-      r.querySelector('.vn-choices').innerHTML = ch.map((c, k) =>
-        `<button class="btn sm ${k === 0 ? 'primary' : ''}" data-act="vn-choice" data-k="${k}">${U.esc(c.label)}</button>`).join('');
+      const chEl = r.querySelector('.vn-choices');
+      chEl.classList.remove('wait');
+      chEl.querySelectorAll('button').forEach(b => b.removeAttribute('tabindex'));
     } else {
       r.classList.add('done');
       if (cur.i === cur.lines.length - 1 && voiceOn(cur)) speak(closeVoice(cur));

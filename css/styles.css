@@ -775,10 +775,15 @@ details summary { list-style: revert; }
   position: absolute; left: 0; top: 0; width: 66px; height: 66px; transform-origin: 0 0;
   transform: scale(calc(1 / var(--dpr, 1))); image-rendering: pixelated; image-rendering: crisp-edges;
 }
-.vn-text { font-size: 16px; line-height: 1.5; min-height: 3em; color: var(--text); text-wrap: pretty; }
+/* Altura fija (5 renglones en móvil): la caja no crece mientras el Profe escribe y su retrato no se mueve.
+   Las respuestas a elegir aparecen abajo, dentro de esa misma altura. */
+.vn-body { --vn-lines: 5; font-size: 16px; line-height: 1.5; height: calc(var(--vn-lines) * 1.5em); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; }
+.vn-body::-webkit-scrollbar { display: none; }
+.vn-text { color: var(--text); text-wrap: pretty; }
 .vn-text b { color: #e9ffb8; }
-.vn-choices { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.vn-choices { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; padding-top: 10px; }
 .vn-choices:empty { display: none; }
+.vn-choices.wait { visibility: hidden; }
 .vn-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 7px; min-height: 16px; padding-left: 12px; }
 .vn-dots { display: flex; gap: 5px; align-items: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .vn-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / 0.16); transition: background 0.2s, transform 0.2s; }
@@ -826,7 +831,7 @@ details summary { list-style: revert; }
 .nm-coach { text-align: center; font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
 .nm-coach b { color: var(--text); }
 .nm-coach span { display: block; opacity: 0.7; font-size: 11.5px; margin-top: 2px; }
-@media (min-width: 760px) { .vn-text { font-size: 17px; } .vn-box { padding: 26px 24px 12px; } }
+@media (min-width: 760px) { .vn-body { --vn-lines: 4; font-size: 17px; } .vn-box { padding: 26px 24px 12px; } }
 
 /* ---------------------------------------------------------------- Vestuario */
 .tag.loan { background: rgb(93 184 255 / 0.16); color: #8fd0ff; }
