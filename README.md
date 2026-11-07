@@ -79,7 +79,7 @@ Después entra en <http://localhost:8000>.
   - La música arranca sola al empezar o continuar partida y baja de volumen durante los partidos.
 - **Interfaz con efectos:** botones con relieve, brillo y onda al pulsar, partículas y confeti en goles, fichajes, patrocinios, victorias y subidas de nivel, y animaciones de entrada.
 - **Escudos reales** de primeras divisiones europeas (≈300 clubes masculinos y 50 femeninos), cargados desde el repositorio público [luukhopman/football-logos](https://github.com/luukhopman/football-logos) vía jsDelivr. Si un club no está o no hay conexión, se usa el escudo generado. Los escudos son marcas registradas de sus clubes: no se copian en este repositorio, solo se enlazan.
-- **Guardado automático**, exportar e importar partida, y música (`Strategic Swing.mp3`).
+- **Guardado automático**, exportar e importar partida, y banda sonora por momentos de la temporada (`assets/music/`: el tema del juego y una carpeta por momento).
 
 La evaluación del juego desde el punto de vista de un jugador de Football
 Manager y la hoja de ruta están en [docs/EVALUACION.md](docs/EVALUACION.md).

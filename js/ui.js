@@ -154,27 +154,112 @@
   A['close-sheet'] = () => closeSheet();
 
   // ------------------------------------------------------------ Música
+  // Banda sonora en assets/music: el tema del juego (tema-del-juego.mp3) y una carpeta por momento
+  // de la carrera, con pistas numeradas 1.mp3, 2.mp3… Si la carpeta de un momento está vacía, sigue
+  // sonando lo que suena, sin cortes ni reinicios.
+  const MUSIC_DIR = 'assets/music/';
+  const THEME = MUSIC_DIR + 'tema-del-juego.mp3';
   const Music = {
+    base: 0.32,
+    cur: THEME,            // pista que suena ahora
+    ctx: 'tema',           // momento actual de la carrera
+    banks: {},             // carpeta → [urls] (null mientras se comprueba)
+    vol: 1,                // atenuación (partido en directo)
     on() { try { return localStorage.getItem('touchline.music') !== '0'; } catch (e) { return true; } },
     el() { return document.getElementById('bgm'); },
     start() {
       const a = Music.el();
       if (!a || !Music.on()) return;
+      if (!a._wired) {
+        a._wired = true;
+        // Al acabar una pista de un momento: otra del mismo momento (sin repetir) o el tema del juego
+        a.addEventListener('ended', () => Music.next());
+      }
       if (!a.paused) return;
       a.volume = 0;
       const p = a.play();
       if (p && p.catch) p.catch(() => { /* bloqueado hasta interacción */ });
-      Music.fade(Music.base);
+      Music.fade(Music.base * Music.vol);
+      if (G.S) Music.mood(G.S);
     },
-    base: 0.32,
-    fade(to, ms) {
+    fade(to, ms, done) {
       const a = Music.el(); if (!a) return;
       clearInterval(Music._f);
       const from = a.volume, steps = 20, dt = (ms || 1200) / steps;
       let k = 0;
-      Music._f = setInterval(() => { k++; a.volume = Math.max(0, Math.min(1, from + (to - from) * k / steps)); if (k >= steps) clearInterval(Music._f); }, dt);
+      Music._f = setInterval(() => {
+        k++; a.volume = Math.max(0, Math.min(1, from + (to - from) * k / steps));
+        if (k >= steps) { clearInterval(Music._f); if (done) done(); }
+      }, dt);
     },
-    duck(on) { if (Music.on()) Music.fade(on ? 0.1 : Music.base, 800); },
+    duck(on) { Music.vol = on ? 0.31 : 1; if (Music.on()) Music.fade(Music.base * Music.vol, 800); },
+    /** ¿Qué momento vive la carrera? (el peligro manda sobre la racha, y la racha sobre la fase) */
+    context(S) {
+      if (!S || S.user == null || S.mode === 'tour') return 'tema';
+      if (S.over) return 'fin-de-temporada';
+      const SE = TL.Season, tab = SE.table(S), n = tab.length, pos = tab.findIndex(r => r.id === S.user) + 1;
+      const { relegate } = SE.promoInfo(S);
+      // Últimos resultados en liga (V/E/D)
+      const res = [];
+      for (let r = 0; r < S.week && r < S.fixtures.length; r++) {
+        const m = S.fixtures[r].find(x => x[0] === S.user || x[1] === S.user);
+        if (m && m[2] >= 0) { const g = m[0] === S.user ? m[2] - m[3] : m[3] - m[2]; res.push(g > 0 ? 1 : g < 0 ? -1 : 0); }
+      }
+      let wins = 0; for (let i = res.length - 1; i >= 0 && res[i] > 0; i--) wins++;
+      const left = S.fixtures.length - S.week;
+      const danger = S.board.conf < 28 || (relegate && S.week >= 8 && pos > n - relegate);
+      if (danger) return 'peligro';
+      if (wins >= 3) return 'racha';
+      if (S.week < 4) return 'pretemporada';
+      if (left <= 8) return 'recta-final';
+      return 'temporada';
+    },
+    /** Pistas de una carpeta: 1.mp3, 2.mp3… seguidas (se comprueba una vez por sesión). */
+    bank(dir) {
+      if (Music.banks[dir] !== undefined) return Promise.resolve(Music.banks[dir]);
+      Music.banks[dir] = null;
+      const list = [];
+      const probe = i => fetch(MUSIC_DIR + dir + '/' + i + '.mp3', { method: 'HEAD', cache: 'no-cache' })
+        .then(r => { if (r.ok && i <= 12) { list.push(MUSIC_DIR + dir + '/' + i + '.mp3'); return probe(i + 1); } return list; })
+        .catch(() => list);
+      return probe(1).then(l => (Music.banks[dir] = l));
+    },
+    /** Cambia de pista con un fundido (salida y entrada), sin cortes. */
+    play(url, loop) {
+      const a = Music.el(); if (!a) return;
+      if (Music.cur === url) { a.loop = loop; return; }
+      Music.cur = url;
+      const go = () => {
+        a.src = url; a.loop = loop; a.volume = 0;
+        if (Music.on()) { const p = a.play(); if (p && p.catch) p.catch(() => {}); Music.fade(Music.base * Music.vol, 1600); }
+      };
+      if (a.paused || !Music.on()) go(); else Music.fade(0, 1400, go);
+    },
+    /** Llamado al pintar la pantalla: si cambia el momento y su carpeta tiene música, suena esa. */
+    mood(S) {
+      const ctx = Music.context(S);
+      if (ctx === Music.ctx) return;
+      Music.ctx = ctx;
+      if (ctx === 'tema') {
+        // Menús: vuelve el tema del juego solo si lo que suena es música de un momento ya pasado
+        if (Music.cur !== THEME) Music.play(THEME, true);
+        return;
+      }
+      Music.bank(ctx).then(list => {
+        if (Music.ctx !== ctx || !list || !list.length) return; // carpeta vacía: sigue lo que suena
+        if (list.includes(Music.cur)) return;
+        Music.play(Music.pick(list), list.length === 1);
+      });
+    },
+    pick(list) {
+      const opts = list.length > 1 ? list.filter(u => u !== Music.cur) : list;
+      return opts[Math.floor(Math.random() * opts.length)];
+    },
+    next() {
+      const list = Music.banks[Music.ctx];
+      if (list && list.length) Music.play(Music.pick(list), list.length === 1);
+      else Music.play(THEME, true);
+    },
     toggle() {
       const on = !Music.on();
       try { localStorage.setItem('touchline.music', on ? '1' : '0'); } catch (e) { /* nada */ }
@@ -242,6 +327,7 @@
     if (VIEWS[UI.tab + 'After']) VIEWS[UI.tab + 'After'](S);
     mountFaces(view);
     window.scrollTo(0, keepScroll ? y : 0);
+    Music.mood(S);
   }
   UI.render = render;
   UI.refresh = () => render(true);
@@ -1645,9 +1731,10 @@
         <button data-act="title-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
         <button data-act="title-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
       </div>
-      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Música: “Strategic Swing”. · v${TL.VERSION || '3'}</p>
+      <p class="credits">Datos de jugadores basados en el dataset EA SPORTS FC 27 (EA_FC_ANALYSIS). Escudos: luukhopman/football-logos (marcas de sus clubes). Tema del juego: “Strategic Swing”. · v${TL.VERSION || '3'}</p>
     </div>`;
     setTimeout(() => TL.Splash && TL.Splash.preload(), 1200); // portadas de «Nueva partida»
+    Music.mood(null); // en los menús, el tema del juego
   }
   A['title-music'] = () => { Music.toggle(); renderTitle(); };
   A.lang = el => TL.I18N.set(el.dataset.l);
