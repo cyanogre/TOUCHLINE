@@ -49,7 +49,10 @@
   function eff(p, slot, en) {
     const mor = p.mor == null ? 70 : p.mor;
     const f = en == null ? p.fit : en;
-    return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * (0.916 + 0.12 * mor / 100);
+    // Moral: lineal y con extremos (en llamas por encima de 85, desconectado por debajo de 40)
+    const mf = 0.9 + 0.15 * mor / 100 + (mor >= 85 ? 0.015 : 0) - (mor <= 40 ? 0.03 : 0);
+    // Confianza (vestuario vivo): subidón o bajón de unas jornadas tras un momento en el despacho
+    return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * mf * (p.cf || 1);
   }
 
   function available(p) { return p.inj <= 0 && p.sus <= 0; }

@@ -86,6 +86,9 @@
       if (g && p.club === S.user) t.push(`<span class="tag gem" title="Talento oculto">✨${g.stage >= 2 ? ' ADN' : ''}</span>`);
       const tr = LK.traits(S, p.id);
       if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
+      // Confianza tras un momento en el despacho: subidón o bajón de unas jornadas
+      const cf = TL.Social && p.club === S.user ? TL.Social.conf(S, p.id) : null;
+      if (cf) t.push(`<span class="tag cf ${cf.mult > 1 ? 'up' : 'down'}" title="${cf.mult > 1 ? 'Subidón' : 'Bajón'}: ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)} % (${cf.n} ${cf.n === 1 ? 'jornada' : 'jornadas'})">${cf.mult > 1 ? '🔥' : '🌧️'} ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)}%</span>`);
     }
     return t.join('');
   }
@@ -373,7 +376,9 @@
         <div class="vn-portrait sm"><div class="vn-face" data-face="1"></div></div>
         <div class="grow"><h2>La escuela del Profe</h2><div class="note">Aprende a ganar partidos: puntos, formaciones, cambios y cómo progresar. ${doneN}/${TL.School.LESSONS.length} lecciones.</div></div></div>
         <button class="btn sm primary block mt" data-act="school">${doneN ? 'Seguir aprendiendo' : 'Empezar la primera lección'}</button></section>` : '';
-    return `<div class="grid two three">${next}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
+    const nMom = TL.Social && S.lk ? TL.Social.active(S).length : 0;
+    const momNote = nMom ? `<button class="lk-office span2 home-mo" data-act="tab" data-tab="squad"><span>💬</span><span><b>${nMom === 1 ? '1 momento en el vestuario' : nMom + ' momentos en el vestuario'}</b><small>Alguien necesita una charla. Caducan pronto.</small></span><span class="go">›</span></button>` : '';
+    return `<div class="grid two three">${next}${momNote}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
   };
   VIEWS.homeAfter = S => {
     // Lo mostrado en Inicio queda como leído
@@ -486,9 +491,25 @@
     const staff = (S.staff || []).map(s => li(TL.Staff.ROLES[s.role].icon, `<b>${esc(s.name)}</b> · ${TL.Staff.ROLES[s.role].name} ${'★'.repeat(s.q)}`)).join('');
     const pending = S.inbox.filter(m => m.kind === 'decision' && !m.done && m.data && /^lk_/.test(m.data.ev || '')).length;
     const block = (t, body) => (body ? `<div class="lk-block"><div class="group-title">${t}</div><ul class="lk-list">${body}</ul></div>` : '');
+    // Vestuario vivo: momentos que piden una charla, agenda de la semana y quién manda en el vestuario
+    const SO = TL.Social;
+    let alive = '';
+    if (SO) {
+      const used = SO.agendaUsed(S), left = SO.agendaLeft(S);
+      const moms = SO.active(S).sort((a, b) => a.exp - b.exp);
+      const agenda = `<span class="agenda" title="Charlas que te quedan esta semana">${'<i class="on"></i>'.repeat(used)}${'<i></i>'.repeat(left)}<small>${left === 1 ? '1 charla libre' : left + ' charlas libres'} esta semana</small></span>`;
+      const momHtml = moms.length ? `<div class="mo-list">${moms.map(m => {
+        const K = SO.KINDS[m.k], p = S.players[m.pid], left2 = m.exp - S.week;
+        return `<button class="mo mo-${m.k}" data-act="mo-open" data-id="${m.id}"><span class="mo-ic">${K.icon}</span><span class="grow"><b>${esc(K.title(S, p, m.d))}</b><small>${left2 <= 0 ? 'Última semana para hablarlo' : 'Quedan ' + (left2 + 1) + ' semanas'}</small></span><span class="go">›</span></button>`;
+      }).join('')}</div>` : `<p class="note mo-empty">Sin momentos ahora. Surgen de lo que pasa en el campo: un partidazo, un error, el banquillo, un pique…</p>`;
+      const heavy = SO.heavyweights(S).map(([p, inf]) => { const [ml2, me2] = TL.News.moraleLabel(p.mor == null ? 70 : p.mor); return li(me2, `${pl(p)} · <em>peso ${inf} · ${ml2.toLowerCase()}</em>`); }).join('');
+      alive = `<div class="mo-head"><div class="group-title">Momentos</div>${agenda}</div>${momHtml}`;
+      alive += `<div class="lk-heavy">${block('Pesos pesados', heavy)}</div>`;
+    }
     return `<section class="card locker" style="margin-bottom:12px">
       <div class="card-head"><h2>Vestuario</h2><span class="muted">${me} Ambiente ${ml.toLowerCase()}</span></div>
-      ${pending ? `<button class="lk-office" data-act="inbox"><span>🚪</span><span><b>${pending} reunión${pending > 1 ? 'es' : ''} pendiente${pending > 1 ? 's' : ''}</b><small>Te esperan en el despacho</small></span><span class="go">›</span></button>` : ''}
+      ${pending ? `<button class="lk-office" data-act="inbox"><span>🚪</span><span><b>${pending > 1 ? pending + ' reuniones pendientes' : '1 reunión pendiente'}</b><small>Te esperan en el despacho</small></span><span class="go">›</span></button>` : ''}
+      ${alive}
       <div class="act-row">${acts}</div>
       <div class="lk-grid">${block('Relaciones', prs)}${block(S.gender === 'F' ? 'Madrinas' : 'Padrinos', men)}${block('Joyas de la cantera', gems)}${block('Cesiones', loans)}${block('Cuerpo técnico', staff)}</div>
       <p class="note" style="margin:8px 0 0">${S.gender === 'F' ? 'Toca a una jugadora para hablar con ella en el despacho, ponerle madrina o un plan de entrenamiento.' : 'Toca a un jugador para hablar con él en el despacho, ponerle padrino o un plan de entrenamiento.'}</p></section>`;
@@ -526,6 +547,16 @@
           : g.stage === 2 ? `<b>🌟 ADN desbloqueado: ${d.name}.</b> Si llega a 80 de media antes de los 23, será una superestrella.` : `<b>🌟 Superestrella.</b> El ${d.name.toLowerCase()} de una generación.`;
       out.push(`<div class="gem-box">${txt}</div>`);
     }
+    if (TL.Social && p.club === S.user) {
+      const pr = TL.Social.profile(S, p);
+      const ch = pr.known >= 2 ? `<b>${pr.icon} ${esc(pr.name)}</b><small>${esc(pr.desc)}</small>`
+        : pr.known === 1 ? `<b>❔ Por descubrir</b><small>Intuyes que ${esc(pr.hint)}. Una charla más y lo sabrás.</small>`
+          : `<b>❔ Sin descubrir</b><small>Lo irás conociendo al hablar en el despacho.</small>`;
+      const mems = pr.memories.slice(0, 6).map(m => `<li class="${m[1] >= 0 ? 'good' : 'bad'}"><span class="mem-v">${m[1] > 0 ? '+' : ''}${Math.round(m[1])}</span><span>${esc(m[3])}</span><em>${m[2]} sem</em></li>`).join('');
+      out.push(`<div class="char-row"><div class="char">${ch}</div><div class="infl" title="Peso en el vestuario">Peso <b>${pr.influence}</b></div></div>`);
+      if (pr.conf) out.push(`<p class="cf-line ${pr.conf.mult > 1 ? 'up' : 'down'}">${pr.conf.mult > 1 ? '🔥 <b>Subidón</b>' : '🌧️ <b>Bajón</b>'} <span>${pr.conf.n === 1 ? `Rinde un ${pr.conf.mult > 1 ? '+' : ''}${Math.round((pr.conf.mult - 1) * 100)} % la próxima jornada.` : `Rinde un ${pr.conf.mult > 1 ? '+' : ''}${Math.round((pr.conf.mult - 1) * 100)} % durante ${pr.conf.n} jornadas.`}</span></p>`);
+      out.push(`<div class="mem-box"><div class="group-title">Lo que lleva dentro</div>${mems ? `<ul class="mem-list">${mems}</ul>` : '<p class="note" style="margin:0">Nada especial: ni euforia ni rencores.</p>'}</div>`);
+    }
     const b = LK.boss(S, p.id);
     const rels = W.squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, LK.rel(S, p.id, q.id)]);
     const fr = rels.filter(r => r[1] >= 40).sort((a, c) => c[1] - a[1]).slice(0, 3);
@@ -549,7 +580,8 @@
       if (rows.length) out.push(`<div class="lk-fields">${rows.join('')}</div>`);
       const met = S.lk.met && S.lk.met[p.id];
       const wait = met != null && S.week - met < 3 && S.week >= met;
-      out.push(`<button class="btn block mt office-btn" data-act="lk-meet" data-id="${p.id}" ${wait ? 'disabled' : ''}>🚪 ${wait ? 'Ya hablasteis hace poco' : 'Reunión en el despacho'}</button>`);
+      const full = TL.Social && TL.Social.agendaLeft(S) <= 0;
+      out.push(`<button class="btn block mt office-btn" data-act="lk-meet" data-id="${p.id}" ${wait || full ? 'disabled' : ''}>🚪 ${wait ? 'Ya hablasteis hace poco' : full ? 'Agenda llena esta semana' : 'Reunión en el despacho'}</button>`);
     }
     return `<div class="group-title">Vestuario</div><div class="lk-section">${out.join('')}</div>`;
   }
@@ -561,6 +593,28 @@
   };
   C['lk-focus'] = el => { const S = G.S; if (el.value) TL.Locker.state(S).focus[+el.dataset.id] = el.value; else delete S.lk.focus[+el.dataset.id]; G.save(); toast('Plan de entrenamiento actualizado'); };
   C['lk-mentor'] = el => { const r = TL.Locker.setMentor(G.S, +el.dataset.id, el.value === '' ? null : +el.value); toast(r.msg, !r.ok); G.save(); openPlayer(+el.dataset.id); };
+  const mdb = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  A['mo-open'] = el => {
+    const S = G.S, SO = TL.Social, m = SO.active(S).find(x => x.id === +el.dataset.id);
+    if (!m) { toast('Ese momento ya pasó.'); render(false); return; }
+    const K = SO.KINDS[m.k], p = S.players[m.pid], pr = SO.profile(S, p), left = SO.agendaLeft(S);
+    const ch = m.k === 'crisis' || m.k === 'feud' ? '' : pr.known >= 2 ? `${pr.icon} <b>${esc(pr.name)}</b> · ${esc(pr.desc)}` : pr.known === 1 ? `❔ <span>Intuyes que ${esc(pr.hint)}.</span>` : '❔ <span>Aún no conoces su carácter: lo descubrirás al hablar.</span>';
+    sheet(sheetHead(K.icon + ' ' + K.title(S, p, m.d)) + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;color:var(--text);line-height:1.45">${esc(K.text(S, p, m.d))}</p></div>
+      ${ch ? `<p class="note mo-char">${ch}</p>` : ''}
+      ${left ? '' : '<p class="note mo-full">Tu agenda de esta semana está llena. Si no caduca, podrás atenderlo la semana que viene.</p>'}
+      <div class="col mt">${SO.options(S, m).map(o => `<button class="btn block office-opt mo-opt" data-act="mo-do" data-id="${m.id}" data-k="${o.key}" ${left ? '' : 'disabled'}><span class="mo-txt"><b>${esc(o.label)}</b>${o.desc ? `<small>${esc(o.desc)}</small>` : ''}</span>${o.mark ? `<span class="mo-mark ${o.mark === '✓' ? 'ok' : o.mark === '✗' ? 'ko' : ''}" title="${o.mark === '✓' ? 'Le va' : o.mark === '✗' ? 'No le va' : 'Ni fu ni fa'}">${o.mark}</span>` : ''}</button>`).join('')}</div>
+      <p class="note mt">Agenda: ${left} de ${SO.agendaMax(S)} charlas libres esta semana.</p></div>`);
+  };
+  A['mo-do'] = el => {
+    const S = G.S, r = TL.Social.resolve(S, +el.dataset.id, el.dataset.k);
+    G.save();
+    if (!r.ok) { toast(r.msg, true); return; }
+    const p = S.players[r.pid];
+    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
+      <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
+    if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
+    render(false);
+  };
   A['lk-meet'] = el => {
     const S = G.S, p = S.players[+el.dataset.id];
     const opts = TL.Locker.meetOptions(S, p);
@@ -572,7 +626,7 @@
     const S = G.S, p = S.players[+el.dataset.id];
     const r = TL.Locker.meet(S, p, el.dataset.k);
     G.save();
-    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${esc(r.msg)}</p></div>
+    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     mountFaces(document.querySelector('.sheet'));
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
