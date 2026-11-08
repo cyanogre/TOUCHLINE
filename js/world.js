@@ -454,6 +454,7 @@
     }
     return {
       v: S.v, db: S.db || 'legacy', gender: S.gender, season: S.season, week: S.week, user: S.user, manager: S.manager, pyr: S.pyr || 0,
+      mgrG: S.mgrG || 'M', face: S.face || null,
       leagues: S.leagues.map(l => l.clubs),
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
@@ -471,6 +472,7 @@
   function restore(data, save) {
     const S = buildBase(data);
     S.season = save.season; S.week = save.week; S.user = save.user; S.manager = save.manager; S.pyr = save.pyr || 0;
+    S.mgrG = save.mgrG || 'M'; S.face = save.face || null;
     S.leagues.forEach((l, i) => { l.clubs = save.leagues[i]; });
     S.clubs.forEach((c, i) => {
       const r = save.clubs[i];

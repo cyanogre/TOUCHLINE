@@ -76,8 +76,10 @@
     careerData,
     preview,
 
-    newGame(data, clubId, manager) {
+    newGame(data, clubId, manager, extra) {
       const S = W.create(data, clubId, manager);
+      S.mgrG = (extra && extra.g) || 'M';
+      S.face = (extra && extra.face) || null;
       W.dirty(S);
       TL.Season.makeFixtures(S);
       TL.Season.setObjective(S);

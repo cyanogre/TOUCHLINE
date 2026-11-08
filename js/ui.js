@@ -377,6 +377,10 @@
   UI.render = render;
   UI.refresh = () => render(true);
   A.tab = el => { UI.tab = el.dataset.tab; TL.SFX && TL.SFX.tab(); render(false); };
+  A['face-edit'] = () => {
+    const S = G.S;
+    TL.Face.open({ g: S.mgrG || (S.face && S.face.g) || 'M', face: S.face, onSave: face => { S.face = face; S.mgrG = face.g; G.save(); toast('Tu cara está lista: la verás en las charlas.'); UI.refresh(); } });
+  };
   A['go-loans'] = () => { closeSheet(); UI.tab = 'market'; UI.market.tab = 'loans'; UI.market.limit = 40; render(false); };
 
   function pageTitle(t, sub, right) {
@@ -740,30 +744,38 @@
       <div class="col mt">${SO.options(S, m).map(o => `<button class="btn block office-opt mo-opt" data-act="mo-do" data-id="${m.id}" data-k="${o.key}" ${left ? '' : 'disabled'}><span class="mo-txt"><b>${esc(o.label)}</b>${o.desc ? `<small>${esc(o.desc)}</small>` : ''}</span>${o.mark ? `<span class="mo-mark ${o.mark === '✓' ? 'ok' : o.mark === '✗' ? 'ko' : ''}" title="${o.mark === '✓' ? 'Le va' : o.mark === '✗' ? 'No le va' : 'Ni fu ni fa'}">${o.mark}</span>` : ''}</button>`).join('')}</div>
       <p class="note mt">Agenda: ${left} de ${SO.agendaMax(S)} charlas libres esta semana.</p></div>`);
   };
+  /** Tu cara diciendo tu frase (si te has hecho la cara). */
+  const meSay = (S, line) => (S.face ? `<div class="office-me">${TL.Face.html(S.face, 'talking')}<div class="say"><small>Tú</small><span data-say>${esc(line)}</span></div></div>` : '');
   A['mo-do'] = el => {
+    const S0 = G.S, mo = TL.Social.active(S0).find(x => x.id === +el.dataset.id);
+    const said = mo ? (TL.Social.options(S0, mo).find(o => o.key === el.dataset.k) || {}).label : '';
     const S = G.S, r = TL.Social.resolve(S, +el.dataset.id, el.dataset.k);
     G.save();
     if (!r.ok) { toast(r.msg, true); return; }
     const p = S.players[r.pid];
-    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
+    sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
+    TL.Face.mount(document.querySelector('.sheet'), S.face);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     render(false);
   };
   A['lk-meet'] = el => {
     const S = G.S, p = S.players[+el.dataset.id];
     const opts = TL.Locker.meetOptions(S, p);
-    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p class="note" style="margin:0;color:var(--text)">${esc(p.name)} entra en tu despacho y se sienta. ¿De qué quieres hablar?</p></div>
+    sheet(sheetHead('Despacho') + `<div class="office">${meSay(S, 'Pasa, siéntate.')}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p class="note" style="margin:0;color:var(--text)">${esc(p.name)} entra en tu despacho y se sienta. ¿De qué quieres hablar?</p></div>
       <div class="col mt">${opts.map(([k, l, d]) => `<button class="btn block office-opt" data-act="lk-meet-do" data-id="${p.id}" data-k="${k}"><b>${esc(l)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`);
     mountFaces(document.querySelector('.sheet'));
+    TL.Face.mount(document.querySelector('.sheet'), S.face);
   };
   A['lk-meet-do'] = el => {
     const S = G.S, p = S.players[+el.dataset.id];
+    const said = (TL.Locker.meetOptions(S, p).find(o => o[0] === el.dataset.k) || [])[1];
     const r = TL.Locker.meet(S, p, el.dataset.k);
     G.save();
-    sheet(sheetHead('Despacho') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
+    sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     mountFaces(document.querySelector('.sheet'));
+    TL.Face.mount(document.querySelector('.sheet'), S.face);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     UI.refresh();
   };
@@ -1367,6 +1379,7 @@
         <div class="btn-grid"><button class="btn" data-act="save">💾 Guardar</button><button class="btn" data-act="export">📤 Exportar</button>
         <button class="btn" data-act="import">📥 Importar</button><button class="btn" data-act="tutorial">🧭 Ver tutorial</button>
         <button class="btn" data-act="school">🎓 Escuela del Profe</button>
+        <button class="btn" data-act="face-edit">🙂 Tu cara de mánager</button>
         <button class="btn danger" data-act="quit">Nueva partida</button></div>
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
@@ -2016,9 +2029,16 @@
         <div class="note">${esc(z.data.leagues[z.league][0])} · Temporada ${U.seasonLabel(z.data.season)}</div></div></div>
         <label class="note" for="mgr">Nombre del entrenador</label>
         <input id="mgr" maxlength="28" value="${esc(z.name || '')}" placeholder="Míster" style="margin-top:6px">
+        <div class="note mt">Eres</div>
+        <div class="seg wz-g">${[['M', 'Hombre'], ['F', 'Mujer']].map(([g, l]) => `<button class="${z.mgrG === g ? 'on' : ''}" data-act="wz-mgr-g" data-g="${g}">${l}</button>`).join('')}</div>
+        <div class="note mt">Tu cara</div>
+        <div class="wz-face mt">${z.face ? TL.Face.html(z.face) : '<span class="wz-face-empty" aria-hidden="true">🙂</span>'}
+          <div class="grow"><p class="note" style="margin:0 0 8px">${z.face ? 'Hablarás con esta cara en las charlas con tus jugadores.' : 'Opcional: hazte una foto, encájala en la silueta y se pixela. Saldrá en las charlas con tus jugadores.'}</p>
+          <div class="btn-row"><button class="btn sm ${z.face ? '' : 'primary'}" data-act="wz-face">${z.face ? 'Cambiar mi cara' : 'Crear mi cara'}</button>${z.face ? '<button class="btn sm" data-act="wz-face-del">Quitar</button>' : ''}</div></div></div>
         <button class="btn primary block mt" data-act="wz-start">Empezar carrera</button></div>`;
     }
     app().innerHTML = `<div class="wizard">${html}</div>`;
+    if (z.step === 3 && z.face) TL.Face.mount(app(), z.face);
     window.scrollTo(0, 0);
     if (z.step === 0 && TL.Splash) app().querySelectorAll('[data-splash]').forEach((b, i) => TL.Splash.mount(b, b.dataset.splash, i * 220));
   }
@@ -2052,14 +2072,28 @@
     }
   };
   A['wz-league'] = el => { UI.wz.league = +el.dataset.l; UI.wz.step = 2; renderWizard(); };
-  A['wz-club'] = el => { UI.wz.club = +el.dataset.c; UI.wz.step = 3; renderWizard(); };
+  A['wz-club'] = el => {
+    const z = UI.wz;
+    z.club = +el.dataset.c; z.step = 3;
+    // La última cara creada y su género, para no repetirlo en cada carrera
+    if (z.face === undefined) { z.face = TL.Face.stored(); z.mgrG = (z.face && z.face.g) || 'M'; }
+    renderWizard();
+  };
+  const keepName = () => { const i = document.getElementById('mgr'); if (i && UI.wz) UI.wz.name = i.value; };
+  A['wz-mgr-g'] = el => { keepName(); UI.wz.mgrG = el.dataset.g; if (UI.wz.face) UI.wz.face.g = el.dataset.g; renderWizard(); };
+  A['wz-face'] = () => {
+    keepName();
+    const z = UI.wz;
+    TL.Face.open({ g: z.mgrG, face: z.face, onSave: face => { z.face = face; z.mgrG = face.g; renderWizard(); } });
+  };
+  A['wz-face-del'] = () => { keepName(); UI.wz.face = null; renderWizard(); };
   A['wz-start'] = () => {
     const z = UI.wz;
     const name = (document.getElementById('mgr').value || '').trim() || 'Míster';
     Music.start();
     app().innerHTML = '<div class="title-screen"><div class="spinner"></div><p class="muted">Creando el mundo…</p></div>';
     setTimeout(() => {
-      G.newGame(z.data, z.club, name);
+      G.newGame(z.data, z.club, name, { g: z.mgrG || 'M', face: z.face || null });
       UI.wz = null;
       UI.tab = 'home';
       renderShell(); render();
