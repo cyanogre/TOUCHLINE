@@ -1902,7 +1902,8 @@
       <div class="logo"><h1>TOUCH<span>LINE</span></h1><p>Football Manager</p></div>
       <div class="title-actions">
         ${meta ? `<button class="btn primary continue-card" data-act="continue"><div class="t">▶ Continuar</div>
-          <div class="s">${esc(meta.club)} · ${U.seasonLabel(meta.season)} · Jornada ${meta.week + 1} · ${esc(meta.manager)}</div></button>` : ''}
+          <div class="s">${esc(meta.club)} · ${U.seasonLabel(meta.season)} · Jornada ${meta.week + 1} · ${esc(meta.manager)}</div>
+          ${(meta.db || 'legacy') !== 'v3' ? '<div class="s legacy-note">Partida con la base de datos antigua (nombres reales). Para la nueva, empieza una nueva partida.</div>' : ''}</button>` : ''}
         <button class="btn ${meta ? '' : 'primary'}" data-act="new-game">Nueva partida</button>
         <button class="btn" data-act="tour-new">🏆 Modo torneo · Mundial y Campions</button>
         <button class="btn ghost" data-act="import">Importar partida</button>

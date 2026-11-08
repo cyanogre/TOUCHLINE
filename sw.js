@@ -1,6 +1,7 @@
 /* TOUCHLINE — service worker: juego offline y carga rápida en móvil.
- * La versión la sustituye el workflow de GitHub Pages por el commit. */
-const VERSION = 'touchline-v6-__BUILD__'; // sube el número en cada versión si publicas desde una rama
+ * La versión la sustituye el workflow de GitHub Pages por el commit (si publica con Actions).
+ * Publicando desde la rama no cambia sola: por eso los datos y los escudos se comprueban siempre con el servidor. */
+const VERSION = 'touchline-v7-__BUILD__';
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/icons.js', 'js/i18n.js', 'data/i18n/ui.js', 'data/i18n/ui2.js', 'data/i18n/club.js', 'data/i18n/match.js', 'data/i18n/social.js', 'data/i18n/news.js', 'data/i18n/profe.js', 'data/i18n/school.js', 'data/i18n/fem.js', 'data/i18n/lower.js', 'data/i18n/manage.js', 'data/i18n/vestuario.js', 'data/i18n/mercado.js', 'data/i18n/copas.js', 'js/formulas.js', 'js/util.js', 'js/events-data.js', 'js/manager.js', 'js/staff.js', 'js/world.js', 'js/engine.js', 'js/coach.js',
@@ -33,9 +34,9 @@ self.addEventListener('fetch', e => {
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
   const isCrest = url.hostname === 'cdn.jsdelivr.net' && url.pathname.includes('football-logos');
   if (!sameOrigin && !isFont && !isCrest) return;
-  // Datos y banderas: primero caché (no cambian entre versiones salvo regenerar)
-  // Resto: red primero con respaldo en caché (así las actualizaciones llegan al momento)
-  const cacheFirst = isFont || isCrest || url.pathname.includes('/data/game/') || url.pathname.includes('/data/legacy/') || url.pathname.includes('/assets/flags/') || url.pathname.includes('/assets/escudos/');
+  // Primero caché solo lo que no cambia nunca (fuentes, banderas, la base de datos antigua).
+  // Resto, datos y escudos incluidos: red primero (con ETag, sin coste si no ha cambiado) y caché sin conexión
+  const cacheFirst = isFont || isCrest || url.pathname.includes('/data/legacy/') || url.pathname.includes('/assets/flags/');
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     if (cacheFirst) {

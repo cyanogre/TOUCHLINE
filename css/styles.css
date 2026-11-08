@@ -1196,3 +1196,4 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .lp-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 2px; }
 .lp-key i.lp-q { background: var(--accent2); } .lp-key i.lp-po { background: var(--warn); } .lp-key i.lp-out { background: rgb(255 90 90 / 0.55); }
 .lp-mine span { white-space: nowrap; }
+.continue-card .legacy-note { margin-top: 4px; font-size: 12px; opacity: 0.85; font-style: italic; }
