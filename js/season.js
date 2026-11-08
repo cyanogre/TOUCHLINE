@@ -388,7 +388,7 @@
     else d = U.int(-5, -1);
     p.ovr = U.clamp(p.ovr + d, 30, 95);
     // El potencial se ajusta: nunca por debajo de la media; con la edad converge
-    if (p.age >= 27) p.pot = p.ovr;
+    if (p.age >= 27 && !(TL.Events && TL.Events.isLB(S, p.id) && p.ovr < p.pot)) p.pot = p.ovr;
     else p.pot = Math.max(p.ovr, p.pot + U.int(-2, 1));
     const delta = p.ovr - before;
     if (delta) p.st = p.st.map(v => U.clamp(v + delta, 15, 99));
@@ -422,6 +422,7 @@
       `Objetivo de la directiva: ${S.board.text}. Presupuesto salarial: ${U.money(S.clubs[S.user].wageBudget)}/sem. ` +
       'El mercado de verano está abierto hasta la jornada 3.', 'board');
     TL.Market.aiListings(S);
+    if (TL.Events) TL.Events.newSeason(S);
   }
 
   /** Elimina del array a los jugadores generados ya retirados (y reasigna ids). */
@@ -433,6 +434,7 @@
     S.players = keep;
     S.tactics.slots = (S.tactics.slots || []).map(id => remap.has(id) ? remap.get(id) : -1);
     if (TL.Locker) TL.Locker.remap(S, remap);
+    if (TL.Events) TL.Events.remap(S, remap);
     for (const n of S.news || []) n.pid = n.pid >= 0 && remap.has(n.pid) ? remap.get(n.pid) : -1;
     for (const m of S.inbox) if (m.data && m.data.pid != null) m.done = true;
   }

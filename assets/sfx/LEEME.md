@@ -47,3 +47,14 @@ Para `canticos`, prueba varias melodías: «la la la la», «oh oh oh», palmas 
 | `nivel` | Subes de nivel como mánager | 1-2 s | Short triumphant level up jingle |
 | `fichaje` | Fichas a un jugador | 1-2 s | Contract signing, pen scribble and a short celebratory sting |
 | `titulo` | Ganas la liga o un torneo | 5-8 s | Huge stadium celebration after winning the championship, fireworks, crowd singing |
+
+## Eventos y fantasía
+
+| Carpeta | Cuándo suena | Duración | Idea de texto para ElevenLabs |
+|---|---|---|---|
+| `limit-break` | Un jugador rompe su límite (cinemática **LIMIT BREAK**) | 3-5 s | Anime power-up: rising energy charge, then a huge explosive impact with a deep bass drop and sparkling shimmer, epic |
+| `evento` | Se para el calendario por un evento (el «¡bum!») | <1 s | Short dramatic comic impact hit, punchy boom with a quick whoosh |
+| `alma` | Equipas o consigues un alma (modo fantasía) | 1-2 s | Mystical ethereal chime, magical soul energy swirling, soft choir pad |
+
+Para el **limit break** basta con un archivo: `assets/sfx/limit-break/1.mp3`. El estallido de la cinemática llega a los 1,6 s: si el audio tiene el golpe fuerte más o menos ahí, irán sincronizados.
+

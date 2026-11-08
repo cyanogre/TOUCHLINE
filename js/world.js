@@ -459,7 +459,7 @@
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
       coaches: TL.Coach.serialize(S), lastForm: S.lastForm || {}, reviews: S.reviews || [],
-      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [],
+      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [], ev: S.ev || null,
       cups: S.cups || [], lastOrder: S.lastOrder || null, titles: S.titles || [], staff: S.staff || [], staffMarket: S.staffMarket || null, hist: S.hist || null,
       pb, pg, sales: S.players.filter(p => p.sale).map(p => [p.id, p.sale.r, p.sale.d, p.sale.w]),
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
@@ -503,7 +503,7 @@
       wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone, mentor: save.mentor || null,
       lastForm: save.lastForm || {}, reviews: save.reviews || [], lk: save.lk || null, tlog: save.tlog || [],
       cups: save.cups || null, lastOrder: save.lastOrder || null, titles: save.titles || [], staff: save.staff || [], staffMarket: save.staffMarket || null, hist: save.hist || null,
-      over: save.over, fired: save.fired
+      over: save.over, fired: save.fired, ev: save.ev || null
     });
     TL.Coach.restore(S, save.coaches);
     dirty(S);
@@ -516,7 +516,7 @@
     for (const c of S.clubs) if (c.stature == null) c.stature = c.rep;
     S.wageShift = S.wageShift || 0;
     if (!S.mentor) S.mentor = { seen: {}, trust: 50, cool: {}, chapter: 1, lessons: {} };
-    if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); TL.Staff.migrate(S); }
+    if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); TL.Staff.migrate(S); if (TL.Events) TL.Events.init(S); }
     if (S.user != null && !S.cups && S.fixtures && TL.Cups) TL.Cups.build(S);
     TL.Manager.init(S);
     S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});

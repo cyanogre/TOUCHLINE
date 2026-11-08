@@ -245,7 +245,7 @@
       </div>
       <div class="btn-row ctl">
         <button class="btn sm ${MV.paused ? 'primary' : ''}" data-act="${MV.paused ? 'mv-resume' : 'mv-pause'}">${MV.paused ? '▶ Seguir' : '⏸ Pausa'}</button>
-        <button class="btn sm" data-act="mv-subs">Cambios ${t.subs}/${t.maxSubs}</button>
+        <button class="btn sm" data-act="mv-subs">Cambios ${t.subs}/${t.maxSubs}${MV.m.subWindows(MV.me) ? ` · ${MV.m.subWindows(MV.me)}/${E.MAX_WINDOWS} paradas` : ''}</button>
         <button class="btn sm" data-act="mv-tactic">Táctica</button>
         <button class="btn sm" data-act="mv-skipmenu">⏭ Saltar</button>
       </div>`;
@@ -490,7 +490,9 @@
   };
   function tacticSheet(wasPaused) {
     const t = MV.m.teams[MV.me];
+    const reorg = t.reorg && MV.m.min < t.reorg;
     UI.sheet(UI.sheetHead('Táctica') + `<div class="group-title">Sistema (${t.onPitch.length} en el campo)</div>
+      <p class="note">${MV.m.atHalfTime() || MV.m.min === 0 ? 'En el descanso hay tiempo de explicarlo: cambiar de sistema no tiene coste.' : `Cambiar de sistema en pleno juego desordena al equipo unos ${E.REORG_MIN} minutos (rinde algo menos mientras se recoloca).`}${reorg ? ` <b>Ahora mismo se están recolocando (hasta el ${t.reorg}').</b>` : ''}</p>
       <div class="chips wrap" style="flex-wrap:wrap">${Object.keys(E.FORMATIONS).map(f =>
         `<button class="chip ${t.formation === f ? 'on' : ''}" data-act="mv-form" data-f="${f}">${f}</button>`).join('')}</div>
       <div class="group-title">Mentalidad</div>
@@ -522,10 +524,16 @@
   function subSheet() {
     const m = MV.m, S = G.S, t = m.teams[MV.me];
     const done = () => { if (!MV.subWasPaused) resume(); else renderFoot(); };
-    const left = t.maxSubs - t.subs;
+    const left = t.maxSubs - t.subs, ht = m.atHalfTime(), wins = m.subWindows(MV.me), open = (t.wins || []).includes(m.min);
     let html = UI.sheetHead(`Cambios (${left} restantes)`);
+    // Como en el fútbol real: 5 cambios en 3 paradas como mucho (los del descanso no cuentan); el que sale ya no vuelve
+    const rule = ht ? 'Descanso: estos cambios no gastan ninguna de tus 3 paradas.'
+      : open ? `Esta parada ya está abierta: puedes hacer más cambios ahora sin gastar otra (${wins}/${E.MAX_WINDOWS} paradas usadas).`
+        : `Paradas para cambios: ${wins}/${E.MAX_WINDOWS} usadas. Haz varios cambios a la vez para no gastarlas. El que sale ya no puede volver.`;
     if (!left) html += '<div class="empty">Ya has hecho todos los cambios.</div>';
+    else if (!m.canSubNow(MV.me)) html += `<div class="empty">Ya has usado tus ${E.MAX_WINDOWS} paradas para cambios.${m.min < 45 ? ' Podrás hacer los que te quedan en el descanso.' : ''}</div>`;
     else if (MV.subOut == null) {
+      html += `<p class="note sub-rule">${rule}</p>`;
       html += '<p class="note">¿Quién sale? Los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
         return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · energía ${Math.round(m.energy(o.pid))}%${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
@@ -607,6 +615,6 @@
     UI.celebrate(G.S);
   };
 
-  A['play-live'] = () => open();
+  A['play-live'] = () => (UI.advance ? UI.advance(open) : open());
   TL.MatchView = { open, MV };
 })();

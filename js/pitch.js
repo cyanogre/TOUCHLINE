@@ -122,6 +122,7 @@
       this.leaving = [];           // los que se van (cambios, expulsiones)
       this.keep = new Set();       // pids que el guion retiene aunque el motor ya los haya quitado
       this.num = {};
+      this.aura = TL.Events && this.S.ev ? TL.Events.auras(this.S) : {}; // limit break y almas: aura y estela
       this.kitSrc = match.teams.map(t => kitsOf(this.S.clubs[t.club]));
       this.colors = this._colors();
       this._numbers();
@@ -1802,6 +1803,39 @@
       c.globalAlpha = 1;
     }
 
+    /** Aura (limit break, almas): estela de imágenes residuales al moverse, halo que late y llamitas que suben. */
+    _aura(a, X, Y, x, y, r, au, upright) {
+      const c = this.cx, t = this.t, LIFE = 0.7;
+      // Estela: imágenes residuales de las últimas posiciones (en coordenadas del campo)
+      const tr = a._tr || (a._tr = []);
+      const last = tr[tr.length - 1];
+      if (!last || Math.hypot(last[0] - a.x, last[1] - a.y) > 0.45) { tr.push([a.x, a.y, t]); if (tr.length > 10) tr.shift(); }
+      while (tr.length && t - tr[0][2] > LIFE) tr.shift();
+      for (let k = 0; k < tr.length - 1; k++) {
+        const age = (t - tr[k][2]) / LIFE;
+        c.globalAlpha = Math.max(0, (1 - age) * 0.55 * ((k + 1) / tr.length));
+        c.fillStyle = k % 2 ? au.c2 : au.c;
+        c.beginPath(); c.arc(X(tr[k][0]), Y(tr[k][1]), r * (1 - age * 0.3), 0, 6.283); c.fill();
+      }
+      // Halo que late
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6 + (a.bob || 0));
+      const R2 = r * (2.3 + 0.55 * pulse);
+      const g = c.createRadialGradient(x, y, r * 0.7, x, y, R2);
+      g.addColorStop(0, hexA(au.c, 0.8)); g.addColorStop(0.5, hexA(au.c2, 0.35)); g.addColorStop(1, hexA(au.c2, 0));
+      c.globalAlpha = 1; c.fillStyle = g; c.beginPath(); c.arc(x, y, R2, 0, 6.283); c.fill();
+      // Anillo de energía que gira
+      c.lineWidth = Math.max(1.2, r * 0.16); c.strokeStyle = hexA(au.c, 0.55 + 0.35 * pulse);
+      c.beginPath(); c.arc(x, y, r * (1.35 + 0.15 * pulse), t * 3, t * 3 + 4.4); c.stroke();
+      // Llamitas que suben
+      if (upright) for (let k = 0; k < 8; k++) {
+        const ph = (t * 1.6 + k / 8 + (a.bob || 0)) % 1, ang = k * 0.785 + Math.sin(t * 3 + k) * 0.35;
+        c.globalAlpha = (1 - ph) * 0.9;
+        c.fillStyle = k % 3 ? au.c : '#ffffff';
+        c.beginPath(); c.arc(x + Math.cos(ang) * r * 1.15 * (1 - ph * 0.4), y - r * 0.3 - ph * r * 2.4 + Math.sin(ang) * r * 0.35, Math.max(0.9, r * 0.22 * (1 - ph)), 0, 6.283); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+
     _card(x, y, R, color) {
       const c = this.cx;
       c.save(); c.translate(x, y); c.rotate(-0.15);
@@ -1827,6 +1861,8 @@
         if (a.state === 'celebrate') y -= Math.abs(Math.sin(this.t * 9 + a.bob)) * R * 0.7;
         if (a.jump && this.t - a.jump < 0.5) y -= Math.sin((this.t - a.jump) / 0.5 * Math.PI) * R * 1.1;
         const sad = a.state === 'sad';
+        const au = this.aura[a.pid];
+        if (au && !a.leave) this._aura(a, X, Y, x, y, r, au, upright);
         c.globalAlpha = a.leave ? 0.7 : sad ? 0.8 : 1;
         // Sombra
         c.beginPath(); c.ellipse(x + 1, y0 + r * 0.85, r * 0.95, r * 0.35, 0, 0, 6.283); c.fillStyle = 'rgb(0 0 0 / 0.28)'; c.fill();
@@ -1916,6 +1952,9 @@
       }
     }
   }
+
+  /** '#rrggbb' + transparencia → rgba(). */
+  function hexA(h, a) { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
 
   TL.Pitch = Pitch;
 })();

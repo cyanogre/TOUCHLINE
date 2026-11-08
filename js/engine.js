@@ -55,7 +55,12 @@
     return p.ovr * fit(p, slot) * (0.75 + 0.25 * f / 100) * mf * (p.cf || 1);
   }
 
-  function available(p) { return p.inj <= 0 && p.sus <= 0; }
+  const MAX_WINDOWS = 3;      // paradas para cambios fuera del descanso
+  const REORG_MIN = 5, REORG_MULT = 0.94; // cambiar de sistema en pleno juego: unos minutos de desorden
+  /** El desorden se acaba: hay que recalcular la fuerza del equipo. */
+  function t0reorg(m, min) { return m.teams.some(t => t.reorg === min); }
+
+  function available(p) { return p.inj <= 0 && p.sus <= 0 && !p.away; }
 
   /** Mejor once posible para una formación (asignación voraz global). */
   function autoLineup(players, formation, rotate) {
@@ -428,7 +433,7 @@
     _strength(i) {
       const t = this.teams[i];
       const b = this.bonus[i];
-      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1);
+      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1) * (t.reorg && this.min < t.reorg ? REORG_MULT : 1);
       const LK = TL.Locker;
       let tm = 1, extra = { mid: 0, att: 0, def: 0 };
       if (LK && this.S.lk) {
@@ -562,7 +567,9 @@
         if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
       }
       if (m % 5 === 0) this._str = null; // el cansancio va pesando
+      if (t0reorg(this, m)) this._str = null;
       if (m === 45) {
+        this.htDone = true;
         this._halfTime();
         if (this.detail) this._ev('ht', -1, null, null, `Descanso. ${this.score[0]}-${this.score[1]}.`);
       }
@@ -687,12 +694,13 @@
       const ot = this.teams[opp];
       if (!t.onPitch.length || !ot.onPitch.length) return;
       // Un jugador amonestado se contiene: comete menos faltas
-      const fo = U.weighted(t.onPitch, o => FOUL_W[o.slot] * (0.7 + this.P(o.pid).st[4] / 160) * (this.pl[o.pid] && this.pl[o.pid].y ? 0.45 : 1));
+      const lfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
+      const fo = U.weighted(t.onPitch, o => FOUL_W[o.slot] * (0.7 + this.P(o.pid).st[4] / 160) * (this.pl[o.pid] && this.pl[o.pid].y ? 0.45 : 1) * (lfx(o.pid).foul || 1));
       const vo = U.weighted(ot.onPitch, o => FOULED_W[o.slot] * Math.pow(Math.max(30, this.P(o.pid).st[3]) / 70, 2) * (((TL.Locker && this.S.lk && TL.Locker.fx(this.S, o.pid)) || {}).fouled || 1));
       const fouler = this.P(fo.pid), victim = this.P(vo.pid);
       this.stats.fouls[i]++;
       this.pl[fouler.id].f++;
-      const strict = this.ref.strict * this.bonus[i].cards;
+      const strict = this.ref.strict * this.bonus[i].cards * (lfx(fouler.id).card || 1);
       const late = this.min > 75 ? 1.2 : 1;
       const r = Math.random();
       let shown = false;
@@ -939,6 +947,7 @@
     substitute(i, outPid, inPid) {
       const t = this.teams[i];
       if (t.subs >= t.maxSubs) return false;
+      if (!this.canSubNow(i)) return false;
       const o = t.onPitch.find(o => o.pid === outPid);
       const bi = t.bench.indexOf(inPid);
       if (!o || bi < 0) return false;
@@ -948,9 +957,23 @@
       this.pl[inPid].en = this.P(inPid).fit;
       o.pid = inPid; o.hurt = false;
       t.subs++;
+      if (!this.atHalfTime()) { t.wins = t.wins || []; if (!t.wins.includes(this.min)) t.wins.push(this.min); }
       this._str = null;
       if (this.detail) this._ev('sub', i, inPid, outPid, say('sub', { p: this.P(inPid).short, a: this.P(outPid).short }));
       return true;
+    }
+
+    /** En el descanso (los cambios de ahí no gastan parada). */
+    atHalfTime() { return this.min === 45 && !!this.htDone; }
+    /** Paradas para cambios usadas fuera del descanso (máximo 3). */
+    subWindows(i) { return (this.teams[i].wins || []).length; }
+    /** ¿Se puede cambiar ahora? Quedan cambios y o es el descanso, o esta parada ya está abierta, o quedan paradas. */
+    canSubNow(i) {
+      const t = this.teams[i];
+      if (t.subs >= t.maxSubs) return false;
+      if (this.atHalfTime()) return true;
+      const w = t.wins || [];
+      return w.includes(this.min) || w.length < MAX_WINDOWS;
     }
 
     /** Cambio de sistema en pleno partido: recoloca a los que están en el campo. */
@@ -989,6 +1012,7 @@
       onPitch.sort((a, b) => a.idx - b.idx);
       t.onPitch = onPitch;
       t.formation = formation;
+      if (this.min > 0 && !this.atHalfTime()) t.reorg = this.min + REORG_MIN;
       this._str = null;
       t.log.push([this.min, formation, t.mentality, why || '']);
       if (this.detail) {
@@ -1113,7 +1137,7 @@
   }
 
   TL.Engine = {
-    FORMATIONS, TALKS, fit, eff, available, autoLineup, lineupScore, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore,
+    FORMATIONS, TALKS, MAX_WINDOWS, REORG_MIN, fit, eff, available, autoLineup, lineupScore, remapLineup, bestFormation, pickBench, userLineup, Match, quickScore,
     teamStrength, outcome, MENT_OWN, MENT_OPP
   };
 })();

@@ -105,6 +105,7 @@
     const t = [];
     if (p.inj > 0) t.push(`<span class="tag inj">LES ${p.inj}s</span>`);
     if (p.sus > 0) t.push('<span class="tag sus">SANC</span>');
+    if (p.away) t.push('<span class="tag inj" title="Fuera unos días">FUERA</span>');
     if (p.listed) t.push('<span class="tag list">EN VENTA</span>');
     else if (p.sale) t.push(`<span class="tag list" title="${esc(TL.Market.SALE[p.sale.r].t)}">EN VENTA −${Math.round(p.sale.d * 100)}%</span>`);
     if (p.club === S.user && p.contract <= S.season + 1) t.push(`<span class="tag exp">FIN ${p.contract}</span>`);
@@ -116,6 +117,8 @@
       if (g && p.club === S.user) t.push(`<span class="tag gem" title="Talento oculto">✨${g.stage >= 2 ? ' ADN' : ''}</span>`);
       const tr = LK.traits(S, p.id);
       if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
+      const so = TL.Events && TL.Events.fantasy(S) && p.club === S.user && TL.Events.soulOf(S, p.id);
+      if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${so.def.icon}</span>`);
       // Confianza tras un momento en el despacho: subidón o bajón de unas jornadas
       const cf = TL.Social && p.club === S.user ? TL.Social.conf(S, p.id) : null;
       if (cf) t.push(`<span class="tag cf ${cf.mult > 1 ? 'up' : 'down'}" title="${cf.mult > 1 ? 'Subidón' : 'Bajón'}: ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)} % (${cf.n} ${cf.n === 1 ? 'jornada' : 'jornadas'})">${cf.mult > 1 ? '🔥' : '🌧️'} ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)}%</span>`);
@@ -419,6 +422,257 @@
       <div class="d">${U.seasonLabel(m.s)} · Semana ${m.w}${m.res ? ' · ' + esc(m.res) : ''}</div>${actions}</div></div>`;
   }
 
+
+  // ------------------------------------------------------------ Calendario por días y eventos
+  /** Día de la semana corto («mar»), en el idioma del juego. */
+  const wday = (S, d) => TL.Events.dateOf(S, d).toLocaleDateString(TL.I18N ? TL.I18N.locale() : 'es-ES', { weekday: 'short', timeZone: 'UTC' }).replace('.', '');
+  /** Tira de días desde el último partido hasta el próximo. */
+  function calHtml(S) {
+    const EV = TL.Events;
+    if (!EV || S.mode === 'tour' || S.over || S.fired) return '';
+    const md = EV.matchDay(S);
+    if (md == null) return '';
+    const E = EV.st(S), today = E.d;
+    let start = Math.min(E.m0, today);
+    if (md - start > 7) start = md - 7;
+    const evDays = new Map(E.log.filter(l => l.s === S.season && l.d >= start).map(l => [l.d, l]));
+    const cells = [];
+    for (let d = start; d <= md; d++) {
+      const dt = EV.dateOf(S, d), ev = evDays.get(d) || (E.pend && E.pend.d === d ? E.pend : null);
+      const cls = ['cal-d', d < today ? 'past' : '', d === today ? 'today' : '', d === md ? 'mday' : '', ev ? 'ev' : ''].filter(Boolean).join(' ');
+      cells.push(`<div class="${cls}"${ev && ev.t ? ` title="${esc(ev.t)}"` : ''}><span class="wd">${esc(wday(S, d))}</span><b>${dt.getUTCDate()}</b><i>${d === md ? '⚽' : ev ? '⚡' : d === E.m0 && d >= 0 && d < md ? '✓' : ''}</i></div>`);
+    }
+    const left = md - today;
+    const note = E.pend ? `<button class="cal-pend" data-act="ev-open">⚡ <b>Asunto pendiente:</b> ${esc((EV.view(S, E.pend) || {}).title || '')}</button>`
+      : `<div class="cal-note"><span>${left > 1 ? `Faltan ${left} días para el partido` : left === 1 ? 'Mañana hay partido' : '<b>Hoy hay partido</b>'}</span>${S.ev && S.ev.fan ? ' · <span class="fan-on">✨ Fantasía</span>' : ''}</div>`;
+    return `<div class="cal" id="cal-strip"><div class="cal-days" style="--n:${md - start + 1}">${cells.join('')}</div>${note}</div>`;
+  }
+  UI.calHtml = calHtml;
+  const calRefresh = S => { const box = document.getElementById('cal-strip'); if (box) box.outerHTML = calHtml(S); };
+
+  /** Avanza el calendario día a día hasta el partido; si pasa algo, se para y lo enseña. then(): jugar. */
+  UI.advance = async function (then) {
+    const S = G.S, EV = TL.Events;
+    if (!EV || !S || S.mode === 'tour' || S.over || S.fired) return then();
+    if (UI.advancing) return;
+    if (EV.st(S).pend) { UI.afterEv = then; openEvent(S); return; }
+    UI.advancing = true;
+    document.body.classList.add('advancing');
+    const quick = UI.reduced || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let ev = null;
+    try {
+      for (let guard = 0; guard < 30; guard++) {
+        const r = EV.step(S);
+        if (r.pend) { ev = r.pend; break; }
+        calRefresh(S);
+        if (r.ev) { ev = r.ev; break; }
+        if (r.ready) break;
+        TL.SFX && TL.SFX.select && TL.SFX.select();
+        if (!quick) await TL.Cine.sleep(170);
+      }
+    } finally { UI.advancing = false; document.body.classList.remove('advancing'); }
+    G.save();
+    if (ev) { await showEvent(S, ev, then); return; }
+    then();
+  };
+
+  /** ¡Bum! (o la cinemática del limit break) y la hoja del evento. */
+  async function showEvent(S, inst, then) {
+    UI.afterEv = then || null;
+    const v = TL.Events.view(S, inst);
+    if (!v) return;
+    if (inst.id === 'limit_break' && inst.lb) {
+      const p = S.players[inst.pid], c = S.clubs[S.user];
+      await TL.Cine.limitBreak({ name: p.name, num: (S.tactics.slots || []).indexOf(p.id) + 1 || '', from: inst.lb.from, to: inst.lb.to, o0: inst.lb.o0, o1: inst.lb.o1, col: c.c1 || '#2b6cff', ink: '#ffffff' });
+    } else await TL.Cine.boom({ tone: v.tone, label: v.catName, icon: v.icon });
+    if (UI.tab === 'home') render(false);
+    openEvent(S);
+  }
+  UI.showEvent = showEvent;
+
+  /** Chips de jugador en la cabecera de un evento. */
+  const evWho = (S, id) => { const p = id != null ? S.players[id] : null; return p ? `<button class="ev-who" data-act="player" data-id="${p.id}">${posB(p.pos)}<span>${esc(p.short)}</span>${ovrB(p.ovr)}</button>` : ''; };
+  function openEvent(S) {
+    const EV = TL.Events, inst = EV.st(S).pend;
+    if (!inst) return;
+    const v = EV.view(S, inst);
+    if (!v) { EV.st(S).pend = null; return; }
+    const chips = v.chips.map(([t, g]) => `<span class="ev-chip ${g > 0 ? 'up' : g < 0 ? 'down' : ''}">${esc(t)}</span>`).join('');
+    const lb = v.lb ? `<div class="ev-lb"><b>Potencial ${v.lb.from} ➜ ${v.lb.to}</b><span>Media ${v.lb.o0} ➜ ${v.lb.o1}</span><span>Ahora crecerá a toda velocidad.</span></div>` : '';
+    sheet(`<div class="ev-sheet cat-${v.cat} tone-${v.tone}">
+      <div class="ev-top"><span class="ev-cat">${v.icon} <span>${esc(v.catName)}</span></span><span class="ev-date">${esc(U.fmtDate(v.date))}</span><button class="icon-btn" data-act="close-sheet" aria-label="Cerrar">${icon('close')}</button></div>
+      <h2 class="ev-title">${esc(v.title)}</h2>
+      ${v.pid != null || v.qid != null ? `<div class="ev-whos">${evWho(S, v.pid)}${evWho(S, v.qid)}</div>` : ''}
+      <p class="ev-body">${esc(v.body)}</p>${lb}
+      ${chips ? `<div class="ev-chips">${chips}</div>` : ''}
+      <div class="col mt">${v.opts.map(o => `<button class="btn block office-opt ev-opt" data-act="ev-do" data-k="${o.k}"><b>${esc(o.l)}</b>${o.d ? `<small>${esc(o.d)}</small>` : ''}</button>`).join('')}</div>
+    </div>`, { onClose: () => { if (UI.tab === 'home') render(false); } });
+  }
+  UI.openEvent = openEvent;
+  A['ev-open'] = () => openEvent(G.S);
+
+  A['ev-do'] = el => {
+    const S = G.S, EV = TL.Events;
+    if (!EV.st(S).pend) { closeSheet(); return; }
+    const said = (el.querySelector('b') || {}).textContent || '';
+    const r = EV.resolve(S, +el.dataset.k);
+    G.save();
+    calRefresh(S);
+    showResult(S, r, said);
+  };
+  A['ev-continue'] = () => { const then = UI.afterEv; UI.afterEv = null; UI.onSheetClose = null; closeSheet(); if (then) UI.advance(then); else render(false); };
+
+  /** Lo que ha pasado: tu frase, el resultado, los efectos y, si lo hay, el partido especial y el premio. */
+  function showResult(S, r, said) {
+    const chips = (r.chips || []).map(([t, g]) => `<span class="ev-chip ${g > 0 ? 'up' : g < 0 ? 'down' : ''}">${esc(t)}</span>`).join('');
+    const mm = r.match;
+    const reward = r.reward || (mm && mm.reward);
+    const board = mm ? `<div class="sm-box"><div class="sm-board">
+        <div class="sm-team">${crest(S.clubs[S.user], 'sm')}<b>${esc(S.clubs[S.user].short || S.clubs[S.user].name)}</b></div>
+        <div class="sm-score"><span id="sm-a">0</span><i>-</i><span id="sm-b">0</span><small id="sm-min">0'</small></div>
+        <div class="sm-team"><span class="sm-opp">🏟️</span><b>${esc(mm.opp)}</b></div></div>
+        <div class="sm-feed" id="sm-feed"></div></div>` : '';
+    const then = UI.afterEv;
+    sheet(`<div class="ev-sheet ev-res ${r.tone ? 'res-' + r.tone : ''}">
+      <div class="ev-top"><span class="ev-cat">${esc(r.title || '')}</span><button class="icon-btn" data-act="close-sheet" aria-label="Cerrar">${icon('close')}</button></div>
+      ${said ? meSay(S, '«' + said + '»') : ''}
+      ${board}
+      <p class="ev-body ev-msg" ${mm ? 'hidden' : ''}>${esc(r.msg || '')}</p>
+      ${chips ? `<div class="ev-chips" ${mm ? 'hidden' : ''}>${chips}</div>` : ''}
+      ${reward ? `<div id="ev-reward" ${mm ? 'hidden' : ''}>${rewardHtml(S, reward)}</div>` : ''}
+      <div class="btn-row mt ev-actions" ${mm ? 'hidden' : ''}>${r.pid != null && S.players[r.pid] && S.players[r.pid].club === S.user ? `<button class="btn" data-act="player" data-id="${r.pid}">Ver ficha</button>` : ''}
+        <button class="btn primary" data-act="ev-continue">${then ? 'Seguir hacia el partido' : 'Cerrar'}</button></div>
+    </div>`, { onClose: () => { UI.afterEv = null; if (UI.tab === 'home') render(false); } });
+    TL.Face.mount(document.querySelector('.sheet'), S.face);
+    const sh = document.querySelector('.sheet');
+    const reveal = () => {
+      sh.querySelectorAll('[hidden]').forEach(x => { x.hidden = false; });
+      if (reward) TL.Cine.reward(sh.querySelector('.rw-card'), reward.kind === 'soul');
+      else if (r.tone === 'good') TL.SFX && TL.SFX.success();
+      else if (r.tone === 'bad') TL.SFX && TL.SFX.error();
+    };
+    if (!mm) { reveal(); return; }
+    // Partido especial: el marcador corre minuto a minuto
+    const quick = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const T = quick ? 0 : 2600, feed = sh.querySelector('#sm-feed');
+    let a = 0, b = 0;
+    TL.SFX && TL.SFX.whistle(false);
+    const tick = setInterval(() => { const m = sh.querySelector('#sm-min'); if (!m) { clearInterval(tick); return; } m.textContent = Math.min(90, (parseInt(m.textContent, 10) || 0) + 3) + "'"; }, T / 30 || 1);
+    for (const g of mm.goals) setTimeout(() => {
+      if (!sh.isConnected) return;
+      if (g.t === 0) a++; else b++;
+      sh.querySelector('#sm-a').textContent = a; sh.querySelector('#sm-b').textContent = b;
+      feed.insertAdjacentHTML('beforeend', `<div class="sm-goal ${g.t ? 'opp' : 'me'}"><span>${g.min}'</span>⚽ ${esc(g.t ? mm.opp : g.who)}</div>`);
+      if (TL.SFX) { if (g.t) TL.SFX.groan(); else TL.SFX.goal(true); }
+    }, (g.min / 90) * T);
+    setTimeout(() => {
+      clearInterval(tick);
+      if (!sh.isConnected) return;
+      const m = sh.querySelector('#sm-min'); if (m) m.textContent = 'Fin del partido';
+      if (mm.pens) feed.insertAdjacentHTML('beforeend', `<div class="sm-goal pens">Penaltis: ${mm.pens[0]}-${mm.pens[1]}</div>`);
+      feed.insertAdjacentHTML('beforeend', `<div class="sm-verdict ${mm.win ? 'win' : 'lose'}">${mm.win ? '¡Victoria!' : 'Derrota'}</div>${mm.hurt ? `<div class="sm-goal opp">${esc(mm.hurt)} acaba tocado</div>` : ''}`);
+      TL.SFX && TL.SFX.whistle(true);
+      if (mm.win && TL.FX) TL.FX.confetti();
+      reveal();
+    }, T + 250);
+  }
+
+  // ------------------------------------------------------------ Almas y objetos
+  const EFF_TXT = { shot: 'Disparos', conv: 'Acierto', assist: 'Asistencias', fouled: 'Faltas recibidas', save: 'Paradas', mid: 'Centro del campo', att: 'Ataque', def: 'Defensa', team: 'Todo el equipo', foul: 'Faltas cometidas', card: 'Tarjetas' };
+  /** «Acierto +6 %», «Defensa +7»… (y si es malo, marcado). */
+  function effList(eff) {
+    return Object.entries(eff || {}).map(([k, v]) => {
+      if (typeof v === 'boolean') return null;
+      let pct, good;
+      if (['mid', 'att', 'def'].includes(k)) { pct = Math.round(v * 10); good = v > 0; return [`${EFF_TXT[k]}: ${pct > 0 ? '+' : ''}${pct}`, good]; }
+      if (k === 'save') { pct = Math.round((1 - v) * 100); return [`${EFF_TXT[k]}: +${pct} %`, true]; }
+      pct = Math.round((v - 1) * 1000) / 10;
+      good = k === 'foul' || k === 'card' ? pct < 0 : pct > 0;
+      return [`${EFF_TXT[k]}: ${pct > 0 ? '+' : ''}${String(pct).replace('.', ',')} %`, good];
+    }).filter(Boolean);
+  }
+  const effChips = eff => effList(eff).map(([t, g]) => `<span class="ev-chip ${g ? 'up' : 'down'}">${esc(t)}</span>`).join('');
+  const LINES = ['Porteros', 'Defensas', 'Medios', 'Delanteros'];
+  function gearDef(kind, k) { const D = TL.Events.DB(); return kind === 'soul' ? D.souls[k] : D.items[k]; }
+  function rewardHtml(S, rw) {
+    const d = gearDef(rw.kind, rw.k);
+    if (!d) return '';
+    const p = rw.pid != null ? S.players[rw.pid] : null;
+    return `<div class="rw-card ${rw.kind}" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div>
+      <div class="grow"><small><span>${rw.kind === 'soul' ? 'Nueva alma' : 'Nuevo objeto'}</span>${p ? `<span> · equipada a ${esc(p.short)}</span>` : ''}</small><b>${esc(d.name)}</b><p>${esc(d.desc)}</p>
+      <div class="ev-chips">${effChips(d.eff)}</div>${d.line && rw.kind === 'soul' ? `<p class="note" style="margin:4px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')}</p>` : ''}
+      ${p ? '' : `<button class="btn sm primary mt" data-act="gear" data-kind="${rw.kind}" data-u="${rw.u}">Equipar</button>`}</div></div>`;
+  }
+
+  /** Tarjeta de la plantilla: tu inventario. */
+  function gearCard(S) {
+    const EV = TL.Events;
+    if (!EV || !S.ev || S.mode === 'tour') return '';
+    const E = S.ev, fan = EV.fantasy(S);
+    if (!fan && !E.items.length) return '';
+    const row = (kind, x) => {
+      const d = gearDef(kind, x.k);
+      if (!d) return '';
+      const p = x.pid != null ? S.players[x.pid] : null;
+      return `<button class="gear-it ${kind} ${p ? 'on' : ''}" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${p ? 'Lo lleva ' + esc(p.short) : 'En el inventario'}</small></span></button>`;
+    };
+    const souls = fan ? E.souls.map(x => row('soul', x)).join('') : '';
+    const items = E.items.map(x => row('item', x)).join('');
+    return `<section class="card gear-card"><div class="card-head"><h2>${fan ? '✨ Almas y objetos' : '🎒 Objetos'}</h2></div>
+      ${fan ? `<div class="group-title">Almas</div>${souls || '<p class="note">Aún no tienes almas. Aparecen en eventos y partidos especiales.</p>'}` : ''}
+      <div class="group-title">Objetos</div>${items || '<p class="note">Gana partidos especiales para conseguir objetos.</p>'}</section>`;
+  }
+  UI.gearCard = gearCard;
+
+  /** Hoja de un alma u objeto: qué hace y a quién se lo pones. */
+  A.gear = el => {
+    const S = G.S, kind = el.dataset.kind, u = +el.dataset.u, EV = TL.Events;
+    const list = kind === 'soul' ? S.ev.souls : S.ev.items, x = list.find(i => i.u === u);
+    if (!x) return;
+    const d = gearDef(kind, x.k);
+    const cur = x.pid != null ? S.players[x.pid] : null;
+    const cands = W.squad(S, S.user).filter(p => EV.canEquip(S, kind, x.k, p))
+      .sort((a, b) => (kind === 'soul' ? EV.affinity(d, b) - EV.affinity(d, a) : 0) || b.ovr - a.ovr);
+    const has = p => (kind === 'soul' ? EV.soulOf(S, p.id) : EV.itemOf(S, p.id));
+    sheet(sheetHead(d.icon + ' ' + esc(d.name)) + `<div class="rw-card ${kind} flat" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div><div class="grow"><p>${esc(d.desc)}</p><div class="ev-chips">${effChips(d.eff)}</div>
+      ${kind === 'soul' && d.line ? `<p class="note" style="margin:6px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')} <span>(en otra línea, a medias)</span></p>` : ''}${d.gk === true ? '<p class="note" style="margin:6px 0 0">Solo para porteros.</p>' : ''}</div></div>
+      ${cur ? `<div class="row between mt"><span><span>Lo lleva</span> <b>${esc(cur.name)}</b></span><button class="btn sm" data-act="gear-off" data-kind="${kind}" data-u="${u}">Quitar</button></div>` : ''}
+      <div class="group-title">${cur ? 'Pasárselo a otro' : '¿A quién se lo pones?'}</div>
+      <div class="plist">${cands.filter(p => p !== cur).map(p => playerRow(S, p, { act: 'gear-on', attrs: ` data-kind="${kind}" data-u="${u}"`, sub: `${F.POS_ES[p.pos]}${kind === 'soul' ? `<span> · ${EV.affinity(d, p) >= 1 ? 'rinde entera' : 'a medias'}</span>` : ''}${has(p) ? `<span> · ya lleva ${esc(has(p).def.name)}</span>` : ''}`, tags: false })).join('')}</div>`);
+  };
+  A['gear-on'] = el => {
+    const S = G.S, kind = el.dataset.kind, r = TL.Events.equip(S, kind, +el.dataset.u, +el.dataset.id);
+    toast(r.msg, !r.ok);
+    if (!r.ok) return;
+    G.save();
+    if (kind === 'soul') { if (!(TL.SFX.sample && TL.SFX.sample('alma'))) TL.SFX.soul(); } else TL.SFX.success();
+    closeSheet(); UI.refresh();
+  };
+  A['gear-off'] = el => { const S = G.S, r = TL.Events.equip(S, el.dataset.kind, +el.dataset.u, null); toast(r.msg, !r.ok); G.save(); closeSheet(); UI.refresh(); };
+
+  /** En la ficha del jugador: su alma y su objeto. */
+  function gearSection(S, p) {
+    const EV = TL.Events;
+    if (!EV || !S.ev || p.club !== S.user) return '';
+    const fan = EV.fantasy(S), so = fan ? EV.soulOf(S, p.id) : null, it = EV.itemOf(S, p.id);
+    const freeSouls = fan ? S.ev.souls.filter(x => x.pid == null && EV.canEquip(S, 'soul', x.k, p)) : [];
+    const freeItems = S.ev.items.filter(x => x.pid == null && EV.canEquip(S, 'item', x.k, p));
+    if (!so && !it && !freeSouls.length && !freeItems.length) return '';
+    const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(e => `<span>${esc(e[0])}</span>`).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+    const pickers = [];
+    if (!so && freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ Equipar un alma (${freeSouls.length})</button>`);
+    if (!it && freeItems.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="item" data-id="${p.id}">🎒 Equipar un objeto (${freeItems.length})</button>`);
+    return `<div class="group-title">${fan ? 'Alma y objeto' : 'Objeto'}</div><div class="gear-sec">${so ? line('soul', so) : ''}${it ? line('item', it) : ''}${pickers.length ? `<div class="btn-row">${pickers.join('')}</div>` : ''}</div>`;
+  }
+  A['gear-pick'] = el => {
+    const S = G.S, kind = el.dataset.kind, p = S.players[+el.dataset.id], EV = TL.Events;
+    const list = (kind === 'soul' ? S.ev.souls : S.ev.items).filter(x => x.pid == null && EV.canEquip(S, kind, x.k, p));
+    sheet(sheetHead(kind === 'soul' ? '✨ Elige un alma' : '🎒 Elige un objeto') + `<p class="note">Para ${esc(p.name)} (${F.POS_ES[p.pos]}).</p>` + list.map(x => {
+      const d = gearDef(kind, x.k);
+      return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(e => `<span>${esc(e[0])}</span>`).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+    }).join(''));
+  };
+
   VIEWS.home = S => {
     if (S.mode === 'tour') return tourHome(S);
     const c = S.clubs[S.user];
@@ -435,7 +689,7 @@
         <div class="nm-actions" style="grid-template-columns:1fr"><button class="btn primary" data-act="season-end">Ver resumen de temporada</button></div></section>`;
     } else if (!fx) {
       next = `<section class="card next-match span2"><div class="nm-meta"><span>${esc(L.name)} · Jornada ${S.week + 1}</span><span>${U.fmtDate(U.dateOf(S.season, S.week))}</span></div>
-        <div class="center" style="margin:22px 0 18px"><h2 style="font-size:26px">Jornada de descanso</h2><p class="muted">Tu equipo no juega esta semana.</p></div>
+        ${calHtml(S)}<div class="center" style="margin:22px 0 18px"><h2 style="font-size:26px">Jornada de descanso</h2><p class="muted">Tu equipo no juega esta semana.</p></div>
         <div class="nm-actions" style="grid-template-columns:1fr"><button class="btn primary" data-act="play-quick">Avanzar jornada</button></div></section>`;
     } else if (TL.Cups.pendingUser(S)) {
       const cp = TL.Cups.pendingUser(S);
@@ -443,7 +697,7 @@
       const agg = cp.leg === 1 && cp.tie.s[0] ? (() => { const [x, y] = cp.tie.s[0]; return cp.tie.h === S.user ? `${x}-${y}` : `${y}-${x}`; })() : null;
       next = `<section class="card next-match cup span2" style="--cup:${cp.cup.color}">
         <div class="nm-meta"><span class="cup-badge">${cp.cup.icon} ${esc(cp.cup.name)}</span><span>Entre semana · J${S.week + 1}</span></div>
-        <div class="cup-round">${esc(cp.round)}${cp.group ? '' : cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
+        ${calHtml(S)}<div class="cup-round">${esc(cp.round)}${cp.group ? '' : cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
         <div class="nm-teams">${[h, a].map(cl => `<div class="nm-team">${crest(cl, 'lg')}<span class="nm-name">${esc(cl.name)}</span><span class="nm-info">${esc(S.leagues[cl.league].country)}</span></div>`).join('<div class="nm-vs">VS</div>')}</div>
         ${expiringWarn(S)}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
@@ -458,6 +712,7 @@
       };
       next = `<section class="card next-match span2">
         <div class="nm-meta"><span>${esc(L.name)} · J${S.week + 1}/${S.fixtures.length}</span><span>${U.fmtDate(U.dateOf(S.season, S.week))}</span></div>
+        ${calHtml(S)}
         <div class="nm-teams">${team(h)}<div class="nm-vs">VS</div>${team(a)}</div>
         ${(() => {
           const oid = fx[0] === S.user ? fx[1] : fx[0], co = TL.Coach.of(S, oid);
@@ -677,7 +932,7 @@
     if (!LK || !S.lk) return '';
     const out = [];
     const tr = LK.traits(S, p.id);
-    if (tr.length) out.push(`<div class="trait-list">${tr.map(k => LK.traitInfo(S, k)).map(T => `<div class="trait"><span class="ti">${T.icon}</span><span><b>${T.name}</b><small>${esc(T.desc)}</small></span></div>`).join('')}</div>`);
+    if (tr.length) out.push(`<div class="trait-list">${tr.map(k => LK.traitInfo(S, k)).map(T => `<div class="trait ${T.edge ? 'edge' : ''}"><span class="ti">${T.icon}</span><span><b>${T.name}${T.edge ? ' <em class="edge-tag">Doble filo</em>' : ''}</b><small>${esc(T.desc)}</small></span></div>`).join('')}</div>`);
     const g = S.lk.gems[p.id];
     if (g) {
       const d = LK.DNA[g.dna];
@@ -817,7 +1072,7 @@
         if (g.length) list += `<div class="group-title">${names[l]} · ${g.length}</div>` + g.map(row).join('');
       }
     } else list = sorted.map(row).join('');
-    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + (S.mode === 'tour' ? '' : lockerCard(S) + devCard(S)) +
+    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + (S.mode === 'tour' ? '' : lockerCard(S) + gearCard(S) + devCard(S)) +
       `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
         <div class="kpi"><div class="k">Nivel club</div><div class="v">${S.clubs[S.user].rep.toFixed(1)}</div></div>
@@ -1622,7 +1877,7 @@
       actions = `<div class="group-title">Su cesión</div>${loanCard(S, loan, true)}`;
     } else if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
-    if (mine || (loan && loan.from === S.user)) actions = lockerSection(S, p) + actions;
+    if (mine || (loan && loan.from === S.user)) actions = lockerSection(S, p) + gearSection(S, p) + actions;
     const sh = sheet(head + playerCharts(S, p, labels, stats6) + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
     if (UI.nego && UI.nego.pid === id && UI.nego.focus) {
       UI.nego.focus = false;
@@ -2035,6 +2290,11 @@
         <div class="wz-face mt">${z.face ? TL.Face.html(z.face) : ''}
           <div class="grow"><p class="note" style="margin:0 0 8px">${z.face ? 'Hablarás con esta cara en las charlas con tus jugadores.' : 'Opcional: hazte una foto, encájala en la silueta y se pixela. Saldrá en las charlas con tus jugadores.'}</p>
           <div class="btn-row"><button class="btn sm ${z.face ? '' : 'primary'}" data-act="wz-face">${z.face ? 'Cambiar mi cara' : 'Crear mi cara'}</button>${z.face ? '<button class="btn sm" data-act="wz-face-del">Quitar</button>' : ''}</div></div></div>
+        <div class="note mt">Modo de juego</div>
+        <div class="wz-fan mt">
+          <button class="wz-fan-opt ${z.fan ? '' : 'on'}" data-act="wz-fan" data-v="0" aria-pressed="${!z.fan}"><b>⚽ Fantasía desactivada</b><small>Fútbol realista: eventos, polémicas, partidos especiales y objetos.</small></button>
+          <button class="wz-fan-opt fan ${z.fan ? 'on' : ''}" data-act="wz-fan" data-v="1" aria-pressed="${!!z.fan}"><b>✨ Fantasía activada</b><small>Además, almas de leyenda con poderes que equipas a tus jugadores, y eventos sobrenaturales.</small></button>
+        </div>
         <button class="btn primary block mt" data-act="wz-start">Empezar carrera</button></div>`;
     }
     app().innerHTML = `<div class="wizard">${html}</div>`;
@@ -2087,13 +2347,14 @@
     TL.Face.open({ g: z.mgrG, face: z.face, onSave: face => { z.face = face; z.mgrG = face.g; renderWizard(); } });
   };
   A['wz-face-del'] = () => { keepName(); UI.wz.face = null; renderWizard(); };
+  A['wz-fan'] = el => { keepName(); UI.wz.fan = el.dataset.v === '1'; TL.SFX && TL.SFX.toggle(UI.wz.fan); renderWizard(); };
   A['wz-start'] = () => {
     const z = UI.wz;
     const name = (document.getElementById('mgr').value || '').trim() || 'Míster';
     Music.start();
     app().innerHTML = '<div class="title-screen"><div class="spinner"></div><p class="muted">Creando el mundo…</p></div>';
     setTimeout(() => {
-      G.newGame(z.data, z.club, name, { g: z.mgrG || 'M', face: z.face || null });
+      G.newGame(z.data, z.club, name, { g: z.mgrG || 'M', face: z.face || null, fan: !!z.fan });
       UI.wz = null;
       UI.tab = 'home';
       renderShell(); render();
@@ -2112,7 +2373,8 @@
   }
   UI.lineupWarning = lineupWarning;
 
-  A['play-quick'] = () => {
+  A['play-quick'] = () => UI.advance(playQuick);
+  function playQuick() {
     const S = G.S;
     if (S.over) return;
     lineupWarning(S);
@@ -2126,7 +2388,7 @@
     G.completeRound(null);
     const m = S.fixtures[S.week - 1].find(m => m[0] === S.user || m[1] === S.user) || null;
     showRoundResults(S, S.week - 1, m);
-  };
+  }
 
   // ------------------------------------------------------------ Copas continentales
   function tieHtml(S, cup, t, r) {

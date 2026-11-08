@@ -94,6 +94,7 @@
         `El club presenta a su nuevo técnico con un objetivo claro: ${S.board.text.toLowerCase()}.`, S.user, null, 'pos');
       Game.S = S;
       TL.Cups.newSeason(S);
+      if (TL.Events) TL.Events.start(S, extra && extra.fan);
       TL.Market.aiListings(S);
       Game.save();
       return S;
@@ -175,10 +176,12 @@
       const S = Game.S;
       const cp = TL.Cups.pendingUser(S);
       if (!cp) return null;
+      const md = TL.Events ? TL.Events.matchDay(S) : null;
       const m = new E.Match(S, cp.home, cp.away);
       m.cup = cp; m._applied = true;
       const out = TL.Cups.completeUser(S, m.simulate().finish(), cp);
       if (S.mode === 'tour') TL.Tour.round(S);
+      if (TL.Events && S.mode !== 'tour') TL.Events.played(S, md);
       Game.save();
       return Object.assign(out, { m, p: cp });
     },
@@ -190,14 +193,17 @@
       if (S.over || !S.fixtures[S.week]) return [];
       if (match && match._applied) return []; // un partido solo cuenta una vez
       if (match) match._applied = true;
+      const md = TL.Events ? TL.Events.matchDay(S) : null;
       if (match && match.cup) {
         const out = TL.Cups.completeUser(S, match.finish(), match.cup);
         if (S.mode === 'tour') TL.Tour.round(S);
+        if (TL.Events && S.mode !== 'tour') TL.Events.played(S, md);
         Game.save();
         return out;
       }
       const res = match ? match.finish() : null;
       const results = TL.Season.playRound(S, res);
+      if (TL.Events) TL.Events.played(S, md);
       Game.save();
       return results;
     }
