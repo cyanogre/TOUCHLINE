@@ -107,7 +107,7 @@
       this.undo = [];
       this.extra = [];
       this.pal = [];
-      this.tool = 'pen'; this.color = [17, 17, 17, 255]; this.both = true; this.pxFrame = 0; this.zoom = 0;
+      this.tool = 'pen'; this.color = [17, 17, 17, 255]; this.both = false; this.pxFrame = 0; this.view = null; this.brush = 1; this.redo = [];
       this.step = 0;
       this.stream = null; this.video = null; this.live = false;
       this.build();
@@ -118,7 +118,7 @@
     // -------------------------------------------------------- Interfaz
     build() {
       const root = this.root = document.createElement('div');
-      root.className = 'face-ed';
+      root.className = 'face-ed'; root.__ed = this; // para depurar desde la consola
       root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Tu cara de mánager');
       const chips = Object.entries(PRESET_NAMES).map(([k, l]) => `<button class="chip ${k === this.preset ? 'on' : ''}" type="button" data-fe-preset="${k}">${l}</button>`).join('');
       const shot = i => `<div class="fe-shot ${i === 0 ? 'on' : ''}" data-fe-shot="${i}" role="button" tabindex="0">
@@ -133,7 +133,8 @@
           <button type="button" data-fe-step="1" role="tab">2 · Píxeles</button>
         </div>
         <div class="fe-body">
-          <section class="fe-sec" data-step="0">
+          <section class="fe-sec fe-grid" data-step="0">
+            <div class="fe-visual">
             <div class="fe-shots">${shot(0)}${shot(1)}</div>
             <div class="fe-stage-box" id="fe-box">
               <canvas id="fe-stage" width="${S}" height="${S}"></canvas>
@@ -146,6 +147,8 @@
               <label class="btn" for="fe-file">🖼️ Subir foto</label><input class="vh" type="file" id="fe-file" accept="image/*">
               <label class="btn" for="fe-shoot" id="fe-shoot-l" hidden>📷 Hacer foto</label><input class="vh" type="file" id="fe-shoot" accept="image/*" capture="user">
             </div>
+            </div>
+            <div class="fe-side">
             <div class="fe-label">Silueta</div>
             <div class="chips">${chips}</div>
             <div class="seg">
@@ -168,49 +171,70 @@
               <button class="btn sm" type="button" data-fe="match">Igualar encuadre con la otra</button>
               <button class="btn sm" type="button" data-fe="flip">Voltear</button>
             </div>
+            </div>
           </section>
 
-          <section class="fe-sec" data-step="1" hidden>
-            <div class="fe-talk">
-              <canvas class="mgr-face" id="fe-talkface" width="64" height="64"></canvas>
-              <div class="grow"><span class="fe-who">Míster</span><p id="fe-talktext">Siéntate. Vamos a hablar de tus minutos.</p></div>
+          <section class="fe-sec fe-grid" data-step="1" hidden>
+            <div class="fe-visual">
+              <div class="fe-pxhead">
+                <div class="seg fe-frametabs" role="tablist" aria-label="Qué cara editas">
+                  <button type="button" class="on" data-fe-px="0" role="tab"><canvas id="fe-out0" width="64" height="64"></canvas>Boca cerrada</button>
+                  <button type="button" data-fe-px="1" role="tab"><canvas id="fe-out1" width="64" height="64"></canvas>Boca abierta</button>
+                </div>
+                <button class="fe-ib" type="button" data-fe="undo" id="fe-undo" disabled aria-label="Deshacer">↶</button>
+                <button class="fe-ib" type="button" data-fe="redo" id="fe-redo" disabled aria-label="Rehacer">↷</button>
+              </div>
+              <div class="fe-pxwrap" id="fe-pxwrap">
+                <canvas id="fe-px" aria-label="Lienzo de 64×64: un dedo pinta, dos dedos acercan y mueven"></canvas>
+                <div class="fe-pxzoom">
+                  <button type="button" data-fe="zin" aria-label="Acercar">+</button>
+                  <button type="button" data-fe="zfit" aria-label="Ver entera">⤢</button>
+                  <button type="button" data-fe="zout" aria-label="Alejar">−</button>
+                </div>
+              </div>
+              <div class="fe-pxtools" role="toolbar" aria-label="Herramientas de dibujo">
+                <button type="button" class="on" data-fe-tool="pen" title="Lápiz">✏️<span>Lápiz</span></button>
+                <button type="button" data-fe-tool="erase" title="Goma">🧽<span>Goma</span></button>
+                <button type="button" data-fe-tool="pick" title="Cuentagotas">💧<span>Color</span></button>
+                <button type="button" data-fe-tool="fill" title="Rellenar">🪣<span>Rellenar</span></button>
+                <button type="button" data-fe-tool="hand" title="Desplazar">✋<span>Mover</span></button>
+                <button type="button" data-fe="brush" id="fe-brush" title="Tamaño del pincel"><i class="fe-bsz" style="--b:1"></i><span>Pincel 1</span></button>
+              </div>
+              <div class="fe-strip">
+                <span class="fe-cur" id="fe-cur" title="Color actual"></span>
+                <div class="fe-palette" id="fe-pal"></div>
+                <label class="fe-sw fe-add" for="fe-addcolor" title="Añadir color">＋</label><input class="vh" type="color" id="fe-addcolor" value="#d0505a">
+              </div>
             </div>
-            <div class="fe-frames">
-              <button type="button" class="fe-frame on" data-fe-px="0"><canvas id="fe-out0" width="64" height="64"></canvas><span>Boca cerrada</span></button>
-              <button type="button" class="fe-frame" data-fe-px="1"><canvas id="fe-out1" width="64" height="64"></canvas><span>Boca abierta</span></button>
+            <div class="fe-side">
+              <div class="fe-tools">
+                <label><input type="checkbox" id="fe-pxonion"> Ver la otra de calco</label>
+                <label><input type="checkbox" id="fe-both"> Pintar también en la otra</label>
+              </div>
+              <div class="fe-row">
+                <button class="btn sm" type="button" data-fe="copyother">Copiar esta cara a la otra</button>
+                <button class="btn sm" type="button" data-fe="clearedits">Quitar retoques de esta cara</button>
+              </div>
+              <p class="note">Cada cara se retoca por separado. Un dedo pinta; dos dedos acercan y mueven el lienzo (en el ordenador, la rueda acerca).</p>
+              <div class="fe-talk">
+                <canvas class="mgr-face" id="fe-talkface" width="64" height="64"></canvas>
+                <div class="grow"><span class="fe-who">Míster</span><p id="fe-talktext">Siéntate. Vamos a hablar de tus minutos.</p></div>
+              </div>
+              <details class="fe-style">
+                <summary>Estilo del píxel</summary>
+                <div class="fe-ctrls">
+                  <label class="fe-ctrl"><span>Colores <output id="fe-colorsv">4</output></span><input type="range" id="fe-colors" min="2" max="32" value="4"></label>
+                  <label class="fe-ctrl"><span>Contraste <output id="fe-contrastv">109%</output></span><input type="range" id="fe-contrast" min="70" max="160" value="109"></label>
+                  <label class="fe-ctrl"><span>Saturación <output id="fe-satv">115%</output></span><input type="range" id="fe-sat" min="40" max="180" value="115"></label>
+                  <label class="fe-ctrl"><span>Brillo <output id="fe-briv">86%</output></span><input type="range" id="fe-bri" min="70" max="140" value="86"></label>
+                </div>
+                <div class="fe-tools">
+                  <label><input type="checkbox" id="fe-outline" checked> Contorno</label>
+                  <label><input type="checkbox" id="fe-clean" checked> Quitar píxeles sueltos</label>
+                </div>
+                <p class="note">Por defecto, 4 colores: un retrato de tonos cálidos. Sube los colores si quieres más detalle. Tus retoques se mantienen aunque cambies el estilo.</p>
+              </details>
             </div>
-            <div class="fe-label">Retocar a mano</div>
-            <div class="fe-pxtools" role="toolbar" aria-label="Herramientas de dibujo">
-              <button type="button" class="on" data-fe-tool="pen" title="Lápiz">✏️<span>Lápiz</span></button>
-              <button type="button" data-fe-tool="erase" title="Goma">🧽<span>Goma</span></button>
-              <button type="button" data-fe-tool="pick" title="Cuentagotas">💧<span>Color</span></button>
-              <button type="button" data-fe-tool="fill" title="Rellenar">🪣<span>Rellenar</span></button>
-              <button type="button" data-fe-tool="hand" title="Desplazar">✋<span>Mover</span></button>
-              <button type="button" data-fe="undo" id="fe-undo" disabled title="Deshacer">↩️<span>Deshacer</span></button>
-            </div>
-            <div class="fe-pxwrap" id="fe-pxwrap"><canvas id="fe-px"></canvas></div>
-            <div class="fe-row fe-pxbar">
-              <button class="btn sm" type="button" data-fe="zout" aria-label="Alejar">−</button>
-              <button class="btn sm" type="button" data-fe="zin" aria-label="Acercar">+</button>
-              <label class="fe-both"><input type="checkbox" id="fe-both" checked> Retocar las dos caras a la vez</label>
-            </div>
-            <div class="fe-palette" id="fe-pal"></div>
-            <div class="fe-row">
-              <label class="btn sm" for="fe-addcolor">＋ Añadir color</label><input class="vh" type="color" id="fe-addcolor" value="#d0505a">
-              <button class="btn sm" type="button" data-fe="clearedits">Quitar los retoques</button>
-            </div>
-            <div class="fe-label">Estilo del píxel</div>
-            <div class="fe-ctrls">
-              <label class="fe-ctrl"><span>Colores <output id="fe-colorsv">4</output></span><input type="range" id="fe-colors" min="2" max="32" value="4"></label>
-              <label class="fe-ctrl"><span>Contraste <output id="fe-contrastv">109%</output></span><input type="range" id="fe-contrast" min="70" max="160" value="109"></label>
-              <label class="fe-ctrl"><span>Saturación <output id="fe-satv">115%</output></span><input type="range" id="fe-sat" min="40" max="180" value="115"></label>
-              <label class="fe-ctrl"><span>Brillo <output id="fe-briv">86%</output></span><input type="range" id="fe-bri" min="70" max="140" value="86"></label>
-            </div>
-            <div class="fe-tools">
-              <label><input type="checkbox" id="fe-outline" checked> Contorno</label>
-              <label><input type="checkbox" id="fe-clean" checked> Quitar píxeles sueltos</label>
-            </div>
-            <p class="note">Por defecto, 4 colores: un retrato de tonos cálidos. Sube los colores si quieres más detalle. Tus retoques se mantienen aunque cambies el estilo.</p>
           </section>
         </div>
         <div class="fe-foot">
@@ -249,9 +273,25 @@
         else if (a === 'resetsil') this.usePreset(this.preset);
         else if (a === 'match') { const f = this.frames[this.cur], o = this.frames[1 - this.cur]; if (!o.img || !f.img) return; f.x = o.x; f.y = o.y; f.rot = o.rot; f.flip = o.flip; f.scale = o.scale * (o.img.height / f.img.height); this.syncSliders(); this.update(true); }
         else if (a === 'flip') { this.frames[this.cur].flip = !this.frames[this.cur].flip; this.update(true); }
+        else if (a === 'brush') {
+          // Pincel de 1, 2 o 3 píxeles; al tocarlo se cambia (y vuelve al lápiz si estabas con otra herramienta)
+          this.brush = this.brush % 3 + 1;
+          b.querySelector('.fe-bsz').style.setProperty('--b', this.brush); b.querySelector('span').textContent = tr('Pincel ' + this.brush);
+          if (this.tool !== 'pen' && this.tool !== 'erase') this.setTool('pen'); else this.renderPx();
+        }
         else if (a === 'undo') this.doUndo();
-        else if (a === 'zin' || a === 'zout') { this.zoom = Math.max(this.fitZoom(), Math.min(16, (this.zoom || this.fitZoom()) + (a === 'zin' ? 2 : -2))); this.renderPx(); }
-        else if (a === 'clearedits') { this.pushUndo(); this.edits = [new Map(), new Map()]; this.compose(); }
+        else if (a === 'redo') this.doRedo();
+        else if (a === 'zin' || a === 'zout') { const [w, h] = this.pxSize(); this.zoomAt(w / 2, h / 2, a === 'zin' ? 1.5 : 1 / 1.5); }
+        else if (a === 'zfit') { this.view = null; this.renderPx(); }
+        else if (a === 'clearedits') { this.pushUndo(); this.edits[this.pxFrame] = new Map(); this.compose(); }
+        else if (a === 'copyother') {
+          // La cara que editas pasa a la otra tal cual (luego puedes cambiarle la boca)
+          this.pushUndo();
+          const o = 1 - this.pxFrame, d = this.final[this.pxFrame].data, m = new Map();
+          for (let p = 0; p < N * N; p++) m.set(p, [d[p * 4], d[p * 4 + 1], d[p * 4 + 2], d[p * 4 + 3]]);
+          this.edits[o] = m; this.compose();
+          const t = this.root.querySelector(`[data-fe-px="${o}"]`); t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse');
+        }
       });
       r.addEventListener('keydown', e => {
         const s = e.target.closest('[data-fe-shot]');
@@ -267,6 +307,10 @@
       for (const id of ['colors', 'contrast', 'sat', 'bri']) this.$('fe-' + id).addEventListener('input', e => { this.$('fe-' + id + 'v').textContent = id === 'colors' ? e.target.value : e.target.value + '%'; this.update(true); });
       for (const id of ['outline', 'clean']) this.$('fe-' + id).addEventListener('change', () => this.update(true));
       this.$('fe-both').addEventListener('change', e => { this.both = e.target.checked; });
+      this.$('fe-pxonion').addEventListener('change', () => this.renderPx());
+      this.onResize = () => this.pxResized();
+      window.addEventListener('resize', this.onResize);
+      if (window.ResizeObserver) { this.ro = new ResizeObserver(this.onResize); this.ro.observe(this.$('fe-pxwrap')); }
       this.$('fe-addcolor').addEventListener('change', e => {
         const h = e.target.value, c = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255];
         if (!this.extra.some(x => x.join() === c.join())) this.extra.push(c);
@@ -286,7 +330,7 @@
       this.step = i;
       this.root.querySelectorAll('[data-fe-step]').forEach(b => b.classList.toggle('on', +b.dataset.feStep === i));
       this.root.querySelectorAll('.fe-sec').forEach(s => { s.hidden = +s.dataset.step !== i; });
-      if (i === 1) { this.camOff(); this.process(); this.zoom = 0; this.renderPx(); this.renderPalette(); this.talkLoop(); }
+      if (i === 1) { this.camOff(); this.process(); this.view = null; requestAnimationFrame(() => { this.renderPx(); }); this.renderPalette(); this.talkLoop(); }
       this.root.querySelector('.fe-body').scrollTop = 0;
     }
     setHint() {
@@ -647,7 +691,7 @@
         const out = this.$('fe-out' + i); out.getContext('2d').putImageData(im, 0, 0);
         const th = this.$('fe-thumb' + i).getContext('2d'); th.clearRect(0, 0, 64, 64); th.drawImage(out, 0, 0);
       });
-      this.$('fe-undo').disabled = !this.undo.length;
+      this.histUI();
       if (this.step === 1) { this.renderPx(); this.renderPalette(); }
       this.drawTalk(false);
     }
@@ -658,58 +702,105 @@
     }
 
     // -------------------------------------------------------- Editor de píxeles
-    fitZoom() { return Math.max(4, Math.floor((this.$('fe-pxwrap').clientWidth || 320) / N)); }
-    setPxFrame(i) { this.pxFrame = i; this.root.querySelectorAll('[data-fe-px]').forEach(b => b.classList.toggle('on', +b.dataset.fePx === i)); this.renderPx(); }
+    // Vista propia (zoom y desplazamiento): un dedo pinta, dos dedos acercan y mueven; la rueda acerca.
+    pxSize() { const r = this.px.getBoundingClientRect(); return [r.width || 320, r.height || 320]; }
+    fitView() { const [w, h] = this.pxSize(), z = Math.min(w, h) / N; this.fitZ = z; this.vsize = [w, h]; this.view = { z, ox: (w - z * N) / 2, oy: (h - z * N) / 2 }; }
+    // Si el lienzo cambia de tamaño (girar el móvil, ventana), se mantiene el zoom y el encuadre en proporción
+    pxResized() {
+      if (this.step !== 1 || !this.view) return;
+      const [w, h] = this.pxSize(), [ow, oh] = this.vsize;
+      if (Math.abs(w - ow) < 1 && Math.abs(h - oh) < 1) return;
+      const k = Math.min(w, h) / Math.min(ow, oh), v = this.view;
+      v.z *= k; v.ox *= k; v.oy *= k; this.fitZ *= k; this.vsize = [w, h];
+      this.clampView(); this.renderPx();
+    }
+    clampView() {
+      const v = this.view, [w, h] = this.pxSize();
+      v.z = Math.max(this.fitZ * 0.8, Math.min(this.fitZ * 12, v.z));
+      const iw = v.z * N, m = 48;
+      v.ox = Math.max(Math.min(0, w - iw) - m, Math.min(Math.max(0, w - iw) + m, v.ox));
+      v.oy = Math.max(Math.min(0, h - iw) - m, Math.min(Math.max(0, h - iw) + m, v.oy));
+    }
+    zoomAt(x, y, k) {
+      if (!this.view) this.fitView();
+      const v = this.view, cx = (x - v.ox) / v.z, cy = (y - v.oy) / v.z;
+      v.z *= k; this.clampView();
+      v.ox = x - cx * v.z; v.oy = y - cy * v.z; this.clampView();
+      this.renderPx();
+    }
+    setPxFrame(i) { this.pxFrame = i; this.root.querySelectorAll('[data-fe-px]').forEach(b => { b.classList.toggle('on', +b.dataset.fePx === i); b.setAttribute('aria-selected', +b.dataset.fePx === i); }); this.renderPx(); }
     setTool(t) {
       this.tool = t;
       this.root.querySelectorAll('[data-fe-tool]').forEach(b => b.classList.toggle('on', b.dataset.feTool === t));
-      this.$('fe-pxwrap').classList.toggle('hand', t === 'hand');
+      this.px.style.cursor = t === 'hand' ? 'grab' : 'crosshair';
+      this.renderPalette();
     }
     swatches() {
       const seen = new Set(), out = [];
       const add = c => { const k = c.slice(0, 3).join(); if (!seen.has(k)) { seen.add(k); out.push([c[0], c[1], c[2], 255]); } };
       this.pal.forEach(add);
-      // Colores de la cara (si no hay foto nueva, salen de la cara guardada)
       if (!this.pal.length) for (const im of this.final || []) for (let i = 0; i < im.data.length && out.length < 32; i += 4) if (im.data[i + 3]) add([im.data[i], im.data[i + 1], im.data[i + 2]]);
       this.extra.forEach(add);
       return out;
     }
     renderPalette() {
-      const sw = this.swatches(), cur = this.color.slice(0, 3).join();
-      this.$('fe-pal').innerHTML = sw.map((c, i) => `<button type="button" class="fe-sw ${c.slice(0, 3).join() === cur && this.tool !== 'erase' ? 'on' : ''}" data-fe-sw="${i}" style="background:rgb(${c[0]} ${c[1]} ${c[2]})" aria-label="Color ${i + 1}"></button>`).join('');
+      const sw = this.swatches(), cur = this.color.slice(0, 3).join(), er = this.tool === 'erase';
+      this.$('fe-pal').innerHTML = sw.map((c, i) => `<button type="button" class="fe-sw ${c.slice(0, 3).join() === cur && !er ? 'on' : ''}" data-fe-sw="${i}" style="background:rgb(${c[0]} ${c[1]} ${c[2]})" aria-label="Color ${i + 1}"></button>`).join('');
+      const k = this.$('fe-cur');
+      k.style.background = er ? 'repeating-conic-gradient(#1a2e24 0 25%, #12221a 0 50%) 0 0 / 12px 12px' : `rgb(${this.color[0]} ${this.color[1]} ${this.color[2]})`;
+      k.title = er ? tr('Goma') : tr('Color actual');
     }
     renderPx() {
-      if (!this.final) return;
-      const z = this.zoom || this.fitZoom(), c = this.px;
-      if (c.width !== N * z) { c.width = c.height = N * z; c.style.width = c.style.height = N * z + 'px'; }
-      const x = c.getContext('2d'), d = this.final[this.pxFrame].data;
-      x.clearRect(0, 0, c.width, c.height);
-      for (let p = 0; p < N * N; p++) {
-        const i = p * 4;
-        if (!d[i + 3]) continue;
-        x.fillStyle = `rgb(${d[i]} ${d[i + 1]} ${d[i + 2]})`;
-        x.fillRect((p % N) * z, Math.floor(p / N) * z, z, z);
+      if (!this.final || this.step !== 1) return;
+      const c = this.px, [w, h] = this.pxSize(), dpr = window.devicePixelRatio || 1;
+      if (!this.view) this.fitView();
+      const W = Math.round(w * dpr), H = Math.round(h * dpr);
+      if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+      const x = c.getContext('2d'), v = this.view, size = v.z * N;
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.clearRect(0, 0, w, h);
+      if (!this.checker) {
+        const t = document.createElement('canvas'); t.width = t.height = 16;
+        const tx = t.getContext('2d'); tx.fillStyle = '#12221a'; tx.fillRect(0, 0, 16, 16); tx.fillStyle = '#1a2e24'; tx.fillRect(0, 0, 8, 8); tx.fillRect(8, 8, 8, 8);
+        this.checker = x.createPattern(t, 'repeat');
       }
-      if (z >= 6) {
-        x.strokeStyle = 'rgb(255 255 255 / 0.07)'; x.lineWidth = 1;
-        x.beginPath();
-        for (let k = 1; k < N; k++) { x.moveTo(k * z + 0.5, 0); x.lineTo(k * z + 0.5, N * z); x.moveTo(0, k * z + 0.5); x.lineTo(N * z, k * z + 0.5); }
+      x.fillStyle = this.checker; x.fillRect(v.ox, v.oy, size, size);
+      x.imageSmoothingEnabled = false;
+      if (this.$('fe-pxonion').checked) { x.globalAlpha = 0.3; x.drawImage(this.$('fe-out' + (1 - this.pxFrame)), v.ox, v.oy, size, size); x.globalAlpha = 1; }
+      x.drawImage(this.$('fe-out' + this.pxFrame), v.ox, v.oy, size, size);
+      if (v.z >= 7) {
+        x.strokeStyle = 'rgb(255 255 255 / 0.08)'; x.lineWidth = 1; x.beginPath();
+        for (let k = 0; k <= N; k++) { const p = Math.round(v.ox + k * v.z) + 0.5, q = Math.round(v.oy + k * v.z) + 0.5; x.moveTo(p, v.oy); x.lineTo(p, v.oy + size); x.moveTo(v.ox, q); x.lineTo(v.ox + size, q); }
         x.stroke();
       }
+      x.strokeStyle = 'rgb(184 245 61 / 0.5)'; x.strokeRect(v.ox + 0.5, v.oy + 0.5, size - 1, size - 1);
+      if (this.hover) {
+        // El píxel (o el pincel) donde vas a pintar
+        const b = this.tool === 'pen' || this.tool === 'erase' ? this.brush : 1, o = Math.floor((b - 1) / 2);
+        x.lineWidth = 2; x.strokeStyle = '#b8f53d';
+        x.strokeRect(v.ox + (this.hover[0] - o) * v.z, v.oy + (this.hover[1] - o) * v.z, b * v.z, b * v.z);
+      }
     }
-    pushUndo() { this.undo.push(this.edits.map(m => new Map(m))); if (this.undo.length > 40) this.undo.shift(); this.$('fe-undo').disabled = false; }
-    doUndo() { const e = this.undo.pop(); if (e) { this.edits = e; this.compose(); } }
-    setPx(p, c) { const fr = this.both ? [0, 1] : [this.pxFrame]; for (const i of fr) this.edits[i].set(p, c); }
+    pushUndo() {
+      this.undo.push(this.edits.map(m => new Map(m))); if (this.undo.length > 60) this.undo.shift();
+      this.redo = []; this.histUI();
+    }
+    histUI() { this.$('fe-undo').disabled = !this.undo.length; this.$('fe-redo').disabled = !this.redo.length; }
+    doUndo() { const e = this.undo.pop(); if (!e) return; this.redo.push(this.edits); this.edits = e; this.histUI(); this.compose(); }
+    doRedo() { const e = this.redo.pop(); if (!e) return; this.undo.push(this.edits); this.edits = e; this.histUI(); this.compose(); }
+    setPx(p, c) { for (const i of (this.both ? [0, 1] : [this.pxFrame])) this.edits[i].set(p, c); }
     paintAt(cx, cy) {
-      if (cx < 0 || cy < 0 || cx >= N || cy >= N) return;
-      const p = cy * N + cx;
-      if (this.tool === 'pen') this.setPx(p, this.color.slice());
-      else if (this.tool === 'erase') this.setPx(p, [0, 0, 0, 0]);
+      const b = this.brush, o = Math.floor((b - 1) / 2);
+      for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) {
+        const x = cx - o + dx, y = cy - o + dy;
+        if (x < 0 || y < 0 || x >= N || y >= N) continue;
+        this.setPx(y * N + x, this.tool === 'erase' ? [0, 0, 0, 0] : this.color.slice());
+      }
     }
     line(x0, y0, x1, y1) {
       const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
       let err = dx + dy;
-      for (;;) {
+      for (let guard = 0; guard < 300; guard++) {
         this.paintAt(x0, y0);
         if (x0 === x1 && y0 === y1) break;
         const e2 = 2 * err;
@@ -718,7 +809,8 @@
       }
     }
     fill(cx, cy) {
-      const d = this.final[this.pxFrame].data, at = p => d.slice(p * 4, p * 4 + 4).join();
+      if (cx < 0 || cy < 0 || cx >= N || cy >= N) return;
+      const d = this.final[this.pxFrame].data, at = p => d[p * 4] + ',' + d[p * 4 + 1] + ',' + d[p * 4 + 2] + ',' + d[p * 4 + 3];
       const start = cy * N + cx, target = at(start);
       const seen = new Uint8Array(N * N), stack = [start];
       while (stack.length) {
@@ -730,31 +822,70 @@
       }
     }
     bindPx() {
-      const c = this.px;
-      const cell = e => { const r = c.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * N), Math.floor((e.clientY - r.top) / r.height * N)]; };
-      let last = null;
+      const c = this.px, ptrs = new Map();
+      let stroke = null, pinch = null, pan = null;
+      const local = e => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+      const cellOf = p => [Math.floor((p[0] - this.view.ox) / this.view.z), Math.floor((p[1] - this.view.oy) / this.view.z)];
+      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       c.addEventListener('pointerdown', e => {
-        if (this.tool === 'hand') return;
+        if (!this.view) this.fitView();
         e.preventDefault();
-        c.setPointerCapture(e.pointerId);
-        const [x, y] = cell(e);
+        try { c.setPointerCapture(e.pointerId); } catch (_) { /* puntero sintético */ }
+        ptrs.set(e.pointerId, local(e));
+        if (ptrs.size === 2) {
+          // Segundo dedo: era un gesto, no un trazo (el trazo empezado se deshace)
+          if (stroke) { this.edits = this.undo.pop(); this.histUI(); stroke = null; this.compose(); }
+          pan = null; this.hover = null;
+          const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), m: mid(a, b) };
+          return;
+        }
+        if (ptrs.size > 2) return;
+        const p = local(e);
+        if (this.tool === 'hand' || e.button === 1 || e.button === 2) { pan = p; return; }
+        const [x, y] = cellOf(p);
+        this.hover = [x, y];
         if (this.tool === 'pick') {
+          if (x < 0 || y < 0 || x >= N || y >= N) return;
           const d = this.final[this.pxFrame].data, i = (y * N + x) * 4;
-          if (d[i + 3]) { this.color = [d[i], d[i + 1], d[i + 2], 255]; if (!this.swatches().some(s => s.slice(0, 3).join() === this.color.slice(0, 3).join())) this.extra.push(this.color.slice()); this.setTool('pen'); this.renderPalette(); }
+          if (d[i + 3]) { this.color = [d[i], d[i + 1], d[i + 2], 255]; if (!this.swatches().some(s => s.slice(0, 3).join() === this.color.slice(0, 3).join())) this.extra.push(this.color.slice()); this.setTool('pen'); }
+          this.renderPx();
           return;
         }
         this.pushUndo();
         if (this.tool === 'fill') { this.fill(x, y); this.compose(); return; }
-        last = [x, y]; this.paintAt(x, y); this.compose();
+        stroke = { last: [x, y] }; this.paintAt(x, y); this.compose();
       });
       c.addEventListener('pointermove', e => {
-        if (!last) return;
-        const [x, y] = cell(e);
-        if (x === last[0] && y === last[1]) return;
-        this.line(last[0], last[1], x, y); last = [x, y]; this.compose();
+        if (!ptrs.has(e.pointerId)) {
+          // Ratón sin pulsar: se marca el píxel bajo el cursor
+          if (e.pointerType === 'mouse' && this.view && this.tool !== 'hand') { this.hover = cellOf(local(e)); this.renderPx(); }
+          return;
+        }
+        ptrs.set(e.pointerId, local(e));
+        if (ptrs.size >= 2 && pinch) {
+          const [a, b] = [...ptrs.values()], d = dist(a, b), m = mid(a, b), v = this.view;
+          const cx = (pinch.m[0] - v.ox) / v.z, cy = (pinch.m[1] - v.oy) / v.z;
+          v.z *= d / pinch.d; this.clampView();
+          v.ox = m[0] - cx * v.z; v.oy = m[1] - cy * v.z; this.clampView();
+          pinch = { d, m }; this.renderPx();
+          return;
+        }
+        if (pan) { const p = local(e); this.view.ox += p[0] - pan[0]; this.view.oy += p[1] - pan[1]; pan = p; this.clampView(); this.renderPx(); return; }
+        if (!stroke) return;
+        const cell = cellOf(local(e));
+        if (cell[0] === stroke.last[0] && cell[1] === stroke.last[1]) return;
+        this.line(stroke.last[0], stroke.last[1], cell[0], cell[1]);
+        stroke.last = cell; this.hover = cell; this.compose();
       });
-      const end = () => { last = null; };
+      const end = e => {
+        ptrs.delete(e.pointerId);
+        if (ptrs.size < 2) pinch = null;
+        if (!ptrs.size) { stroke = null; pan = null; if (e.pointerType !== 'mouse') { this.hover = null; this.renderPx(); } }
+      };
       c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+      c.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !ptrs.size) { this.hover = null; this.renderPx(); } });
+      c.addEventListener('contextmenu', e => e.preventDefault());
+      c.addEventListener('wheel', e => { e.preventDefault(); const p = local(e); this.zoomAt(p[0], p[1], e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
     }
 
     // -------------------------------------------------------- Vista previa hablando
@@ -809,6 +940,7 @@
     close() {
       this.camOff();
       window.removeEventListener('paste', this.onPaste);
+      window.removeEventListener('resize', this.onResize); if (this.ro) this.ro.disconnect();
       this.root.remove();
       document.documentElement.classList.remove('fe-open');
       if (ed === this) ed = null;
