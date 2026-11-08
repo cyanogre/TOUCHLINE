@@ -267,7 +267,8 @@
   const VOL = {
     gol: 1, 'gol-rival': 0.7, ocasion: 0.75, palo: 0.8, parada: 0.75, chut: 0.55, red: 0.6, pitido: 0.55, 'pitido-final': 0.6,
     tarjeta: 0.6, abucheo: 0.7, lamento: 0.7, aplausos: 0.75, silbidos: 0.6, ovacion: 0.95, canticos: 0.7, ambiente: 0.35,
-    boton: 0.35, atras: 0.35, seleccion: 0.3, exito: 0.55, error: 0.45, dinero: 0.55, nivel: 0.6, fichaje: 0.65, titulo: 1
+    boton: 0.35, atras: 0.35, seleccion: 0.3, exito: 0.55, error: 0.45, dinero: 0.55, nivel: 0.6, fichaje: 0.65, titulo: 1,
+    'limit-break': 1, evento: 0.75, alma: 0.8
   };
   const banks = {};
   let samplesStarted = false;
@@ -341,6 +342,22 @@
     success() { tone(660, 0.1, 'triangle', 0.12); tone(990, 0.16, 'triangle', 0.12, null, 0.09); },
     coin() { tone(988, 0.08, 'square', 0.07); tone(1319, 0.22, 'square', 0.07, null, 0.07); },
     levelUp() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'square', 0.07, null, i * 0.09)); tone(1047, 0.5, 'triangle', 0.1, null, 0.36); },
+    // Eventos del día a día: golpe seco con un silbido que sube (el «¡bum!»)
+    boom() { tone(120, 0.32, 'sine', 0.42, 42); burst(0.25, 'lowpass', 900, 0.22, 0.8); tone(420, 0.18, 'triangle', 0.06, 1260, 0.05); },
+    // Limit break (si no hay assets/sfx/limit-break): subida de energía, estallido y brillo
+    limitBreak() {
+      const c = ac(); if (!c || !on()) return;
+      const r = burst(1.5, 'bandpass', 300, 0.22, 6, 0, 1.3);
+      if (r) r.f.frequency.exponentialRampToValueAtTime(5200, r.t + 1.5);
+      tone(110, 1.5, 'sawtooth', 0.05, 880);
+      tone(55, 1.2, 'sine', 0.3, 30, 1.6);
+      burst(0.9, 'lowpass', 1400, 0.5, 0.7, 1.6);
+      tone(1760, 0.08, 'square', 0.05, null, 1.62);
+      [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, 0.5, 'triangle', 0.07, null, 1.75 + i * 0.08));
+      tone(2349, 1.4, 'sine', 0.05, 2400, 2.2);
+    },
+    // Equipar un alma: un acorde que flota
+    soul() { [392, 494, 587, 740].forEach((f, i) => tone(f, 0.9, 'sine', 0.06, f * 1.01, i * 0.07)); burst(0.8, 'highpass', 5000, 0.04, 0.5, 0.05, 0.3); },
     whistle(long) {
       const c = ac(); if (!c || !on()) return;
       const reps = long ? 3 : 1;

@@ -36,8 +36,15 @@
     dnaMagic: { name: 'ADN: Genio del regate', icon: '🌟', desc: 'Regate, pausa y gol. Imparable en el uno contra uno.', eff: { fouled: 1.5, conv: 1.08, shot: 1.2 } },
     dnaWall: { name: 'ADN: Muro bajo palos', icon: '🌟', desc: 'Un portero de los que ganan ligas.', descF: 'Una portera de las que ganan ligas.', eff: { save: 0.85 } },
     dnaNine: { name: 'ADN: Nueve de leyenda', icon: '🌟', desc: 'Huele el gol: siempre está donde cae el balón.', eff: { shot: 1.45, conv: 1.12 } },
-    dnaBrain: { name: 'ADN: Cerebro del equipo', icon: '🌟', desc: 'Dirige el juego: todo pasa por sus botas.', eff: { assist: 1.6, mid: 0.8 } }
+    dnaBrain: { name: 'ADN: Cerebro del equipo', icon: '🌟', desc: 'Dirige el juego: todo pasa por sus botas.', eff: { assist: 1.6, mid: 0.8 } },
+    // Doble filo: ayudan en el campo… y de vez en cuando la lían (ver js/events.js)
+    hothead: { name: 'Sangre caliente', icon: '🌋', edge: true, desc: 'Va a todas: gana duelos y contagia intensidad, pero comete más faltas, ve más tarjetas y se encara con cualquiera.', eff: { def: 0.35, att: 0.15, foul: 1.6, card: 1.5 } },
+    party: { name: 'Alma de la fiesta', icon: '🎉', edge: true, desc: 'Une al vestuario y lo pasa en grande… a veces demasiado: le persiguen las noches largas y los fotógrafos.', eff: { team: 1.006 } },
+    diva: { name: 'Estrella mediática', icon: '📸', edge: true, desc: 'Vende camisetas y se crece ante las cámaras, pero exige protagonismo y no lleva nada bien el banquillo.', eff: { conv: 1.04, fouled: 1.25 } },
+    reborn: { name: 'Reencarnación', icon: '🌀', edge: true, desc: 'Juega como una leyenda de otra época… y carga con su sombra: presión, comparaciones y días en que la leyenda no aparece.', eff: { conv: 1.03, assist: 1.05 } },
+    limitBreak: { name: 'Límite roto', icon: '💥', desc: 'Rompió su techo: juega con un aura distinta y crece a toda velocidad hacia su nuevo potencial.', eff: { conv: 1.04, assist: 1.1, team: 1.003 } }
   };
+  TRAITS.ego.edge = true;
 
   // Joyas con ADN de leyenda: dónde deben jugar y qué entrenamiento las despierta
   const DNA = {
@@ -91,26 +98,27 @@
   }
   function removeTrait(S, pid, t) { const L = state(S); L.tr[pid] = (L.tr[pid] || []).filter(x => x !== t); L._fx = null; }
 
-  /** Efectos combinados de los rasgos de un jugador (o null). */
+  /** Efectos combinados de los rasgos de un jugador, su alma y su objeto (o null). */
   function fx(S, pid) {
     const L = S.lk;
     if (!L) return null;
-    if (!L._fx) {
-      L._fx = {};
-      for (const id in L.tr) {
-        const out = {};
-        for (const t of L.tr[id]) {
-          const e = TRAITS[t] && TRAITS[t].eff; if (!e) continue;
-          for (const k in e) {
-            if (typeof e[k] === 'boolean') out[k] = true;
-            else if (['mid', 'att', 'def'].includes(k)) out[k] = (out[k] || 0) + e[k];
-            else out[k] = (out[k] || 1) * e[k];
-          }
+    if (!L._fx) L._fx = {};
+    if (!(pid in L._fx)) {
+      const effs = [];
+      for (const t of L.tr[pid] || []) { const e = TRAITS[t] && TRAITS[t].eff; if (e) effs.push(e); }
+      if (TL.Events) effs.push(...TL.Events.effs(S, pid));
+      let out = null;
+      for (const e of effs) {
+        out = out || {};
+        for (const k in e) {
+          if (typeof e[k] === 'boolean') out[k] = true;
+          else if (['mid', 'att', 'def'].includes(k)) out[k] = (out[k] || 0) + e[k];
+          else out[k] = (out[k] || 1) * e[k];
         }
-        L._fx[id] = out;
       }
+      L._fx[pid] = out;
     }
-    return L._fx[pid] || null;
+    return L._fx[pid];
   }
 
   // ------------------------------------------------------------ Relaciones
@@ -182,6 +190,7 @@
     if (S.lk.focus[p.id]) g *= 1.1;
     if (TL.Staff) g *= TL.Staff.growth(S, p);
     if (hasTrait(S, p.id, 'vision') && ['RB', 'LB', 'CDM'].includes(p.pos)) g *= 1.25; // reconvertido, como debe ser
+    if (TL.Events && TL.Events.isLB(S, p.id) && p.ovr < p.pot) g *= 2.2; // límite roto: se dispara
     return g;
   }
 
@@ -661,10 +670,11 @@
       const lw = away ? (loanOf(S, p.id) || {}).last : null; // su jornada en el club donde está cedido
       const r = away ? (lw ? lw.r : null) : ratings[p.id];
       if (r != null) { const a = L.rh[p.id] || (L.rh[p.id] = []); a.push(r); if (a.length > 12) a.shift(); }
-      if (p.age > 27) continue;
+      const lb = TL.Events && TL.Events.isLB(S, p.id) && p.ovr < p.pot;
+      if (p.age > 27 && !lb) continue;
       const on = away ? r != null : slots[p.id] != null;
       const room = Math.max(0, p.pot - p.ovr);
-      const ageF = p.age <= 19 ? 1 : p.age <= 21 ? 0.85 : p.age <= 23 ? 0.65 : p.age <= 25 ? 0.4 : 0.22;
+      const ageF = Math.max(lb ? 0.8 : 0, p.age <= 19 ? 1 : p.age <= 21 ? 0.85 : p.age <= 23 ? 0.65 : p.age <= 25 ? 0.4 : 0.22);
       const minF = on ? 1 : p.inj > 0 ? 0.08 : away ? 0.4 : 0.35;
       const rateF = r == null ? 1 : r >= 7.5 ? 1.45 : r >= 7 ? 1.2 : r >= 6.4 ? 1 : r >= 6 ? 0.75 : 0.5;
       const m = p.mor == null ? 70 : p.mor;
@@ -817,12 +827,26 @@
     preMatch(S);
   }
 
+  /** Perks de doble filo repartidas por las ligas: pocas, y según el perfil de cada uno. */
+  function seedPerks(S, rate) {
+    const L = state(S);
+    for (const p of S.players) {
+      if (p.club < 0 || !S.clubs[p.club] || !S.leagues[S.clubs[p.club].league].playable) continue;
+      if ((L.tr[p.id] || []).some(t => TRAITS[t] && TRAITS[t].edge)) continue;
+      if (Math.random() >= rate) continue;
+      const line = F.LINE[p.pos];
+      const opts = [['party', p.age <= 30 ? 2 : 0.5], ['hothead', line === 1 || line === 2 ? 2.2 : 0.6], ['diva', p.ovr >= S.clubs[p.club].rep ? 1.6 : 0.3], ['ego', p.pos === 'ST' ? 1.4 : 0]];
+      addTrait(S, p.id, U.weighted(opts, o => o[1])[0]);
+    }
+  }
+
   /** Fin de temporada: la joya de la cantera, si toca, y los rasgos de los veteranos. */
   function seasonEnd(S) {
     const L = state(S);
     const sq = W().squad(S, S.user);
     // Líderes: los veteranos con galones
     for (const p of sq) if (p.age >= 30 && p.ovr >= S.clubs[S.user].rep - 2 && !hasTrait(S, p.id, 'leader') && Math.random() < 0.25) addTrait(S, p.id, 'leader');
+    seedPerks(S, 0.012);
     if (S.season + 1 >= L.nextGem) {
       makeGem(S);
       L.nextGem = S.season + 1 + U.int(5, 10);
@@ -997,6 +1021,7 @@
     L._fx = null;
     if (TL.Social) TL.Social.restoreConf(S);
     for (const id in L.tr) if (L.tr[id].includes('dnaTotal') && S.players[id]) S.players[id].anyPos = true;
+    if (!L.perks) { L.perks = 1; seedPerks(S, 0.045); }
     if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);
   }
 
@@ -1004,7 +1029,7 @@
     TRAITS, traitInfo, dnaHint, DNA, FOCUS, STAFF, ACT, init, state, remap, traits, hasTrait, addTrait, fx, rel, bond, boss, bossAdd, relLabel, bossLabel, chem, pairs,
     canMentor, canBePupil, pupilsOf, setMentor, staffBonus, growth, afterDevelop, onRetire, makeGem, scoutOffer,
     onLoan, loanOf, loanOut, loanIn, loanable, loanTerms, LOAN_MAX, loanReport, loanCandidates, LOAN_WHY, recall, endLoans, activity, actCost, actReady, matchBoost,
-    afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet, grows, pushHist
+    afterRound, weekly, seasonEnd, windowStart, DEC, meetOptions, meet, grows, pushHist, raise, seedPerks, removeTrait, minutesShare
   };
   if (TL.News && TL.News.EV) Object.assign(TL.News.EV, DEC);
 })();
