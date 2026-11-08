@@ -428,7 +428,7 @@
       const agg = cp.leg === 1 && cp.tie.s[0] ? (() => { const [x, y] = cp.tie.s[0]; return cp.tie.h === S.user ? `${x}-${y}` : `${y}-${x}`; })() : null;
       next = `<section class="card next-match cup span2" style="--cup:${cp.cup.color}">
         <div class="nm-meta"><span class="cup-badge">${cp.cup.icon} ${esc(cp.cup.name)}</span><span>Entre semana · J${S.week + 1}</span></div>
-        <div class="cup-round">${esc(cp.round)}${cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
+        <div class="cup-round">${esc(cp.round)}${cp.group ? '' : cp.legs > 1 ? (cp.leg ? ' · vuelta' : ' · ida') : ' · partido único'}${agg ? ` · ida ${agg}` : ''}</div>
         <div class="nm-teams">${[h, a].map(cl => `<div class="nm-team">${crest(cl, 'lg')}<span class="nm-name">${esc(cl.name)}</span><span class="nm-info">${esc(S.leagues[cl.league].country)}</span></div>`).join('<div class="nm-vs">VS</div>')}</div>
         ${expiringWarn(S)}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
@@ -1909,7 +1909,7 @@
         ${meta ? `<button class="btn primary continue-card" data-act="continue"><div class="t">▶ Continuar</div>
           <div class="s">${esc(meta.club)} · ${U.seasonLabel(meta.season)} · Jornada ${meta.week + 1} · ${esc(meta.manager)}</div></button>` : ''}
         <button class="btn ${meta ? '' : 'primary'}" data-act="new-game">Nueva partida</button>
-        <button class="btn" data-act="tour-new">🏆 Modo torneo · Mundial y Champions</button>
+        <button class="btn" data-act="tour-new">🏆 Modo torneo · Mundial y Campions</button>
         <button class="btn ghost" data-act="import">Importar partida</button>
       </div>
       ${TL.I18N.picker()}
@@ -2105,6 +2105,7 @@
       : `<p class="note" style="margin:0">${cup.clubs.length} clubes · ${next ? `Próximo partido: ${esc(cup.rounds[next.r].name)}${cup.rounds[next.r].legs > 1 ? (next.leg ? ' (vuelta)' : ' (ida)') : ''}, jornada ${next.week + 1}` : ''}</p>`;
     const rounds = cup.rounds.map((r, ri) => {
       if (r.group) return `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div><div class="cup-groups">${groupsHtml(S, r)}</div></div>`;
+      if (r.league) return `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)} · ${r.mdn} partidos</div>${leagueHtml(S, cup, r)}</div>`;
       return r.ties.length ? `<div class="cup-round-box ${ri === cup.cur ? 'cur' : ''}"><div class="group-title">${esc(r.name)}</div>${r.ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>` : '';
     }).reverse().join('');
     return `<div class="chips" style="margin-bottom:10px">${chips}</div>
@@ -2113,6 +2114,21 @@
       <div class="cup-rounds">${rounds}</div></div>`;
   }
   A['cup-sel'] = el => { UI.cupSel = el.dataset.k; UI.refresh(); };
+
+  /** Tabla de la fase de liga (o una por región): 1º-8º a octavos, 9º-24º al play-off. */
+  function leagueHtml(S, cup, r) {
+    const regions = r.regions ? r.regions.map((_, i) => i) : [0];
+    return regions.map(rg => {
+      const tab = TL.Cups.leagueTable(S, r, rg);
+      const zone = k => (r.regions ? (k < 8 ? 'q' : 'out') : k < 8 ? 'q' : k < 24 ? 'po' : 'out');
+      const mine = r.ties.filter(t => t.h === S.user || t.a === S.user).sort((a, b) => a.md - b.md);
+      return `${r.regions ? `<div class="cg-head">${esc((cup.regionNames || [])[rg] || 'Región ' + (rg + 1))}</div>` : ''}
+        <table class="table cg-table lp-table"><thead><tr><th></th><th class="l" style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr></thead><tbody>
+        ${tab.map((x, k) => `<tr class="${x.id === S.user ? 'me' : ''} lp-${zone(k)}"><td>${k + 1}</td><td class="l"><span class="cg-team">${crest(S.clubs[x.id], 'xs')}<span class="ellipsis">${esc(S.clubs[x.id].name)}</span></span></td>
+          <td>${x.pj}</td><td>${x.w}</td><td>${x.d}</td><td>${x.l}</td><td>${x.gf - x.ga > 0 ? '+' : ''}${x.gf - x.ga}</td><td><b>${x.pts}</b></td></tr>`).join('')}</tbody></table>
+        ${mine.length && (!r.regions || r.regions[rg].includes(S.user)) ? `<div class="group-title mt">Tus partidos</div><div class="cg-games lp-mine">${mine.map(t => `<span>J${t.md + 1} · ${esc(S.clubs[t.h].code)} ${t.s.length ? `${t.s[0][0]}-${t.s[0][1]}` : 'vs'} ${esc(S.clubs[t.a].code)}</span>`).join('')}</div>` : ''}`;
+    }).join('') + `<p class="note lp-key"><i class="lp-q"></i> octavos${r.regions ? '' : ' · <i class="lp-po"></i> play-off'} · <i class="lp-out"></i> eliminados</p>`;
+  }
 
   /** Tablas de la fase de grupos (el tuyo primero). */
   function groupsHtml(S, r, only) {
@@ -2170,8 +2186,8 @@
     const cup = S.cups[0], md = cup.mds.filter(m => m.done)[before];
     if (md) {
       const r = cup.rounds[md.r];
-      const ties = r.group ? r.ties.filter(t => t.md === md.leg) : r.ties;
-      sheet(sheetHead(`${cup.icon} ${esc(r.group ? `${r.name} · jornada ${md.leg + 1}` : r.name)}`) + `<div class="card" style="padding:6px 10px">${ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>
+      const ties = r.group || r.league ? r.ties.filter(t => t.md === md.leg) : r.ties;
+      sheet(sheetHead(`${cup.icon} ${esc(r.group || r.league ? `${r.name} · jornada ${md.leg + 1}` : r.name)}`) + `<div class="card" style="padding:6px 10px">${ties.map(t => tieHtml(S, cup, t, r)).join('')}</div>
         <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => render(false) });
     } else render(false);
   };
