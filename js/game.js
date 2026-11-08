@@ -119,7 +119,7 @@
       try {
         localStorage.setItem(SAVE_KEY, JSON.stringify(W.serialize(S)));
         localStorage.setItem(META_KEY, JSON.stringify({
-          club: S.clubs[S.user].name, season: S.season, week: S.week, gender: S.gender,
+          club: S.clubs[S.user].name, season: S.season, week: S.week, gender: S.gender, db: S.db || 'legacy',
           manager: S.manager, savedAt: Date.now(), fired: !!S.fired
         }));
         return true;
