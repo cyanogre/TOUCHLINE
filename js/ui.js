@@ -18,7 +18,8 @@
     close: '<path d="M18 6 6 18M6 6l12 12"/>',
     back: '<path d="M15 18l-6-6 6-6"/>',
     next: '<path d="M9 18l6-6-6-6"/>',
-    search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>'
+    search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+    exit: '<path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/>'
   };
   function icon(n) {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -298,6 +299,19 @@
     }
   };
   A.music = () => Music.toggle();
+  // Salir al menú principal (la partida ya está guardada; el torneo no se guarda)
+  A.exit = () => {
+    const tour = G.S && G.S.mode === 'tour';
+    sheet(sheetHead('Salir al menú') + `<p>${tour ? 'El modo torneo no se guarda: si sales, se acaba este torneo.' : 'Tu partida queda guardada: podrás seguir donde lo dejaste con «Continuar».'}</p>
+      <div class="btn-row mt"><button class="btn" data-act="close-sheet">Cancelar</button><button class="btn primary" data-act="exit-ok">Salir</button></div>`);
+  };
+  A['exit-ok'] = () => {
+    closeSheet();
+    if (G.S && G.S.mode === 'tour') { A['tour-exit'](); return; }
+    G.save();
+    G.S = null; UI.tab = 'home';
+    renderTitle();
+  };
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
   A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); UI.refresh(); };
   A['opt-mentor'] = () => { TL.Mentor.setOn(!TL.Mentor.on()); UI.refresh(); };
@@ -319,7 +333,8 @@
       document.getElementById('topbar').innerHTML = `${crest(c)}
         <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${cup.icon} ${esc(cup.name)} · ${esc(TL.Tour.stage(S))}</div></div>
         <button class="icon-btn help-btn" data-act="help" aria-label="Ayuda del Profe" title="Ayuda del Profe">?</button>
-        <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
+        <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>
+      <button class="icon-btn" data-act="exit" aria-label="Salir al menú" title="Salir al menú">${icon('exit')}</button>`;
     } else {
     const L = W.userLeague(S);
     const d = U.dateOf(S.season, S.week).toLocaleDateString((TL.I18N ? TL.I18N.locale() : 'es-ES'), { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -329,7 +344,8 @@
       <div class="grow"><div class="club-name ellipsis">${esc(c.name)}</div><div class="club-sub ellipsis">${U.seasonLabel(S.season)} · ${wk} · ${esc(L.name)}</div></div>
       <div class="cash ${c.cash < 0 ? 'neg' : ''} ${UI.lastCash != null && UI.lastCash !== Math.round(c.cash) ? (c.cash > UI.lastCash ? 'up pop' : 'down pop') : ''}">${U.money(c.cash)}<small>Saldo</small></div>
       <button class="icon-btn help-btn" data-act="help" aria-label="Ayuda del Profe" title="Ayuda del Profe">?</button>
-      <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>`;
+      <button class="icon-btn" data-act="music" aria-label="Música">${icon(Music.on() ? 'musicOn' : 'musicOff')}</button>
+      <button class="icon-btn" data-act="exit" aria-label="Salir al menú" title="Salir al menú">${icon('exit')}</button>`;
     UI.lastCash = Math.round(c.cash);
     TL.Commerce.refreshBudget(S);
     }
