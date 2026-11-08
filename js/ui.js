@@ -46,30 +46,25 @@
   // ------------------------------------------------------------ Componentes
   /** Escudo: el real si existe (CDN) y, si no carga, el generado con iniciales. */
   const CREST_OK = new Set();
-  // Escudos de la base nueva: una spritesheet SVG por género (assets/escudos/sprite-M.svg / -F.svg,
-  // generada con tools/build-crest-sprite.js a partir de los SVG sueltos). Se inyecta una vez en la página.
-  const SPRITES = {};
-  function loadSprite(g) {
-    if (SPRITES[g]) return SPRITES[g];
-    SPRITES[g] = fetch(`assets/escudos/sprite-${g}.svg`).then(r => (r.ok ? r.text() : '')).then(t => {
-      if (!t) { SPRITES[g] = null; return; }
-      const box = document.createElement('div');
-      box.setAttribute('aria-hidden', 'true');
-      box.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
-      box.innerHTML = t;
-      document.body.appendChild(box);
-      document.documentElement.classList.add('crests-' + g);
-      // Los <use> que se pintaron antes de tener la hoja se vuelven a enlazar
-      document.querySelectorAll('svg.crest-svg use').forEach(u => u.setAttribute('href', u.getAttribute('href')));
-    }).catch(() => { SPRITES[g] = null; });
-    return SPRITES[g];
-  }
+  // Escudos de la base nueva: una imagen en cuadrícula (spritesheet) por género, assets/escudos/escudos-M.png y -F.png.
+  // data/game/escudos.js dice en qué casilla está cada club; la imagen puede tener cualquier resolución
+  // mientras conserve la cuadrícula (la posición va en porcentajes).
   const crestGender = () => (G.S && G.S.gender) || (UI.wz && UI.wz.gender) || 'M';
+  const ATLAS_IDX = {};
+  function atlasCell(g, id) {
+    const A = window.TL_CREST_ATLAS && window.TL_CREST_ATLAS[g];
+    if (!A) return null;
+    const idx = ATLAS_IDX[g] || (ATLAS_IDX[g] = new Map(A.ids.map((x, i) => [x, i])));
+    const i = idx.get(id);
+    if (i == null) return null;
+    const col = i % A.cols, row = Math.floor(i / A.cols);
+    return `background-image:url(assets/escudos/escudos-${g}.png);background-size:${A.cols * 100}% ${A.rows * 100}%;` +
+      `background-position:${A.cols > 1 ? (col / (A.cols - 1)) * 100 : 0}% ${A.rows > 1 ? (row / (A.rows - 1)) * 100 : 0}%`;
+  }
   function crest(c, cls) {
     if (c.crest) {
-      const g = crestGender();
-      loadSprite(g);
-      return `<span class="crest svg ${cls || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"><b>${esc(c.code)}</b><svg class="crest-svg" viewBox="0 0 100 110"><use href="#${esc(c.crest)}"/></svg></span>`;
+      const bg = atlasCell(crestGender(), c.crest);
+      if (bg) return `<span class="crest img ${cls || ''}" style="${bg}" aria-hidden="true"></span>`;
     }
     const known = c.logo && CREST_OK.has(c.logo);
     const img = c.logo ? `<img src="${esc(c.logo)}" alt="" ${known ? '' : 'loading="lazy"'} decoding="async" onload="TL.UI.crestOk(this)" onerror="this.remove()">` : '';

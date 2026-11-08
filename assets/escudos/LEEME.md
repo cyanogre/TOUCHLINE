@@ -1,21 +1,27 @@
 # Escudos
 
-Cada club tiene su escudo en un SVG suelto en esta carpeta: retócalo con cualquier editor (Inkscape, Figma, Illustrator o un editor de texto).
+El juego dibuja los escudos desde dos imágenes en cuadrícula (spritesheets), una por género:
 
-- **`C0001.svg` … `C1039.svg`**: escudos de los clubes de la base de datos (`data/db/clubs.json`, campo `crest`).
-- **`PM001.svg`…, `PF001.svg`…**: escudos de los clubes inventados de las divisiones inferiores (masculinas y femeninas).
-- **`sprite-M.svg` y `sprite-F.svg`**: las spritesheets que carga el juego, con todos los escudos de cada género. **No las edites a mano**: se generan.
-- **`index.json`**: qué escudos van en cada spritesheet.
+- **`escudos-M.png`**: fútbol masculino, 37 × 33 casillas.
+- **`escudos-F.png`**: fútbol femenino, 13 × 11 casillas.
 
-## Después de retocar un escudo
+Cada casilla es un club; en la imagen que genera el juego, cada casilla mide 64 × 70 píxeles.
+
+## Retocar o redibujar escudos
+
+1. Abre la imagen con tu editor y dibuja encima de las casillas que quieras.
+2. Guárdala con el mismo nombre y en la misma carpeta, en PNG con fondo transparente.
+
+**Puedes guardarla más grande**, por ejemplo al doble (128 × 140 por casilla), siempre que mantengas el número de filas y columnas: el juego coloca cada casilla en proporción, no en píxeles.
+
+**Qué club va en cada casilla:** lo dice `data/game/escudos.js`. Las casillas van fila a fila, de izquierda a derecha.
+
+## Volver a generarlas
+
+Los escudos originales de la base de datos están en `data/db/escudos/*.svg`. Para rehacer las imágenes desde ellos:
 
 ```
-node tools/build-crest-sprite.js
+node tools/build-crest-atlas.js
 ```
 
-Así se rehacen las spritesheets con los cambios.
-
-## Formato
-
-- Lienzo de 100×110 (`viewBox="0 0 100 110"`).
-- Los `id` internos (por ejemplo, el `clipPath`) pueden repetirse entre archivos: el script los renombra al empaquetarlos.
+**Ojo:** ese comando sobrescribe los PNG y se pierden los retoques hechos a mano.
