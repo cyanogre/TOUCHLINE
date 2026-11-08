@@ -591,6 +591,19 @@
       sm: { opp: 'Los fantasmas del estadio viejo', rel: 6, win: 'soul' },
       o: PLAY({ l: 'Ni hablar', fx: { team: -1 }, r: 'El vestuario se queda con la duda.' }) },
 
+    { id: 'pe_evasion', cat: 'especial', tone: 'pos', who: 'c', p: 0.12, per: 'season', cd: 300, give: 'espinilleras',
+      t: 'Evasión o victoria', b: 'Un rodaje de época necesita un partido de verdad: los guardias de un campo de prisioneros contra los presos. Os toca hacer de presos. El premio: {k}.',
+      sm: { opp: 'Los guardias del campo', rel: 3, win: 'item', fans: 0.003 },
+      o: PLAY({ l: 'Nada de rodajes', fx: {}, r: 'El director busca a otro equipo.' }) },
+    { id: 'pe_shaolin', cat: 'especial', tone: 'pos', who: 'c', p: 0.12, per: 'season', cd: 300, give: 'tacos_barro',
+      t: 'Los monjes de la pierna de acero', b: 'Unos monjes bajan de la montaña y os retan: juegan con patadas de kung-fu y saltos imposibles. Si ganáis, os regalan {k}.',
+      sm: { opp: 'Los monjes shaolin', rel: 2, win: 'item', fans: 0.003 },
+      o: PLAY({ l: 'Mejor no', fx: {}, r: 'Los monjes se marchan levitando.' }) },
+    { id: 'pe_dibujos', cat: 'especial', tone: 'pos', who: 'c', p: 0.1, per: 'season', cd: 300, give: 'gorra',
+      t: 'El equipo de los dibujos animados', b: 'Un equipo juvenil que corre campos de diez kilómetros, remata de chilena desde cualquier sitio y tiene un portero con gorra os desafía. El premio: {k}.',
+      sm: { opp: 'Los campeones de los dibujos', rel: 5, win: 'item', fans: 0.004 },
+      o: PLAY({ l: 'Eso no es real', fx: {}, r: 'Se van corriendo. Todavía no han llegado a la otra portería.' }) },
+
     // ============================================================ LEYENDA (raros: 1 de cada 5 temporadas)
     { id: 'programa_ego', cat: 'leyenda', tone: 'neu', who: 'c', fixed: true, if: { line: 3, age: [16, 24], no: ['ego', 'egoTeam'] }, p: 0.2, per: 'season', once: true,
       t: 'Te invitan al programa del ego', b: 'Un programa experimental encierra durante dos semanas a los mejores delanteros jóvenes para fabricar al más egoísta del mundo. Quieren a {n}.',
@@ -672,38 +685,46 @@
       ] }
   ];
 
-  // ------------------------------------------------------------ Objetos (en los dos modos)
+  // ------------------------------------------------------------ Objetos (en los dos modos): todos son guiños
+  // a momentos míticos del fútbol, al anime, al cine y a los videojuegos.
   // eff: los mismos efectos que los rasgos (shot, conv, assist, fouled, save, mid, att, def, team, foul, card). gk: true solo porteros, false nunca porteros.
   const ITEMS = {
-    botas_oro: { name: 'Las botas doradas', icon: '👟', gk: false, w: 1, desc: 'Botas de una bota de oro olvidada. Más acierto de cara a puerta.', eff: { conv: 1.06 } },
-    guantes_final: { name: 'Los guantes de la final', icon: '🧤', gk: true, w: 1, desc: 'Los guantes de un portero que paró tres penaltis en una final.', eff: { save: 0.93 } },
-    brazalete: { name: 'El brazalete histórico', icon: '🎗️', w: 1, desc: 'Lo llevó el capitán del primer título del club. Une al equipo.', eff: { team: 1.006 } },
-    espinilleras: { name: 'Las espinilleras de la suerte', icon: '🛡️', gk: false, w: 1, desc: 'Nunca se rompieron en veinte años. Más firmeza atrás.', eff: { def: 0.3 } },
-    amuleto: { name: 'El amuleto de la abuela', icon: '🧿', w: 1, desc: 'Una medalla de la abuela de un viejo utillero. Protege y da confianza.', eff: { conv: 1.02, assist: 1.05 } },
-    balon_calle: { name: 'El balón de la plaza', icon: '⚽', gk: false, w: 0.6, desc: 'Gastado de tanto rondo callejero. Más regate y más faltas recibidas.', eff: { fouled: 1.3, conv: 1.02 } },
-    trofeo_verano: { name: 'La copa del torneo de verano', icon: '🏆', w: 0.6, desc: 'Pequeña, pero da moral: quien la custodia se siente imparable.', eff: { team: 1.004, conv: 1.02 } },
-    cinta_pelo: { name: 'La cinta del diez', icon: '🎽', gk: false, w: 1, desc: 'La cinta del pelo de un diez de leyenda. Más pases de gol.', eff: { assist: 1.15 } },
-    silbato: { name: 'El silbato del árbitro retirado', icon: '📯', w: 0.7, desc: 'Quien lo lleva parece que se sabe el reglamento mejor que nadie: menos tarjetas.', eff: { card: 0.7 } },
-    tacos_barro: { name: 'Los tacos de barro', icon: '🥾', gk: false, w: 1, desc: 'Para los días de lluvia y las batallas. Más fuerza en el medio.', eff: { mid: 0.3 } },
-    gorra: { name: 'La gorra del gato', icon: '🧢', gk: true, w: 0.7, desc: 'Un portero mítico jamás se la quitaba. Reflejos felinos.', eff: { save: 0.95 } },
-    reloj: { name: 'El reloj del minuto 93', icon: '⏱️', gk: false, w: 0.7, desc: 'Se paró en el minuto del gol más famoso del club. Más disparos con fe.', eff: { shot: 1.15 } }
+    botas_oro: { name: 'La Bota de Oro', icon: '👟', gk: false, w: 1, desc: 'La que se gana marcando más goles que nadie en Europa. Pesa, pero mete.', eff: { conv: 1.06 } },
+    guantes_final: { name: 'La Mano Celestial', icon: '🧤', gk: true, w: 1, desc: 'Unos guantes con una mano dorada pintada. Dicen que paran hasta los tiros que arden.', eff: { save: 0.93 } },
+    brazalete: { name: 'El brazalete del capitán de los dibujos', icon: '🎗️', w: 1, desc: 'El de aquel capitán de anime que cruzaba campos de diez kilómetros sin despeinarse. Une al equipo.', eff: { team: 1.006 } },
+    espinilleras: { name: 'La camiseta de Evasión o victoria', icon: '👕', w: 1, desc: 'De aquel partido contra los guardias de un campo de prisioneros. Con ella puesta, nadie se rinde.', eff: { def: 0.3, team: 1.003 } },
+    amuleto: { name: 'La Mano de Dios', icon: '✋', gk: false, w: 0.8, desc: 'Un guante viejo de México 86. Marcas goles que no deberían subir… y algún árbitro se mosquea.', eff: { conv: 1.05, card: 1.15 } },
+    balon_calle: { name: 'El balón amigo', icon: '⚽', gk: false, w: 0.8, desc: '«El balón es mi amigo». Pegado al pie: más regate y más faltas recibidas.', eff: { fouled: 1.3, conv: 1.02 } },
+    trofeo_verano: { name: 'La Orejona de juguete', icon: '🏆', w: 0.6, desc: 'Una réplica de la copa de las orejas grandes. Quien la custodia se cree invencible.', eff: { team: 1.004, conv: 1.02 } },
+    cinta_pelo: { name: 'Las botas del Panenka', icon: '🥾', gk: false, w: 1, desc: 'Para quien se atreve a picarla en el penalti decisivo. Sangre fría de cara a puerta.', eff: { conv: 1.04, assist: 1.05 } },
+    silbato: { name: 'El silbato del calvo temido', icon: '📯', w: 0.7, desc: 'De aquel árbitro calvo que te miraba con los ojos muy abiertos y te callabas. Quien lo lleva ve menos tarjetas.', eff: { card: 0.7 } },
+    tacos_barro: { name: 'La pierna de acero', icon: '🦵', gk: false, w: 0.8, desc: 'La del monje que chutaba balones hasta convertirlos en cometas. Disparo brutal.', eff: { shot: 1.2, conv: 1.03 } },
+    gorra: { name: 'La gorra del portero imbatible', icon: '🧢', gk: true, w: 0.7, desc: 'Un portero de dibujos jamás se la quitaba y no encajaba ni un gol desde fuera del área.', eff: { save: 0.95 } },
+    reloj: { name: 'El reloj del 92:48', icon: '⏱️', gk: false, w: 0.7, desc: 'Se paró en el minuto de aquel cabezazo en una final que parecía perdida. Más disparos con fe.', eff: { shot: 1.15 } },
+    cartel: { name: 'El cartel de BELIEVE', icon: '🪧', w: 0.8, desc: 'Un folio amarillo pegado con celo encima de la puerta del vestuario. Contagia fe a todos.', eff: { team: 1.004, mid: 0.2 } },
+    balon_oro: { name: 'El Balón de Oro', icon: '🥇', w: 0.35, desc: 'Lo que todos sueñan y casi nadie toca. Quien lo tiene en la taquilla juega como el mejor del mundo.', eff: { conv: 1.04, assist: 1.1, team: 1.003 } },
+    bufanda: { name: 'La bufanda del Maracanazo', icon: '🧣', w: 0.8, desc: 'De la tarde en que un estadio de doscientas mil personas enmudeció. Rinde cuando nadie da un duro por vosotros.', eff: { def: 0.3, conv: 1.02 } }
   };
 
-  // ------------------------------------------------------------ Almas (solo en modo fantasía)
+  // ------------------------------------------------------------ Almas (solo en modo fantasía): apodos de leyendas y héroes del anime
   // line: líneas donde rinde entera (0 portero · 1 defensa · 2 medio · 3 delantero); fuera, a medias. c/c2: colores del aura.
   const SOULS = {
-    emperador: { name: 'El alma del Emperador', icon: '👑', c: '#ffd23f', c2: '#ff9f1a', line: [1, 2], starter: true, desc: 'Defiende como un rey y sale jugando como un mediocentro.', eff: { def: 0.7, mid: 0.5, assist: 1.25 } },
-    fantasma: { name: 'El alma del Fantasma del Área', icon: '👻', c: '#c9d6ff', c2: '#7c8cff', line: [3], starter: true, desc: 'Aparece donde cae el balón. Pero no defiende nada.', eff: { shot: 1.4, conv: 1.12, def: -0.3 } },
-    dragon: { name: 'El alma del Dragón', icon: '🐉', c: '#ff5a3d', c2: '#ffb03b', line: [2, 3], desc: 'Disparos que queman la red. Le hacen muchas faltas.', eff: { conv: 1.1, shot: 1.3, fouled: 1.3 } },
-    muralla: { name: 'El alma de la Muralla', icon: '🧱', c: '#8fe3ff', c2: '#3aa0ff', line: [0], starter: true, desc: 'Una portería que parece más pequeña.', eff: { save: 0.82 } },
-    bailarin: { name: 'El alma del Bailarín', icon: '💃', c: '#ff7ad9', c2: '#b05cff', line: [2, 3], desc: 'Regate y pausa: les vuelve locos y reparte asistencias.', eff: { fouled: 1.7, conv: 1.05, assist: 1.25 } },
-    berserker: { name: 'El alma del Berserker', icon: '🪓', c: '#ff3b3b', c2: '#8a0000', line: [1, 2], desc: 'Arrasa en cada duelo… y colecciona tarjetas.', eff: { def: 0.8, att: 0.4, foul: 1.8, card: 1.6 } },
-    oraculo: { name: 'El alma del Oráculo', icon: '🔮', c: '#b48cff', c2: '#5d3bff', line: [2], desc: 'Ve la jugada antes de que pase. Pases imposibles.', eff: { assist: 1.7, mid: 0.7 } },
-    ego_absoluto: { name: 'El alma del Ego Absoluto', icon: '🦁', c: '#4dd2ff', c2: '#0057ff', line: [3], hidden: true, desc: 'Solo existe el gol. Los demás, decorado.', eff: { shot: 1.9, conv: 1.12, assist: 0.35 } },
-    leon: { name: 'El alma del Corazón de León', icon: '🦁', c: '#ffb347', c2: '#ff6a00', line: [1, 2, 3], desc: 'Contagia al equipo entero: nadie se rinde con él en el campo.', eff: { team: 1.012 } },
-    relampago: { name: 'El alma del Relámpago', icon: '⚡', c: '#f4ff5e', c2: '#7dff3a', line: [3, 2], desc: 'Velocidad imposible: rompe líneas y provoca faltas.', eff: { att: 0.6, fouled: 1.35 } },
-    gato: { name: 'El alma del Gato Negro', icon: '🐈‍⬛', c: '#9be15d', c2: '#00b36b', line: [0], desc: 'Reflejos y suerte. Mucha suerte.', eff: { save: 0.88, team: 1.003 } },
-    general: { name: 'El alma del General', icon: '🎖️', c: '#e0e0e0', c2: '#8a9bb0', line: [1], desc: 'Ordena la defensa como un ejército.', eff: { def: 1, team: 1.004 } }
+    emperador: { name: 'El alma del Káiser', icon: '👑', c: '#ffd23f', c2: '#ff9f1a', line: [1, 2], starter: true, desc: 'El líbero que defendía como un emperador y salía jugando con la cabeza alta.', eff: { def: 0.7, mid: 0.5, assist: 1.25 } },
+    fantasma: { name: 'El alma del Fenómeno', icon: '💫', c: '#c9d6ff', c2: '#7c8cff', line: [3], starter: true, desc: 'Arranca y nadie le alcanza: bicicletas, recortes y gol. Eso sí, no baja a defender.', eff: { shot: 1.4, conv: 1.12, def: -0.3 } },
+    dragon: { name: 'El alma del Tigre', icon: '🐯', c: '#ff5a3d', c2: '#ffb03b', line: [2, 3], desc: 'El delantero de los dibujos que reventaba redes con su disparo del tigre. Le hacen muchas faltas.', eff: { conv: 1.1, shot: 1.3, fouled: 1.3 } },
+    muralla: { name: 'El alma de la Araña Negra', icon: '🕷️', c: '#8fe3ff', c2: '#3aa0ff', line: [0], starter: true, desc: 'Vestía de negro y parecía tener ocho brazos. El único portero con Balón de Oro.', eff: { save: 0.82 } },
+    bailarin: { name: 'El alma del Pibe de Oro', icon: '🌟', c: '#ff7ad9', c2: '#b05cff', line: [2, 3], desc: 'Regate imposible y genio del barrio. Les vuelve locos… y alguna tarjeta cae.', eff: { fouled: 1.7, conv: 1.06, assist: 1.25, card: 1.1 } },
+    berserker: { name: 'El alma de Ringhio', icon: '🐺', c: '#ff3b3b', c2: '#8a0000', line: [1, 2], desc: 'El perro de presa que gruñía en cada balón dividido. Arrasa en los duelos y colecciona tarjetas.', eff: { def: 0.8, att: 0.4, foul: 1.8, card: 1.6 } },
+    oraculo: { name: 'El alma del Arquitecto', icon: '📐', c: '#b48cff', c2: '#5d3bff', line: [2], desc: 'Barba, calma y pases de cuarenta metros al pie. Ve la jugada antes de que pase.', eff: { assist: 1.7, mid: 0.7 } },
+    ego_absoluto: { name: 'El alma del Egoísta Definitivo', icon: '🔷', c: '#4dd2ff', c2: '#0057ff', line: [3], hidden: true, desc: 'Salió de la jaula de los delanteros: solo existe el gol. Los demás, decorado.', eff: { shot: 1.9, conv: 1.12, assist: 0.35 } },
+    leon: { name: 'El alma de la Saeta Rubia', icon: '🏹', c: '#ffb347', c2: '#ff6a00', line: [1, 2, 3], desc: 'Estaba en todas partes: defendía, creaba y marcaba. Contagia a todo el equipo.', eff: { team: 1.008, att: 0.3, mid: 0.3 } },
+    relampago: { name: 'El alma del Flaco', icon: '🧠', c: '#f4ff5e', c2: '#ff8a00', line: [2, 3], desc: 'Fútbol total: cada pase, una lección; cada giro, un truco con su nombre.', eff: { mid: 0.6, assist: 1.3, att: 0.3 } },
+    gato: { name: 'El alma del Portero Imbatible', icon: '🧢', c: '#9be15d', c2: '#00b36b', line: [0], desc: 'Juró que no le meterían un gol desde fuera del área. Y casi lo cumple.', eff: { save: 0.88, team: 1.003 } },
+    general: { name: 'El alma de Tarzán', icon: '🦁', c: '#e0e0e0', c2: '#8a9bb0', line: [1], desc: 'Melena al viento y el pecho por delante en cada balón. Ordena la defensa como un ejército.', eff: { def: 1, team: 1.004 } },
+    pulga: { name: 'El alma de la Pulga', icon: '🐜', c: '#7fd1ff', c2: '#ff3b6b', line: [2, 3], desc: 'Pequeño, pegado al balón e imparable en el uno contra uno. Asiste tanto como marca.', eff: { conv: 1.08, assist: 1.3, fouled: 1.4 } },
+    rey: { name: 'El alma del Rey', icon: '♛', c: '#ffe066', c2: '#2fd17c', line: [3], starter: true, desc: 'Mil goles y tres Mundiales. Con él en el campo, el equipo entero se cree campeón.', eff: { conv: 1.1, shot: 1.2, team: 1.005 } },
+    divino: { name: 'El alma del Divino', icon: '🎗️', c: '#a0e7ff', c2: '#3a6bff', line: [2, 3], desc: 'Coleta, zurda y elegancia. Genio puro… que a veces falla el penalti que más importa.', eff: { conv: 1.08, assist: 1.2 } },
+    ibra: { name: 'El alma de Ibracadabra', icon: '🦒', c: '#ffd0a0', c2: '#ff5a00', line: [3], desc: 'Taekwondo, chilenas imposibles y un ego que no cabe en el estadio. Lo dice él: no necesita a nadie.', eff: { shot: 1.6, conv: 1.12, assist: 0.6 } }
   };
 
   window.TL_EVENTOS = { cats: CATS, events: EVENTS, items: ITEMS, souls: SOULS };
