@@ -2032,7 +2032,7 @@
         <div class="note mt">Eres</div>
         <div class="seg wz-g">${[['M', 'Hombre'], ['F', 'Mujer']].map(([g, l]) => `<button class="${z.mgrG === g ? 'on' : ''}" data-act="wz-mgr-g" data-g="${g}">${l}</button>`).join('')}</div>
         <div class="note mt">Tu cara</div>
-        <div class="wz-face mt">${z.face ? TL.Face.html(z.face) : '<span class="wz-face-empty" aria-hidden="true">🙂</span>'}
+        <div class="wz-face mt">${z.face ? TL.Face.html(z.face) : ''}
           <div class="grow"><p class="note" style="margin:0 0 8px">${z.face ? 'Hablarás con esta cara en las charlas con tus jugadores.' : 'Opcional: hazte una foto, encájala en la silueta y se pixela. Saldrá en las charlas con tus jugadores.'}</p>
           <div class="btn-row"><button class="btn sm ${z.face ? '' : 'primary'}" data-act="wz-face">${z.face ? 'Cambiar mi cara' : 'Crear mi cara'}</button>${z.face ? '<button class="btn sm" data-act="wz-face-del">Quitar</button>' : ''}</div></div></div>
         <button class="btn primary block mt" data-act="wz-start">Empezar carrera</button></div>`;
