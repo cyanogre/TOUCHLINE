@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const TL = window.TL;
-  TL.VERSION = '3.7';
+  TL.VERSION = '3.8';
 
   function boot() {
     TL.UI.renderTitle();
