@@ -6,9 +6,9 @@
  * Salidas:
  *  - data/game/men.js, data/game/women.js   datos compactos del juego
  *  - data/game/pyramid.js                    divisiones inferiores (versión 2, clubes inventados)
- *  - assets/escudos/P*.svg                   escudos de los clubes de esas divisiones
- *  - assets/escudos/index.json               qué escudos van en cada spritesheet (M / F)
- * Después: node tools/build-crest-sprite.js  (empaqueta los escudos en assets/escudos/sprite-*.svg)
+ *  - data/db/escudos/P*.svg                   escudos de los clubes de esas divisiones
+ *  - data/db/escudos/index.json               qué escudos van en cada spritesheet (M / F)
+ * Después: node tools/build-crest-atlas.js   (pinta los escudos en la cuadrícula assets/escudos/escudos-*.png)
  *
  * La base de datos antigua (dataset con nombres reales) queda en data/legacy/ con su script en tools/legacy/.
  * Uso: node tools/build-db.js
@@ -21,7 +21,7 @@ const F = require('../js/formulas.js');
 const ROOT = path.join(__dirname, '..');
 const DB = path.join(ROOT, 'data', 'db');
 const OUT_DIR = path.join(ROOT, 'data', 'game');
-const CREST_DIR = path.join(ROOT, 'assets', 'escudos');
+const CREST_DIR = path.join(ROOT, 'data', 'db', 'escudos');
 const SEASON = F.SEASON_START;
 
 // ---------------------------------------------------------------- CSV
@@ -316,7 +316,7 @@ function main() {
   fs.writeFileSync(path.join(OUT_DIR, 'pyramid.js'), pjs);
   fs.writeFileSync(path.join(CREST_DIR, 'index.json'), JSON.stringify(sprite));
   console.log('data/game/pyramid.js:', Object.entries(pyr).map(([g, P]) => `${g} ${P.length} ligas, ${P.reduce((s, L) => s + L.clubs.length, 0)} clubes`).join(' · '));
-  console.log('assets/escudos/index.json:', sprite.M.length, 'M ·', sprite.F.length, 'F');
+  console.log('data/db/escudos/index.json:', sprite.M.length, 'M ·', sprite.F.length, 'F');
 }
 
 main();

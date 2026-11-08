@@ -8,8 +8,8 @@ Juego de gestión de fútbol para móvil (de momento en HTML responsive) con una
 - **`data/db/`**: la base de datos sin licencias (jugadores, clubes, ligas y especificación de competiciones).
   `node tools/build-db.js` genera los datos del juego (`data/game/`), las divisiones inferiores inventadas
   y sus escudos.
-- **`assets/escudos/`**: un SVG por club, para retocarlo a mano. `node tools/build-crest-sprite.js` los
-  empaqueta en las spritesheets que carga el juego (ver `assets/escudos/LEEME.md`).
+- **`assets/escudos/escudos-M.png` y `escudos-F.png`**: spritesheet con todos los escudos en cuadrícula
+  (una casilla por club). Se retoca directamente la imagen; ver `assets/escudos/LEEME.md`.
 - **`data/legacy/`**: la base de datos anterior (dataset EA SPORTS FC 27), con su script en `tools/legacy/`.
   Se conserva para abrir las partidas guardadas con ella: el juego cambia solo de base al cargarlas.
   Las partidas nuevas usan siempre la base nueva.
