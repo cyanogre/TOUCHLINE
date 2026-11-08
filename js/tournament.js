@@ -42,7 +42,7 @@
   };
   const KINDS = {
     wc: { name: 'Mundial', icon: '🌍', color: '#f2c94c', desc: 'Selecciones con los mejores jugadores de cada país.' },
-    cl: { name: 'Copa de Campeones de Europa', icon: '⭐', color: '#5db8ff', desc: 'Los 32 mejores clubes de Europa.' }
+    cl: { name: 'Campions', icon: '⭐', color: '#5db8ff', desc: 'Los 32 mejores clubes de Europa.' }
   };
 
   /** Prepara el mundo del torneo (las selecciones se forman con los mejores de cada país). */

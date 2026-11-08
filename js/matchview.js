@@ -584,7 +584,7 @@
             <span class="rating ${r >= 7.5 ? 'hi' : r < 6 ? 'lo' : ''}">${r != null ? r.toFixed(1) : '—'}</span></div>`;
         }).join('')}</div>
       ${cp ? `<div class="card mt" style="padding:6px 10px"><div class="group-title">${cp.cup.icon} ${esc(cp.cup.name)} · ${esc(cp.round)}</div>
-        ${cp.cup.rounds[cp.md.r].ties.map(x => UI.tieHtml(S, cp.cup, x, cp.cup.rounds[cp.md.r])).join('')}</div>`
+        ${(r => (r.group || r.league ? r.ties.filter(x => x.md === cp.md.leg) : r.ties))(cp.cup.rounds[cp.md.r]).map(x => UI.tieHtml(S, cp.cup, x, cp.cup.rounds[cp.md.r])).join('')}</div>`
         : `<div class="card mt" style="padding:6px 10px"><div class="group-title">${esc(L.name)} · Jornada ${S.week}</div>
         ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`}`;
     UI.mountFaces(body);
