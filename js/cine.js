@@ -25,7 +25,7 @@
   /** Golpe corto antes de enseñar un evento. Devuelve una promesa (≈ 0,8 s). */
   function boom(o) {
     o = o || {};
-    if (TL.SFX) { if (!(TL.SFX.sample && TL.SFX.sample('evento'))) TL.SFX.boom && TL.SFX.boom(); }
+    if (TL.SFX && TL.SFX.rec) TL.SFX.rec('evento', TL.SFX.boom);
     if (reduce()) return Promise.resolve();
     const word = o.word || '¡BUM!';
     const el = layer('boom tone-' + (o.tone || 'neu'), `<div class="boom-burst"><svg viewBox="-100 -100 200 200" aria-hidden="true"><polygon points="${burst(14, 92, 58)}"/></svg>
@@ -197,15 +197,15 @@
   function playLB() {
     const S = TL.SFX;
     if (!S) return;
-    if (S.sample && S.sample('limit-break')) return;
-    if (S.limitBreak) S.limitBreak();
+    // Va al compás de la animación: si la grabación no llega en medio segundo, no suena a destiempo
+    if (S.rec) S.rec('limit-break', S.limitBreak, { maxWait: 500 });
   }
 
   /** Brillo de una recompensa (objeto o alma) dentro de una hoja. */
   function reward(el, soul) {
     if (!el) return;
     el.classList.add('rw-in');
-    if (TL.SFX) { if (soul) { if (!(TL.SFX.sample && TL.SFX.sample('alma'))) TL.SFX.soul && TL.SFX.soul(); } else TL.SFX.levelUp && TL.SFX.levelUp(); }
+    if (TL.SFX) { if (soul) { if (TL.SFX.rec) TL.SFX.rec('alma', TL.SFX.soul); } else TL.SFX.levelUp && TL.SFX.levelUp(); }
     if (TL.FX && !reduce()) setTimeout(() => TL.FX.sparkle && TL.FX.sparkle(el), 120);
   }
 
