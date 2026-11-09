@@ -166,7 +166,7 @@
     // Avisos
     const total = S.fixtures.length;
     if (S.week === Math.floor(total / 2) - 1) {
-      const exp = W.squad(S, S.user).filter(p => p.contract <= S.season + 1);
+      const exp = W.squad(S, S.user).concat(W.reserve(S)).filter(p => p.contract <= S.season + 1);
       if (exp.length) TL.Game.mail(S, 'Contratos que expiran',
         `${exp.length} jugador${exp.length > 1 ? 'es terminan' : ' termina'} contrato este verano: ` +
         exp.map(p => p.short).join(', ') + '. Renueva desde su ficha o se irán libres.', 'club');
@@ -325,8 +325,11 @@
     W.dirty(S);
 
     // Cantera
+    // Tu club: los canteranos van al filial (js/academy.js); los de 23 suben al primer equipo
     sum.youth = [];
+    if (TL.Academy && TL.Academy.on(S)) { sum.promoted = TL.Academy.promoteAged(S).map(p => p.name); sum.youth = TL.Academy.intake(S); sum.called = TL.Academy.fillFirst(S).map(p => p.name); }
     for (const c of S.clubs) {
+      if (c.id === S.user && TL.Academy && TL.Academy.on(S)) continue;
       const sq = W.squad(S, c.id);
       const yb = TL.Manager.bonus(S, c.id);
       const k = (sq.length < 22 ? 4 : sq.length < 26 ? 3 : sq.length < 32 ? 2 : 0) + (sq.length < 34 ? yb.youthExtra : 0);

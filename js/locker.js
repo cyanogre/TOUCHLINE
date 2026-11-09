@@ -246,8 +246,11 @@
     const p = W().makePlayer(S, { club: S.user, nat: U.pick(nats.length ? nats : [0]), pos, age: U.int(16, 17), ovr, pot: U.int(72, 78), contract: S.season + 4 });
     p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
     p.mor = 80;
+    // Como todos los canteranos, empieza en el filial
+    const fil = TL.Academy && TL.Academy.on(S);
+    if (fil) { p.res = true; p.wage = TL.Academy.RES_WAGE; W().dirty(S); }
     state(S).gems[p.id] = { dna: dk, stage: 0, hidden: U.int(90, 95), apps: 0 };
-    TL.Game.mail(S, gx(S, 'En la cantera hay un chaval distinto', 'En la cantera hay una chavala distinta'), `Los técnicos de la cantera no paran de hablar de ${p.name} (${p.age} años, ${F.POS_ES[pos]}). "Tiene algo que no se enseña", dicen. Dale minutos en su sitio y un plan de entrenamiento: puede ser algo muy grande.`, 'good');
+    TL.Game.mail(S, gx(S, 'En la cantera hay un chaval distinto', 'En la cantera hay una chavala distinta'), `Los técnicos de la cantera no paran de hablar de ${p.name} (${p.age} años, ${F.POS_ES[pos]}). "Tiene algo que no se enseña", dicen. Dale minutos en su sitio y un plan de entrenamiento: puede ser algo muy grande.` + (fil ? gx(S, ' Está en el filial: súbelo al primer equipo cuando quieras darle esos minutos.', ' Está en el filial: súbela al primer equipo cuando quieras darle esos minutos.') : ''), 'good');
     return p;
   }
 
@@ -686,6 +689,17 @@
       if (!away && !on && p.age <= 23 && m < 50 && S.week > 6 && Math.random() < 0.05) { p.pot = Math.max(p.ovr, p.pot - 1); L.month.push([p.id, -1, -1]); }
       if (r != null && r >= 8 && p.age <= 23 && Math.random() < 0.3) p.pot = Math.min(95, p.pot + 1);
     }
+    // Filial: juegan cada semana (como cedidos), pero solo crecen hasta el 80 % de su potencial
+    if (TL.Academy && TL.Academy.on(S)) for (const p of TL.Academy.reserve(S)) {
+      if (p.inj > 0) continue;
+      const cap = TL.Academy.capOf(p);
+      if (p.ovr >= cap) continue;
+      const ageF = p.age <= 19 ? 1 : p.age <= 21 ? 0.85 : 0.65;
+      const m = p.mor == null ? 70 : p.mor;
+      const morF = m >= 75 ? 1.15 : m >= 55 ? 1 : m >= 40 ? 0.8 : 0.6;
+      L.dp[p.id] = (L.dp[p.id] || 0) + TL.Academy.grow(S, p, ageF, morF, growth(S, p), youthSkill);
+      while (L.dp[p.id] >= 1 && p.ovr < cap) { L.dp[p.id] -= 1; const b = p.ovr; raise(S, p, 1); L.month.push([p.id, b, p.ovr]); }
+    }
     // Resumen cada 4 jornadas
     if (S.week % 4 === 3 && L.month.length) {
       const up = {}, down = new Set();
@@ -703,6 +717,7 @@
     const mine = results.find(r => r.h === S.user || r.a === S.user);
     loanWeek(S, results);
     growWeek(S, mine);
+    if (TL.Academy) TL.Academy.fillFirst(S);
     const played = new Set();
     if (mine && mine.slots) {
       for (const id in mine.slots) {

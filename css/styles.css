@@ -1494,3 +1494,17 @@ body.shake-s { animation: shake-s .35s; }
 @keyframes blink { 50% { opacity: .35; } }
 .cine.lb.static .lb-title, .cine.lb.static .lb-kicker, .cine.lb.static .lb-sub, .cine.lb.static .lb-pot, .cine.lb.static .lb-ovr, .cine.lb.static .lb-tap { opacity: 1; animation: none; }
 @media (max-height: 520px) { .lb-stage { top: 40%; } .lb-w { font-size: clamp(48px, 12vh, 90px); } }
+
+/* ================================================================ Cantera: el filial */
+.sq-tabs button { font-weight: 700; }
+.tag.res { background: rgb(47 209 124 / .14); color: var(--accent2); border: 1px solid rgb(47 209 124 / .4); }
+.tag.res.cap { background: rgb(255 194 71 / .14); color: var(--warn); border-color: rgb(255 194 71 / .45); }
+.res-cap { color: var(--accent2); font-weight: 600; }
+.res-cap.full { color: var(--warn); }
+.res-intro p { margin: 0 0 6px; line-height: 1.45; }
+.res-intro p.note { margin: 0; }
+.res-box { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; border: 1px solid rgb(47 209 124 / .4); background: linear-gradient(135deg, rgb(47 209 124 / .1), var(--bg2)); }
+.res-box > b { font: 800 15px/1 var(--font-c); text-transform: uppercase; letter-spacing: .06em; color: var(--accent2); }
+.res-box span { font-size: 13.5px; line-height: 1.4; color: var(--text); }
+.res-box .btn { align-self: flex-start; margin-top: 4px; }
+.res-box .res-full { color: var(--warn); font-weight: 700; }
