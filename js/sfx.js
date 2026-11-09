@@ -5,7 +5,7 @@
   let ctx = null, master = null, crowd = null;
 
   function on() { try { return localStorage.getItem('touchline.sfx') !== '0'; } catch (e) { return true; } }
-  function setOn(v) { try { localStorage.setItem('touchline.sfx', v ? '1' : '0'); } catch (e) { /* nada */ } if (!v) stopCrowd(); }
+  function setOn(v) { try { localStorage.setItem('touchline.sfx', v ? '1' : '0'); } catch (e) { /* nada */ } if (!v) stopCrowd(); else preloadSamples(); }
 
   function ac() {
     if (!ctx) {
@@ -70,6 +70,7 @@
   function unlock() {
     const c = ac();
     if (!c) return;
+    decodeAll();   // lo que ya se descargó, listo para sonar
     if (!unlocked) {
       // iOS: un búfer en silencio dentro del gesto deja el audio abierto
       try { const b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); } catch (e) { /* nada */ }
@@ -262,14 +263,18 @@
   // ------------------------------------------------------------ Efectos grabados (ElevenLabs u otros)
   // assets/sfx/<carpeta>/1.mp3, 2.mp3… (numerados seguidos, hasta 8). Si una carpeta tiene archivos, se usan
   // (al azar y sin repetir el último); si está vacía, suena el efecto sintetizado de siempre.
+  // Se descargan al abrir la página (primero lo que suena en los menús). Si una carpeta tiene grabaciones que
+  // aún no han llegado, el sonido las espera (hasta WAIT_MAX) en vez de tocar el sintetizado.
   // El volumen se nivela solo y cada carpeta tiene su peso en la mezcla (VOL).
-  const SFX_DIR = 'assets/sfx/', MAXV = 8;
+  const SFX_DIR = 'assets/sfx/', MAXV = 8, WAIT_MAX = 3000;
   const VOL = {
     gol: 1, 'gol-rival': 0.7, ocasion: 0.75, palo: 0.8, parada: 0.75, chut: 0.55, red: 0.6, pitido: 0.55, 'pitido-final': 0.6,
     tarjeta: 0.6, abucheo: 0.7, lamento: 0.7, aplausos: 0.75, silbidos: 0.6, ovacion: 0.95, canticos: 0.7, ambiente: 0.35,
     boton: 0.35, atras: 0.35, seleccion: 0.3, exito: 0.55, error: 0.45, dinero: 0.55, nivel: 0.6, fichaje: 0.65, titulo: 1,
     'limit-break': 1, evento: 0.75, alma: 0.8
   };
+  // Lo que puede sonar en la portada y los menús va primero
+  const FIRST = ['aplausos', 'boton', 'seleccion', 'atras', 'exito', 'error', 'dinero', 'fichaje', 'nivel', 'evento', 'alma'];
   const banks = {};
   let samplesStarted = false;
   function rms(b) {
@@ -278,59 +283,103 @@
     for (let i = 0; i + F <= d.length; i += F) { let e = 0; for (let k = i; k < i + F; k++) e += d[k] * d[k]; e /= F; if (e > 1e-4) { sum += e; n++; } }
     return n ? Math.sqrt(sum / n) : 0;
   }
-  function loadBank(cat) {
-    if (banks[cat]) return banks[cat].ready;
-    const B = banks[cat] = { list: [], last: -1, ready: null };
-    const c = ac();
-    if (!c || !window.fetch) { B.ready = Promise.resolve(B); return B.ready; }
-    B.ready = (async () => {
-      for (let k = 1; k <= MAXV; k++) {
-        try {
-          const r = await fetch(`${SFX_DIR}${cat}/${k}.mp3`);
-          if (!r.ok) break;                      // numerados seguidos: el primero que falta cierra la carpeta
-          const ab = await r.arrayBuffer();
-          const b = await new Promise((res, rej) => c.decodeAudioData(ab, res, rej));
-          const v = rms(b);
-          B.list.push({ b, gain: v ? Math.max(0.3, Math.min(5, 0.16 / v)) : 1 });
-        } catch (e) { break; }
-      }
-      return B;
-    })();
-    return B.ready;
+  // st: 'new' (sin mirar) → 'probe' (pidiendo 1.mp3) → 'files' (hay grabaciones) o 'empty' (no hay: sintetizado)
+  function bank(cat) { return banks[cat] || (banks[cat] = { cat, list: [], raw: [], last: -1, st: 'new', busy: 0, wait: [], probing: null, more: false }); }
+  async function getFile(cat, k) {
+    try { const r = await fetch(`${SFX_DIR}${cat}/${k}.mp3`); return r.ok ? await r.arrayBuffer() : null; } catch (e) { return null; }
   }
-  /** Carga en segundo plano todas las carpetas (una petición por carpeta vacía). */
+  /** El primer archivo de la carpeta: dice si hay grabaciones y ya deja una lista para sonar. */
+  function probe(B) {
+    if (B.st !== 'new') return B.probing || Promise.resolve();
+    if (!window.fetch) { B.st = 'empty'; settle(B); return Promise.resolve(); }
+    B.st = 'probe';
+    return (B.probing = getFile(B.cat, 1).then(ab => {
+      if (!ab) { B.st = 'empty'; settle(B); return; }
+      B.st = 'files'; B.raw.push(ab); decode(B);
+    }));
+  }
+  /** Las demás variantes (2.mp3, 3.mp3…), con calma. */
+  async function more(B) {
+    if (B.st !== 'files' || B.more) return;
+    B.more = true;
+    for (let k = 2; k <= MAXV; k++) { const ab = await getFile(B.cat, k); if (!ab) break; B.raw.push(ab); decode(B); }
+  }
+  /** Decodifica lo descargado (hace falta el contexto de audio, que se crea con el primer toque). */
+  function decode(B) {
+    if (!ctx) return;
+    while (B.raw.length) {
+      const ab = B.raw.shift();
+      B.busy++;
+      const done = b => {
+        B.busy--;
+        if (b) { const v = rms(b); B.list.push({ b, gain: v ? Math.max(0.3, Math.min(5, 0.16 / v)) : 1 }); }
+        else if (!B.list.length && !B.raw.length && !B.busy) B.st = 'empty';   // ninguno se pudo leer
+        settle(B);
+      };
+      try { const pr = ctx.decodeAudioData(ab, done, () => done(null)); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { done(null); }
+    }
+  }
+  function decodeAll() { for (const k in banks) decode(banks[k]); }
+  /** Los sonidos que esperaban a esta carpeta: suenan ahora (o el sintetizado, si al final no había archivos). */
+  function settle(B) {
+    if (!B.wait.length) return;
+    if (!B.list.length && B.st !== 'empty') return;
+    const now = Date.now(), w = B.wait.splice(0);
+    for (const x of w) {
+      if (now - x.t > x.max || !on()) continue;      // ha llegado tarde: mejor no sonar que sonar a destiempo
+      if (B.list.length) playNow(B, x.o); else if (x.synth) x.synth();
+    }
+  }
+  /** Descarga todas las carpetas: primero mira cuáles tienen archivos (de 6 en 6) y luego las variantes. */
   function preloadSamples() {
-    if (samplesStarted) return;
+    if (samplesStarted || !on()) return;
     samplesStarted = true;
-    const cats = Object.keys(VOL);
-    const next = () => { const k = cats.shift(); if (k) loadBank(k).then(() => setTimeout(next, 60)); };
-    setTimeout(next, 800);
+    const cats = FIRST.concat(Object.keys(VOL).filter(k => !FIRST.includes(k)));
+    let i = 0;
+    const worker = async () => { while (i < cats.length) await probe(bank(cats[i++])); };
+    Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]).then(async () => { for (const k of cats) await more(bank(k)); });
   }
-  /** Suena un efecto grabado de la carpeta `cat`. Devuelve los segundos que dura, o 0 si no hay. */
-  function sample(cat, o) {
-    const c = ac(); if (!c || !on()) return 0;
-    o = o || {};
-    const B = banks[cat];
-    if (!B) { loadBank(cat); return 0; }
-    if (!B.list.length) return 0;
+  function playNow(B, o) {
+    const c = ctx;
     let k = Math.floor(Math.random() * B.list.length);
     if (B.list.length > 1 && k === B.last) k = (k + 1) % B.list.length;
     B.last = k;
     const it = B.list[k], src = c.createBufferSource(), g = c.createGain(), t = c.currentTime + (o.delay || 0);
     src.buffer = it.b;
     src.playbackRate.value = o.rate || (0.97 + Math.random() * 0.06);   // que ni el mismo archivo suene idéntico
-    g.gain.value = it.gain * (VOL[cat] || 0.6) * (o.vol == null ? 1 : o.vol);
+    g.gain.value = it.gain * (VOL[B.cat] || 0.6) * (o.vol == null ? 1 : o.vol);
     const p = o.pan ? panner(o.pan) : null;
     src.connect(g);
     if (p) g.connect(p).connect(master); else g.connect(master);
     if (o.loop) src.loop = true;
     src.start(t);
     track(src, o.loop ? t + 3600 : t + it.b.duration + 0.2);
+    if (o.onStart) o.onStart(src, it.b.duration);
     return o.loop ? src : it.b.duration;
   }
+  /**
+   * Suena un efecto grabado de la carpeta `cat`. Devuelve los segundos que dura (o la fuente, en bucle);
+   * 0 si la carpeta está vacía (toca tú el sintetizado); -1 si hay grabaciones que aún no han llegado:
+   * sonarán en cuanto lleguen, y si al final no había ninguna, suena `synth`.
+   * o: { vol, pan, rate, delay, loop, onStart(src, segundos), maxWait (ms) }
+   */
+  function sample(cat, o, synth) {
+    const c = ac(); if (!c || !on()) return 0;
+    o = o || {};
+    const B = bank(cat);
+    decode(B);
+    if (B.list.length) return playNow(B, o);
+    if (B.st === 'empty') return 0;
+    preloadSamples();
+    probe(B);
+    if (B.wait.length < 3) B.wait.push({ o, synth, t: Date.now(), max: o.maxWait || WAIT_MAX });
+    return -1;
+  }
+  /** Grabación si la hay; si no, el sintetizado (`synth`), también cuando la carpeta resulta estar vacía. */
+  function rec(cat, synth, o) { return sample(cat, o, synth) || (synth ? (synth(), 0) : 0); }
 
   const S = {
-    on, setOn, unlock, ac, applause, whistles, ovation, chant, CHANTS, sample, preloadSamples, VOL,
+    on, setOn, unlock, ac, applause, whistles, ovation, chant, CHANTS, sample, rec, preloadSamples, VOL,
     // Botones: cada tipo suena distinto, agudos y cortos para que se oigan en el altavoz del móvil
     click() { tone(1180, 0.05, 'triangle', 0.2, 640); tick(0.14); },
     press() { tone(560, 0.09, 'sine', 0.3, 280); tone(1480, 0.07, 'triangle', 0.09, 1960, 0.03); tick(0.18); },
@@ -469,36 +518,42 @@
     const synth = S[name];
     S[name] = function (...args) {
       if (!on()) return;
-      preloadSamples();
-      const d = sample(USE[name](...args));
+      const fb = () => synth.apply(S, args);
       // El gol propio grabado va con ovación de fondo (aplausos y silbidos sintetizados encima)
-      if (d && name === 'goal' && args[0]) { applause(Math.min(5, d + 1), 0.4); whistles(6, 0.05); S.crowdSwell(1); }
-      if (!d) return synth.apply(S, args);
+      const o = name === 'goal' && args[0] ? { onStart: (src, d) => { applause(Math.min(5, d + 1), 0.4); whistles(6, 0.05); S.crowdSwell(1); } } : null;
+      if (!sample(USE[name](...args), o, fb)) return fb();
     };
   }
   // Aplausos, silbidos y cánticos: también pueden ser grabaciones
   const synthApplause = S.applause, synthWhistles = S.whistles, synthChant = S.chant;
-  S.applause = (dur, vol, pan) => (sample('aplausos', { vol: vol == null ? 1 : Math.min(1.2, vol * 1.6), pan }) || synthApplause(dur, vol, pan));
-  S.whistles = (n, vol) => (sample('silbidos', { vol: Math.min(1.2, (n || 4) / 6) }) || synthWhistles(n, vol));
+  S.applause = (dur, vol, pan) => rec('aplausos', () => synthApplause(dur, vol, pan), { vol: vol == null ? 1 : Math.min(1.2, vol * 1.6), pan });
+  S.whistles = (n, vol) => rec('silbidos', () => synthWhistles(n, vol), { vol: Math.min(1.2, (n || 4) / 6) });
   S.chant = (name, o) => {
     o = o || {};
     const c = ac();
     if (!o.force && chantNow && c && chantNow > c.currentTime) return 0;
-    const d = sample('canticos', { vol: o.away ? 0.5 : 1, pan: o.away ? -0.7 : 0 });
-    if (d) { chantNow = c.currentTime + d; return d; }
+    const d = sample('canticos', { vol: o.away ? 0.5 : 1, pan: o.away ? -0.7 : 0, onStart: (src, dur) => { chantNow = ctx.currentTime + dur; } }, () => synthChant(name, o));
+    if (d === -1) { chantNow = c.currentTime + 4; return 4; }   // la grabación está llegando
+    if (d) return d;
     return synthChant(name, o);
   };
   // Ambiente de grada grabado (en bucle) en lugar del ruido, si existe
   const synthStart = S.startCrowd;
-  let bedLoop = null;
+  let bedLoop = null, bedTok = 0;
   S.startCrowd = () => {
     preloadSamples();
     synthStart();
-    const src = sample('ambiente', { loop: true });
-    if (src && crowd) { bedLoop = src; crowd.g.gain.cancelScheduledValues(ctx.currentTime); crowd.g.gain.setValueAtTime(0.02, ctx.currentTime); }
+    const tok = ++bedTok;
+    sample('ambiente', { loop: true, onStart: src => {
+      if (tok !== bedTok || !crowd) { try { src.stop(); } catch (e) { /* nada */ } return; }   // ya se paró la grada
+      bedLoop = src; crowd.g.gain.cancelScheduledValues(ctx.currentTime); crowd.g.gain.setValueAtTime(0.02, ctx.currentTime);
+    } });
   };
   const synthStop = S.stopCrowd;
-  S.stopCrowd = () => { if (bedLoop) { try { bedLoop.stop(); } catch (e) { /* nada */ } bedLoop = null; } synthStop(); };
+  S.stopCrowd = () => { bedTok++; if (bedLoop) { try { bedLoop.stop(); } catch (e) { /* nada */ } bedLoop = null; } synthStop(); };
 
   TL.SFX = S;
+  // Los efectos grabados se empiezan a descargar al abrir la página, no al primer sonido
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', preloadSamples, { once: true });
+  else preloadSamples();
 })();

@@ -5,6 +5,7 @@ Cada carpeta es un efecto del juego. Mete dentro los MP3 numerados seguidos: `1.
 - **Variantes:** el juego elige uno al azar y nunca repite el anterior. Cuantas más variantes, menos repetitivo.
 - **Volumen:** se iguala solo. Da igual lo alto que lo exportes de ElevenLabs.
 - **Carpeta vacía:** suena el efecto sintetizado de siempre. No pasa nada si falta alguna.
+- **Carpeta con archivos:** se descargan al abrir la página (primero los de los menús). Si pulsas algo antes de que lleguen, el juego espera a tu grabación (hasta 3 s) en vez de tocar el sintetizado.
 - **Numeración:** tiene que ser seguida. Si hay `1.mp3` y `3.mp3` pero no `2.mp3`, solo se usa el `1`.
 - **Archivos nuevos:** se oyen la siguiente vez que abras el juego.
 

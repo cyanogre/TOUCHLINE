@@ -646,7 +646,7 @@
     toast(r.msg, !r.ok);
     if (!r.ok) return;
     G.save();
-    if (kind === 'soul') { if (!(TL.SFX.sample && TL.SFX.sample('alma'))) TL.SFX.soul(); } else TL.SFX.success();
+    if (kind === 'soul') TL.SFX.rec('alma', TL.SFX.soul); else TL.SFX.success();
     closeSheet(); UI.refresh();
   };
   A['gear-off'] = el => { const S = G.S, r = TL.Events.equip(S, el.dataset.kind, +el.dataset.u, null); toast(r.msg, !r.ok); G.save(); closeSheet(); UI.refresh(); };
