@@ -414,16 +414,28 @@
 
   // ------------------------------------------------------------ Índices
   function squadsIndex(S) {
-    const idx = {};
+    const idx = { res: [] };
     for (const p of S.players) {
+      if (p.res) {
+        // Filial: solo existe en tu club. Si se va (traspaso, libre), deja de ser del filial; si está cedido, vuelve a él
+        if (p.club === S.user) { idx.res.push(p.id); continue; }
+        const l = TL.Locker && S.lk && TL.Locker.loanOf(S, p.id);
+        if (!(l && l.from === S.user)) p.res = false;
+      }
       if (p.club >= 0) (idx[p.club] || (idx[p.club] = [])).push(p.id);
     }
     return idx;
   }
 
+  /** Plantilla de un club. En tu club, solo el primer equipo (el filial va aparte: reserve). */
   function squad(S, clubId) {
     if (!S._sq) S._sq = squadsIndex(S);
     return (S._sq[clubId] || []).map(id => S.players[id]);
+  }
+  /** Tu filial (la cantera). */
+  function reserve(S) {
+    if (!S._sq) S._sq = squadsIndex(S);
+    return (S._sq.res || []).map(id => S.players[id]);
   }
 
   /** Invalida índices tras traspasos, retiradas, etc. y recalcula reputaciones. */
@@ -437,7 +449,8 @@
   function wageBill(S, clubId) {
     // Cedidos con parte de la ficha pagada por su club de origen
     const ls = clubId === S.user && S.lk && S.lk.loans && S.lk.loans.length ? new Map(S.lk.loans.filter(l => l.to === clubId && l.ws != null).map(l => [l.pid, l.ws])) : null;
-    return U.sum(squad(S, clubId), p => p.wage * (ls && ls.has(p.id) ? ls.get(p.id) : 1));
+    const res = clubId === S.user ? U.sum(reserve(S), p => p.wage) : 0;
+    return U.sum(squad(S, clubId), p => p.wage * (ls && ls.has(p.id) ? ls.get(p.id) : 1)) + res;
   }
 
   function userLeague(S) { return S.leagues[S.clubs[S.user].league]; }
@@ -446,7 +459,7 @@
   function serialize(S) {
     const pb = [], pg = [];
     for (const p of S.players) {
-      const flags = (p.listed ? 1 : 0);
+      const flags = (p.listed ? 1 : 0) | (p.res ? 2 : 0);
       const mor = p.mor == null ? -1 : Math.round(p.mor);
       if (!p.gen) pb.push([p.club, p.age, p.ovr, p.pot, p.contract, p.wage, p.fit, p.inj, p.sus, flags, mor]);
       else pg.push([p.name, p.short, p.club, p.nat, p.pos, p.alt.join(' '), p.age, p.ovr, p.pot, p.foot, p.sm, p.wf,
@@ -459,7 +472,7 @@
       clubs: S.clubs.map(c => [c.league, c.cash, c.wageBudget, c.revScale, c.capacity, c.price, c.stadium, c.stature]),
       wageShift: S.wageShift || 0, jobOffers: S.jobOffers || null, endDone: !!S.endDone, mentor: S.mentor || null,
       coaches: TL.Coach.serialize(S), lastForm: S.lastForm || {}, reviews: S.reviews || [],
-      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [], ev: S.ev || null,
+      lk: S.lk ? Object.assign({}, S.lk, { _fx: undefined }) : null, tlog: S.tlog || [], ev: S.ev || null, ac: S.ac || null,
       cups: S.cups || [], lastOrder: S.lastOrder || null, titles: S.titles || [], staff: S.staff || [], staffMarket: S.staffMarket || null, hist: S.hist || null,
       pb, pg, sales: S.players.filter(p => p.sale).map(p => [p.id, p.sale.r, p.sale.d, p.sale.w]),
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
@@ -482,7 +495,7 @@
       const p = S.players[i];
       const d = r[2] - p.ovr;
       [p.club, p.age, p.ovr, p.pot, p.contract, p.wage, p.fit, p.inj, p.sus] = r;
-      p.listed = !!(r[9] & 1);
+      p.listed = !!(r[9] & 1); p.res = !!(r[9] & 2);
       if (r[10] != null && r[10] >= 0) p.mor = r[10];
       if (d) p.st = p.st.map(v => U.clamp(v + d, 15, 99));
     });
@@ -491,7 +504,7 @@
         id: S.players.length, name: r[0], short: r[1], club: r[2], nat: r[3], pos: r[4],
         alt: r[5] ? r[5].split(' ') : [], age: r[6], ovr: r[7], pot: r[8], foot: r[9], sm: r[10], wf: r[11],
         st: r[12].split(',').map(Number), contract: r[13], wage: r[14], fit: r[15], inj: r[16], sus: r[17],
-        listed: !!(r[18] & 1), gen: true, base: -1, mor: r[19] != null && r[19] >= 0 ? r[19] : undefined
+        listed: !!(r[18] & 1), res: !!(r[18] & 2), gen: true, base: -1, mor: r[19] != null && r[19] >= 0 ? r[19] : undefined
       });
     }
     for (const [id, r, d, w] of save.sales || []) if (S.players[id]) S.players[id].sale = { r, d, w };
@@ -503,7 +516,7 @@
       wageShift: save.wageShift || 0, jobOffers: save.jobOffers || null, endDone: !!save.endDone, mentor: save.mentor || null,
       lastForm: save.lastForm || {}, reviews: save.reviews || [], lk: save.lk || null, tlog: save.tlog || [],
       cups: save.cups || null, lastOrder: save.lastOrder || null, titles: save.titles || [], staff: save.staff || [], staffMarket: save.staffMarket || null, hist: save.hist || null,
-      over: save.over, fired: save.fired, ev: save.ev || null
+      over: save.over, fired: save.fired, ev: save.ev || null, ac: save.ac || null
     });
     TL.Coach.restore(S, save.coaches);
     dirty(S);
@@ -526,6 +539,7 @@
     if (S.user != null) {
       TL.Commerce.init(S);
       for (const p of squad(S, S.user)) if (p.mor == null) p.mor = Math.round(U.rand(62, 80));
+      if (TL.Academy) TL.Academy.start(S);   // el filial (también en partidas de antes de la cantera)
     }
     return S;
   }
@@ -533,7 +547,7 @@
   TL.World = {
     PYR: window.TL_PYRAMID_V || 0, pyramid,
     migrate,
-    create, restore, serialize, makePlayer, maintainSquads, genName, squad, dirty, value, repOf, wageBill, userLeague,
+    create, restore, serialize, makePlayer, maintainSquads, genName, squad, reserve, dirty, value, repOf, wageBill, userLeague,
     revenueCurve, newFin, LINE_POS
   };
 })();

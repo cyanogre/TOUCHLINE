@@ -106,6 +106,7 @@
     if (p.inj > 0) t.push(`<span class="tag inj">LES ${p.inj}s</span>`);
     if (p.sus > 0) t.push('<span class="tag sus">SANC</span>');
     if (p.away) t.push('<span class="tag inj" title="Fuera unos días">FUERA</span>');
+    if (p.res && p.club === S.user) t.push(TL.Academy.atCap(p) ? `<span class="tag res cap" title="Ha llegado a su techo en el filial">FILIAL · TOPE</span>` : '<span class="tag res">FILIAL</span>');
     if (p.listed) t.push('<span class="tag list">EN VENTA</span>');
     else if (p.sale) t.push(`<span class="tag list" title="${esc(TL.Market.SALE[p.sale.r].t)}">EN VENTA −${Math.round(p.sale.d * 100)}%</span>`);
     if (p.club === S.user && p.contract <= S.season + 1) t.push(`<span class="tag exp">FIN ${p.contract}</span>`);
@@ -1039,7 +1040,9 @@
   A['loan-recall'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.recall(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); openPlayer(p.id); UI.refresh(); } };
 
   VIEWS.squad = S => {
-    const sq = W.squad(S, S.user);
+    const AC = TL.Academy, hasRes = AC && AC.on(S);
+    const resTab = hasRes && UI.squadTab === 'res';
+    const sq = resTab ? AC.reserve(S) : W.squad(S, S.user);
     const bill = W.wageBill(S, S.user);
     const total = U.sum(sq, p => W.value(S, p));
     const avg = sq.length ? U.sum(sq, p => p.ovr) / sq.length : 0;
@@ -1057,9 +1060,15 @@
     });
     const row = p => {
       const st = S.stats[p.id];
+      const [ml, me] = TL.News.moraleLabel(p.mor);
+      if (resTab) {
+        const cap = AC.capOf(p);
+        const cols = `<span class="w-s">${p.age}</span><span class="w-s">${cap}</span><span class="w-s">${p.pot}</span><span>${U.money(p.wage)}</span><span class="w-s">${p.contract}</span>`;
+        const sub = `${flag(S, p)} ${p.age} años · <span class="res-cap ${AC.atCap(p) ? 'full' : ''}">techo en el filial ${cap}</span> · <span title="Moral: ${ml}">${me}</span>`;
+        return playerRow(S, p, { cols, sub });
+      }
       const cols = `<span class="w-s">${p.age}</span><span class="w-s">${fitB(p.fit)}</span><span>${U.money(W.value(S, p))}</span>
         <span>${U.money(p.wage)}</span><span class="w-s">${p.contract}</span><span class="w-s">${st ? st[0] + 'pj ' + st[1] + 'g' : '—'}</span>`;
-      const [ml, me] = TL.News.moraleLabel(p.mor);
       const yel = st && st[4] ? ` · 🟨${st[4]}` : '';
       const sub = `${flag(S, p)} ${p.age} años · ${U.money(W.value(S, p))} · <span title="Moral: ${ml}">${me}</span> ${fitB(p.fit)}${yel}`;
       return playerRow(S, p, { cols, sub });
@@ -1072,7 +1081,24 @@
         if (g.length) list += `<div class="group-title">${names[l]} · ${g.length}</div>` + g.map(row).join('');
       }
     } else list = sorted.map(row).join('');
-    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + (S.mode === 'tour' ? '' : lockerCard(S) + gearCard(S) + devCard(S)) +
+    const nRes = hasRes ? AC.reserve(S).length : 0;
+    const seg = hasRes ? `<div class="seg sq-tabs" style="margin-bottom:12px"><button class="${resTab ? '' : 'on'}" data-act="sq-tab" data-k="first">Primer equipo · ${W.squad(S, S.user).length}</button><button class="${resTab ? 'on' : ''}" data-act="sq-tab" data-k="res">🌱 Filial · ${nRes}</button></div>` : '';
+    if (resTab) {
+      const bill = U.sum(sq, p => p.wage), cap = sq.filter(p => AC.atCap(p)).length;
+      return pageTitle('Plantilla', `Filial · ${sq.length}/${AC.MAX_RES} jugadores`) + seg +
+        `<section class="card res-intro"><p>${S.gender === 'F' ? 'Las canteranas nuevas llegan aquí cada verano.' : 'Los canteranos nuevos llegan aquí cada verano.'} En el filial juegan cada semana y crecen como si estuvieran ${S.gender === 'F' ? 'cedidas' : 'cedidos'}, pero solo hasta el ${Math.round(AC.CAP * 100)} % de su potencial. ${S.gender === 'F' ? 'Para que pasen de ahí, súbelas al primer equipo o cédelas.' : 'Para que pasen de ahí, súbelos al primer equipo o cédelos.'} A los ${AC.PROMOTE_AGE} años suben obligatoriamente.</p>
+          <p class="note">Cobran ${U.money(AC.RES_WAGE)}/sem hasta que les renuevas. ${S.gender === 'F' ? `Desde la ficha de cada jugadora puedes subirla o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarla.` : `Desde la ficha de cada jugador puedes subirle o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarle.`}</p></section>
+        <div class="kpis" style="margin:12px 0">
+          <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
+          <div class="kpi"><div class="k">En su techo</div><div class="v">${cap}</div></div>
+          <div class="kpi"><div class="k">Salarios/sem</div><div class="v">${U.money(bill)}</div></div></div>
+        <div class="chips" role="tablist">${SQ_SORTS.filter(([k]) => k !== 'fit' && k !== 'value').map(([k, l]) => `<button class="chip ${key === k ? 'on' : ''}" data-act="sq-sort" data-k="${k}">${l}</button>`).join('')}</div>
+        <div class="card" style="margin-top:12px;padding:6px 8px">
+          <div class="pcols" style="justify-content:flex-end;padding:6px 60px 6px 0;font-size:11px;text-transform:uppercase;letter-spacing:.05em">
+            <span class="w-s">Edad</span><span class="w-s">Techo</span><span class="w-s">Pot.</span><span>Salario</span><span class="w-s">Fin</span></div>
+          <div class="plist">${list || `<div class="empty">El filial está vacío. Llegarán ${S.gender === 'F' ? 'canteranas' : 'canteranos'} en verano.</div>`}</div></div>`;
+    }
+    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + seg + (S.mode === 'tour' ? '' : lockerCard(S) + gearCard(S) + devCard(S)) +
       `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
         <div class="kpi"><div class="k">Nivel club</div><div class="v">${S.clubs[S.user].rep.toFixed(1)}</div></div>
@@ -1085,6 +1111,7 @@
         <div class="plist">${list}</div></div>`;
   };
   A['sq-sort'] = el => { UI.squadSort = el.dataset.k; UI.refresh(); };
+  A['sq-tab'] = el => { UI.squadTab = el.dataset.k; TL.SFX && TL.SFX.tab(); UI.refresh(); };
 
   // ------------------------------------------------------------ Tácticas
   const MENT = ['Defensiva', 'Equilibrada', 'Ofensiva'];
@@ -1927,13 +1954,29 @@
     }
     const loan = TL.Locker.loanOf(S, p.id);
     if (loan && loan.to === S.user) return `<div class="nego mt"><p class="note">Llega cedido por el <b>${esc(S.clubs[loan.from].name)}</b> hasta final de temporada. No se puede vender ni renovar.</p></div>`;
-    return `<div class="btn-grid mt">
+    const AC = TL.Academy;
+    let fil = '';
+    if (AC && AC.on(S) && p.res) {
+      const fem = S.gender === 'F';
+      fil = `<div class="res-box mt"><b>🌱 Filial</b><span>Crece jugando cada semana, pero solo hasta ${AC.capOf(p)} (el ${Math.round(AC.CAP * 100)} % de su potencial, ${p.pot}).</span>
+        ${AC.atCap(p) ? '<span class="res-full">Ya ha llegado a su techo en el filial.</span>' : ''}
+        <span>${fem ? 'Para pasar de ahí, súbela al primer equipo o cédela.' : 'Para pasar de ahí, súbelo al primer equipo o cédelo.'}</span>
+        <span>Sube al primer equipo sí o sí a los ${AC.PROMOTE_AGE} años.</span>
+        ${p.wage <= AC.RES_WAGE ? `<span>Cobra ${U.money(p.wage)}/sem hasta que le renueves.</span>` : ''}
+        <button class="btn sm primary" data-act="ac-up" data-id="${p.id}">⬆️ Subir al primer equipo</button></div>`;
+    } else if (AC && AC.on(S) && AC.canDemote(S, p)) {
+      fil = `<button class="btn sm block mt" data-act="ac-down" data-id="${p.id}">⬇️ Bajar al filial</button>`;
+    }
+    return fil + `<div class="btn-grid mt">
       <button class="btn sm" data-act="renew" data-id="${p.id}">Renovar</button>
       ${open ? `<button class="btn sm" data-act="loan-out" data-id="${p.id}">Ceder</button>` : ''}
       <button class="btn sm" data-act="list" data-id="${p.id}">${p.listed ? 'Quitar de venta' : 'Poner en venta'}</button>
       ${open ? `<button class="btn sm" data-act="quick-sell" data-id="${p.id}">Venta rápida · ${U.money(F.roundMoney(W.value(S, p) * 0.7))}</button>` : ''}
       <button class="btn sm danger" data-act="release" data-id="${p.id}">Rescindir</button></div>${renew}`;
   }
+
+  A['ac-up'] = el => { const S = G.S, p = S.players[+el.dataset.id], r = TL.Academy.promote(S, p); toast(r.msg, !r.ok); if (r.ok) { TL.SFX && TL.SFX.success(); G.save(); openPlayer(p.id); UI.refresh(); } };
+  A['ac-down'] = el => { const S = G.S, p = S.players[+el.dataset.id], r = TL.Academy.demote(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); openPlayer(p.id); UI.refresh(); } };
 
   /** Cesión: por qué su club le dejaría salir y en qué condiciones. */
   function loanBox(S, p) {
@@ -2010,7 +2053,7 @@
     openPlayer(p.id);
   };
   // ------------------------------------------------------------ Renovaciones: que nadie se vaya gratis sin que lo sepas
-  function expiring(S) { return W.squad(S, S.user).filter(p => p.contract <= S.season + 1 && !TL.Locker.onLoan(S, p.id)).sort((a, b) => b.ovr - a.ovr); }
+  function expiring(S) { return W.squad(S, S.user).concat(W.reserve ? W.reserve(S) : []).filter(p => p.contract <= S.season + 1 && !TL.Locker.onLoan(S, p.id)).sort((a, b) => b.ovr - a.ovr); }
   function expiringWarn(S) {
     const n = S.fixtures.length, exp = expiring(S);
     if (!exp.length || S.week < Math.floor(n / 2) - 1) return '';
@@ -2141,7 +2184,8 @@
       </div>
       ${sum.left.length ? `<p class="note mt">Se van libres (fin de contrato): ${esc(sum.left.join(', '))}.</p>` : ''}
       ${sum.retired.length ? `<p class="note mt">Se retiran: ${esc(sum.retired.join(', '))}.</p>` : ''}
-      ${youth.length ? `<div class="group-title">Llegan de la cantera</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${Math.max(p.ovr, p.pot - 3)}–${Math.min(95, p.pot + 3)}` })).join('')}` : ''}
+      ${sum.promoted && sum.promoted.length ? `<p class="note mt">Suben del filial al primer equipo (${TL.Academy.PROMOTE_AGE} años): ${esc(sum.promoted.join(', '))}.</p>` : ''}
+      ${youth.length ? `<div class="group-title">${TL.Academy && TL.Academy.on(S) ? 'Llegan al filial' : 'Llegan de la cantera'}</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${Math.max(p.ovr, p.pot - 3)}–${Math.min(95, p.pot + 3)}` })).join('')}` : ''}
       ${sum.lastChance ? '<p class="note bad mt">La directiva está muy descontenta, pero te da una última oportunidad. Otra temporada así y estarás fuera.</p>' : ''}
       ${sum.fired ? '<p class="note bad mt">La directiva ha decidido prescindir de ti.</p>' : ''}
       <p class="note mt">Reputación de mánager: ${S.mgr.rep} (${sum.repDelta >= 0 ? '+' : ''}${Math.round(sum.repDelta)}).</p>
