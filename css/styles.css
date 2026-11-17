@@ -1535,3 +1535,10 @@ body.shake-s { animation: shake-s .35s; }
   .match.narr .narr-call { grid-column: 1; grid-row: 2 / span 3; margin: 10px; }
   .match.narr.narr-show .narr-call { display: none; }
 }
+/* Ficha: lo de hoy, destacado */
+.info.now > div { background: color-mix(in srgb, var(--accent) 7%, var(--surface2, var(--surface))); }
+.info .warn .v { color: var(--warn); }
+.feel { font-weight: 700; }
+.feel.ok { color: var(--accent2); } .feel.mid { color: var(--warn); } .feel.low { color: var(--danger); }
+.narr-call.tense p { color: var(--warn); }
+.office-follow .office-opt b { font-style: italic; }

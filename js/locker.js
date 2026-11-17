@@ -874,12 +874,45 @@
   }
 
   // ------------------------------------------------------------ Reuniones que pides tú
+  /** Lo que te cuenta de su vida (fijo para cada jugador, como su carácter). */
+  function lifeLine(S, p) {
+    const fem = S.gender === 'F';
+    const far = !!(S.nations[p.nat] && S.nations[p.nat][0] !== S.leagues[S.clubs[S.user].league].country);
+    const pool = [
+      fem ? 'Te cuenta que su madre no se pierde un partido, aunque tenga que coger tres autobuses.' : 'Te cuenta que su padre no se pierde un partido, aunque tenga que coger tres autobuses.',
+      'Se ha comprado un perro y no duerme: «Es peor que una pretemporada, míster».',
+      fem ? 'Está ahorrando para comprarle una casa a su familia. Por eso no sale nunca.' : 'Está ahorrando para comprarle una casa a su familia. Por eso no sale nunca.',
+      'Te confiesa que le cuesta dormir antes de los partidos grandes. Se pasa la noche repasando jugadas.',
+      'Lleva semanas aprendiendo a tocar la guitarra. Dice que le despeja la cabeza.',
+      'Su pareja acaba de mudarse a la ciudad. Por fin tiene la casa llena.',
+      'Te habla de su abuelo, que le llevaba al campo de pequeño. Juega pensando en él.'.replace('le llevaba', fem ? 'la llevaba' : 'le llevaba'),
+      'Ha empezado a ir al psicólogo deportivo y está notando la diferencia.'
+    ];
+    if (fem) pool.push('Estudia a distancia por si el fútbol no le da para vivir: «Tengo que tener un plan B, míster».',
+      'Te cuenta que de pequeña era la única niña del equipo del barrio. Los chicos no le pasaban el balón… hasta que empezó a marcar.',
+      'Hasta hace dos años trabajaba por las tardes en una tienda para pagarse el alquiler. Ahora puede vivir del fútbol y lo valora como nadie.',
+      'Su hermana pequeña juega en el alevín del club y quiere ser como ella. Le hace ilusión que la veas.');
+    if (far) pool.push(fem ? 'Echa de menos su país: la comida, el idioma, a su gente. Hay días que se siente muy sola.' : 'Echa de menos su país: la comida, el idioma, a su gente. Hay días que se siente muy solo.');
+    const r = F.seeded('life:' + p.name + ':' + p.id + ':' + S.season);
+    return pool[Math.floor(r * pool.length)];
+  }
+  const FOLLOW = {
+    f_promise: (S, p) => { state(S).promises.push({ pid: p.id, apps0: appsOf(S, p.id), need: 2, until: S.week + 4 }); mor(p, 8); bossAdd(S, p.id, 4); return { msg: 'Le prometes jugar al menos 2 de los próximos 4 partidos. Sale del despacho con otra cara. No le falles.', good: true }; },
+    f_earn: (S, p) => { const c = TL.Social ? TL.Social.charOf(S, p.id) : 'pro'; const q = { comp: 2, sens: -1, pro: 1, amb: 1, cha: 0, vol: 'x' }[c]; const v = q === 'x' ? (Math.random() < 0.5 ? 2 : -2) : q; const t = TL.Social ? TL.Social.react(S, p, v, 'earn', 'Le pediste que se lo ganara', 4) : ''; return { msg: `«Vale, míster. Te lo voy a demostrar.» ${t}`, good: v > 0, bad: v < 0 }; },
+    f_renew: (S, p) => { const y = TL.Market.renewOptions(S, p); if (!y.length) return { msg: 'Ya tiene un contrato largo: se lo recuerdas y se queda tranquilo.' }; const r = TL.Market.renew(S, p, y[Math.min(1, y.length - 1)]); bossAdd(S, p.id, 8); return { msg: r.msg, good: !!r.ok }; },
+    f_wait: (S, p) => { mor(p, -3); return { msg: '«Vale… pero que no se nos olvide.» Se va pensativo.' }; },
+    f_why: (S, p) => { const c = TL.Social ? TL.Social.charOf(S, p.id) : 'pro'; const need = { comp: 'competir por algo grande', sens: 'sentir que confías en ella', pro: 'saber qué esperas exactamente', amb: 'un papel importante y un proyecto con ambición', cha: 'un vestuario con buen rollo', vol: 'que le des la oportunidad de demostrarlo en el campo' }[c].replace('en ella', S.gender === 'F' ? 'en ella' : 'en él'); if (TL.Social) { TL.Social.remember(S, p, 'escuchado', 5, 5, 'Le preguntaste qué necesitaba'); TL.Social.st(S).know[p.id] = 2; } bossAdd(S, p.id, 6); return { msg: `Se lo piensa y te lo dice claro: necesita ${need}. Ahora sabes cómo es.`, good: true }; },
+    f_door: (S, p) => { p.listed = true; mor(p, 4); return { msg: 'Le dices que no le vas a retener. Lo pones en la lista de transferibles. Se lo agradece, aunque le duele un poco.' }; },
+    f_loan: (S, p) => { const r = loanOut(S, p); if (r.ok) return { msg: r.msg, good: true }; (state(S).loanLater || (S.lk.loanLater = [])).push(p.id); mor(p, 3); return { msg: 'Ahora no hay destino, pero le buscarás equipo en cuanto abra el mercado.' }; }
+  };
   function enemyOf(S, p) {
     return W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).filter(r => r[1] <= -30).sort((a, b) => a[1] - b[1]).map(r => r[0])[0] || null;
   }
   function meetOptions(S, p) {
     // Los elogios y las broncas «porque sí» ya no valen: van en los momentos, con su contexto
-    const o = [['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente… y te deja ver cómo es.']];
+    const o = [['future', 'Hablar de su futuro', 'Te cuenta qué quiere y cómo se siente… y te deja ver cómo es.'],
+      ['life', 'Preguntar cómo está fuera del fútbol', 'Familia, casa, la cabeza. A veces lo que pesa no está en el campo.'],
+      ['role', 'Hablar de su papel en el equipo', 'Le dices dónde está en tus planes. A unos les tranquiliza; a otros les pica.']];
     if (p.age >= 26 && TL.Social && !TL.Social.hasGalones(S, p) && TL.Social.galonesLeft(S) > 0) o.push(['galones', gx(S, 'Darle galones', 'Darle galones'), 'Más peso en el vestuario. Solo tres por temporada.']);
     const en = enemyOf(S, p);
     if (en) o.push(['reconcile', `Mediar con ${en.short}`, 'Intentar que hagan las paces.']);
@@ -888,6 +921,7 @@
   }
   function meet(S, p, k) {
     const L = state(S);
+    if (FOLLOW[k]) return FOLLOW[k](S, p);   // segunda vuelta de la misma charla: no gasta agenda
     // Cada charla gasta un hueco de la agenda de la semana (vestuario vivo)
     if (TL.Social) {
       if (TL.Social.agendaLeft(S) <= 0) return { msg: 'Tu agenda de esta semana está llena. Prueba la semana que viene.' };
@@ -916,7 +950,32 @@
       bossAdd(S, p.id, m < 58 ? 3 : 1);
       if (TL.Social && m < 58) TL.Social.remember(S, p, 'escuchado', 4, 4, 'Le escuchaste cuando lo necesitaba');
       const reveal = TL.Social ? TL.Social.learn(S, p) : '';
-      return { msg: `${want}${fr && fr[1] >= 40 ? ` Su mejor amigo en el vestuario es ${fr[0].short}.` : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.${reveal}` };
+      // Según lo que te cuente, la charla puede seguir
+      const follow = [];
+      if (/minutos|Quiere jugar/.test(want)) follow.push(['f_promise', 'Te prometo minutos'], ['f_earn', 'Gánatelo en los entrenamientos']);
+      else if (/renovar/.test(want)) follow.push(['f_renew', 'Lo hablamos ya mismo'], ['f_wait', 'En verano lo vemos']);
+      else if (/No es feliz/.test(want)) follow.push(['f_why', '¿Qué necesitas para estar bien aquí?'], ['f_door', 'Si quieres irte, no te retengo']);
+      return { msg: `${want}${fr && fr[1] >= 40 ? (S.gender === 'F' ? ` Su mejor amiga en el vestuario es ${fr[0].short}.` : ` Su mejor amigo en el vestuario es ${fr[0].short}.`) : ''} Relación contigo: ${bossLabel(boss(S, p.id)).toLowerCase()}.${reveal}`, follow };
+    }
+    if (k === 'life') {
+      const c = TL.Social ? TL.Social.charOf(S, p.id) : 'pro';
+      const line = lifeLine(S, p);
+      const q = { comp: 0, sens: 2, pro: 1, amb: 0, cha: 1, vol: 1 }[c];
+      const txt = TL.Social ? TL.Social.react(S, p, q, 'life', gx(S, 'Se interesó por él como persona', 'Se interesó por ella como persona'), 5) : '';
+      bossAdd(S, p.id, 2);
+      return { msg: `${line} ${txt}${TL.Social ? TL.Social.learn(S, p) : ''}`, good: q > 0 };
+    }
+    if (k === 'role') {
+      const sq = W().squad(S, S.user).sort((a, c) => c.ovr - a.ovr), r = sq.findIndex(q => q.id === p.id);
+      const tier = r < 8 ? 'key' : r < 15 ? 'rot' : 'sub';
+      const c = TL.Social ? TL.Social.charOf(S, p.id) : 'pro';
+      const Q = { key: { comp: 1, sens: 2, pro: 1, amb: 2, cha: 1, vol: 1 }, rot: { comp: 0, sens: 1, pro: 2, amb: -1, cha: 1, vol: -1 }, sub: { comp: -1, sens: -1, pro: 1, amb: -2, cha: 0, vol: -2 } };
+      const said = { key: gx(S, 'Le dices que es fijo: el equipo se construye a su alrededor.', 'Le dices que es fija: el equipo se construye a su alrededor.'),
+        rot: 'Le explicas que entrará en las rotaciones: tendrá minutos, pero no todos.',
+        sub: 'Le dices la verdad: ahora mismo hay otras por delante, y tendrá que ganárselo.'.replace('otras', gx(S, 'otros', 'otras')) }[tier];
+      const txt = TL.Social ? TL.Social.react(S, p, Q[tier][c], 'role', 'Le hablaste claro de su papel', 4) : '';
+      const follow = tier === 'sub' ? [['f_loan', gx(S, 'Si quieres, te busco una cesión', 'Si quieres, te busco una cesión')], ['f_earn', 'Demuéstramelo en los entrenamientos']] : [];
+      return { msg: `${said} ${txt}${TL.Social ? TL.Social.learn(S, p) : ''}`, good: Q[tier][c] > 0, bad: Q[tier][c] < 0, follow };
     }
     if (k === 'reconcile') {
       const en = enemyOf(S, p);

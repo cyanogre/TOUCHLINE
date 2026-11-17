@@ -1027,10 +1027,11 @@
   };
   A['lk-meet-do'] = el => {
     const S = G.S, p = S.players[+el.dataset.id];
-    const said = (TL.Locker.meetOptions(S, p).find(o => o[0] === el.dataset.k) || [])[1];
+    const said = (TL.Locker.meetOptions(S, p).find(o => o[0] === el.dataset.k) || [])[1] || ((el.querySelector('b') || {}).textContent || '').replace(/[«»]/g, '');
     const r = TL.Locker.meet(S, p, el.dataset.k);
     G.save();
-    sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
+    const fol = (r.follow || []).length ? `<div class="col mt office-follow"><div class="group-title">¿Qué le dices?</div>${r.follow.map(([k, l]) => `<button class="btn block office-opt" data-act="lk-meet-do" data-id="${p.id}" data-k="${k}"><b>«${esc(l)}»</b></button>`).join('')}</div>` : '';
+    sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>${fol}
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     mountFaces(document.querySelector('.sheet'));
     TL.Face.mount(document.querySelector('.sheet'), S.face);
@@ -1867,29 +1868,32 @@
     const pot = TL.Feel.potential(S, p);
     const status = p.inj > 0 ? `Lesionado (${p.inj} sem)` : p.sus > 0 ? `Sancionado (${p.sus})` : 'Disponible';
     const st = S.stats[id];
-    const season = st ? `<div class="info mt"><div><div class="k">Partidos</div><div class="v">${st[0]}</div></div>
+    const season = st ? `<div class="group-title">Esta temporada</div><div class="info"><div><div class="k">Partidos</div><div class="v">${st[0]}</div></div>
       <div><div class="k">Goles</div><div class="v">${st[1]}</div></div><div><div class="k">Asistencias</div><div class="v">${st[2]}</div></div>
       <div><div class="k">Nota media</div><div class="v">${(st[3] / st[0]).toFixed(2)}</div></div><div><div class="k">MVP</div><div class="v">${st[6]}</div></div>
-      <div><div class="k">Tarjetas</div><div class="v">🟨 ${st[4]} · 🟥 ${st[5]}</div></div></div>` : '';
+      <div><div class="k">Tarjetas</div><div class="v">🟨 ${st[4]} · 🟥 ${st[5]}</div></div>
+      <div><div class="k">Faltas</div><div class="v">${st[7] || 0}</div></div><div><div class="k">Ciclo amarillas</div><div class="v">${st[4] % 5}/5</div></div></div>` : '';
     const head = `<div class="sheet-head" style="margin-bottom:6px"><div class="grow"></div><button class="icon-btn" data-act="close-sheet" aria-label="Cerrar">${icon('close')}</button></div>
       <div class="phead"><div class="big-ovr ovr ${ovrCls(p.ovr)}">${p.ovr}<small>${F.POS_ES[p.pos]}</small></div>
       <div class="grow"><h2>${esc(p.name)}</h2>
         <div class="note" style="margin-top:4px">${flag(S, p)} ${esc(S.nations[p.nat][0])} · ${p.age} años · ${p.alt.length ? 'También ' + p.alt.map(a => F.POS_ES[a]).join(', ') : 'Sin posición secundaria'}</div>
         <div class="row" style="margin-top:6px;gap:6px">${club ? crest(club, 'sm') + `<span style="font-weight:600">${esc(club.name)}</span>` : `<span style="font-weight:600">${clubName(S, p.club)}</span>`}${playerTags(S, p)}</div>
       </div></div>`;
-    const info = `<div class="info">
-      <div><div class="k">Valor</div><div class="v">${U.money(W.value(S, p))}</div></div>
-      <div><div class="k">Salario</div><div class="v">${free || retired ? '—' : U.money(p.wage) + '/sem'}</div></div>
-      <div><div class="k">Contrato</div><div class="v">${free || retired ? '—' : 'Hasta ' + p.contract}</div></div>
+    const mor = TL.Feel.morale(S, p.mor);
+    const cell = (k, v, cls) => `<div class="${cls || ''}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+    // Lo que importa hoy, arriba y destacado; el perfil, debajo
+    const info = `<div class="group-title">Ahora mismo</div><div class="info now">
+      ${cell('Estado', status, p.inj > 0 || p.sus > 0 ? 'warn' : '')}
+      ${cell('Forma física', fitW(S, p.fit))}
+      ${cell('Moral', `${mor[1]} <span>${mor[0]}</span>`)}
+      ${cell('Contrato', free || retired ? '—' : 'Hasta ' + p.contract, mine && p.contract <= S.season + 1 ? 'warn' : '')}</div>
+      <div class="group-title">Perfil</div><div class="info">
+      ${cell('Valor', U.money(W.value(S, p)))}
+      ${cell('Salario', free || retired ? '—' : U.money(p.wage) + '/sem')}
       <div><div class="k">Potencial</div><div class="v" title="${pot.exact ? '' : 'Lo que calcula tu cuerpo técnico'}">${pot.txt}</div></div>
-      <div><div class="k">Pie</div><div class="v">${p.foot ? 'Diestro' : 'Zurdo'}</div></div>
-      <div><div class="k">Estado</div><div class="v">${status}</div></div>
-      <div><div class="k">Filigranas</div><div class="v">${starsN(p.sm)}</div></div>
-      <div><div class="k">Pierna mala</div><div class="v">${starsN(p.wf)}</div></div>
-      <div><div class="k">Forma física</div><div class="v">${fitW(S, p.fit)}</div></div>
-      <div><div class="k">Moral</div><div class="v">${TL.Feel.morale(S, p.mor)[1]} <span>${TL.Feel.morale(S, p.mor)[0]}</span></div></div>
-      <div><div class="k">Faltas temporada</div><div class="v">${st ? st[7] || 0 : 0}</div></div>
-      <div><div class="k">Ciclo amarillas</div><div class="v">${st ? st[4] % 5 : 0}/5</div></div></div>`;
+      ${cell('Pie', p.foot ? 'Diestro' : 'Zurdo')}
+      ${cell('Filigranas', starsN(p.sm))}
+      ${cell('Pierna mala', starsN(p.wf))}</div>`;
     const pnews = S.news.filter(n => n.pid === p.id).slice(0, 4);
     const newsBox = pnews.length ? `<div class="group-title">En la prensa</div>${pnews.map(n => newsHtml(S, { ...n, pid: -1 })).join('')}` : '';
     let actions = '';

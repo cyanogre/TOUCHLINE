@@ -51,6 +51,78 @@
   ];
 
   const EVENTS = [
+    // ============================================================ FÚTBOL FEMENINO (solo en la partida femenina)
+    { id: 'f_embarazo', cat: 'personal', tone: 'pos', who: 'p', if: { g: 'F', age: [24, 35] }, p: 0.03, per: 'season', cdp: 600,
+      t: '{s} va a ser mamá', b: '{n} te pide hablar a solas: está embarazada. Quiere seguir en el club y volver después del parto, pero tiene miedo de que la temporada que viene no cuentes con ella.',
+      o: [
+        { l: 'Contrato blindado y vuelta a su ritmo', d: 'Se le renueva un año más y el club le prepara la vuelta.', fx: { mor: 18, boss: 20, team: 4, fans: 0.004, away: 40, cost: 0.05 }, r: '«Gracias, míster. No sabes lo que significa.» El vestuario entero la abraza. Volverá.' },
+        { l: 'Lo que diga el convenio, ni más ni menos', fx: { mor: 4, boss: 2, away: 40 }, r: 'Se va tranquila, pero esperaba algo más de ti.' },
+        { l: 'Ofrecerle volver como ayudante mientras tanto', d: 'Que siga cerca del grupo.', fx: { mor: 12, boss: 12, team: 3, away: 30 }, r: 'Le encanta la idea: estará en el banquillo con libreta los días de partido.' }
+      ] },
+    { id: 'f_huelga', cat: 'club', tone: 'neg', who: 'c', if: { g: 'F' }, p: 0.08, per: 'season', cd: 600,
+      t: 'Huelga por el convenio', b: 'El sindicato de jugadoras convoca huelga: piden un sueldo mínimo digno y que el club pague las bajas por maternidad. Tus capitanas te preguntan qué piensas.',
+      o: [
+        { l: 'Apoyarlas en público', d: 'La directiva no lo verá con buenos ojos.', fx: { team: 8, board: -6, fans: 0.006 }, r: 'Las jugadoras salen a la calle con tu foto en las pancartas. Ganan el pulso.' },
+        { l: 'Mediar con la directiva', odds: [{ p: 0.6, fx: { team: 5, board: 2, cost: 0.08 }, r: 'Consigues un acuerdo: el club sube los mínimos y la huelga se desconvoca.' }, { p: 0.4, fx: { team: -3, board: -2 }, r: 'Nadie te escucha. La huelga sigue y el ambiente se enrarece.' }] },
+        { l: 'Mantenerte al margen', fx: { team: -6, boss: -4 }, r: '«Pensábamos que estabas con nosotras.» Les ha dolido.' }
+      ] },
+    { id: 'f_rodilla', cat: 'club', tone: 'neu', who: 'c', if: { g: 'F' }, p: 0.25, per: 'season', cd: 400,
+      t: 'Plan contra la rotura de cruzado', b: 'Tu fisio te enseña los datos: las futbolistas se rompen el cruzado mucho más que los hombres. Propone un programa de fuerza y prevención para toda la plantilla.',
+      o: [
+        { l: 'Adelante con el programa', d: 'Cuesta dinero y algo de cansancio estas semanas.', fx: { cost: 0.06, teamFit: -4, team: 3 }, r: 'El grupo agradece que se cuide su salud. Menos sustos en las rodillas.' },
+        { l: 'Solo para las titulares', fx: { cost: 0.03, team: -1 }, r: 'Las suplentes preguntan por qué ellas no.' },
+        { l: 'No hay presupuesto', fx: { team: -2 }, r: 'El fisio se va del despacho negando con la cabeza.' }
+      ] },
+    { id: 'f_ciclo', cat: 'club', tone: 'pos', who: 'c', if: { g: 'F' }, p: 0.2, per: 'season', cd: 500,
+      t: 'Entrenar según el ciclo', b: 'La preparadora física quiere ajustar las cargas al ciclo menstrual de cada jugadora, como hacen los grandes clubes. Hace falta que las jugadoras quieran compartir esos datos.',
+      o: [
+        { l: 'Proponerlo, voluntario y confidencial', fx: { team: 4, teamFit: 4, cost: 0.02 }, r: 'Casi todas se apuntan. Entrenan mejor y se cansan menos.' },
+        { l: 'Obligatorio para todas', odds: [{ p: 0.4, fx: { teamFit: 5 }, r: 'Funciona, aunque a algunas no les ha hecho gracia.' }, { p: 0.6, fx: { team: -6, boss: -3 }, r: '«Eso es nuestro, míster.» Varias se niegan y hay mal ambiente.' }] },
+        { l: 'No es el momento', fx: {}, r: 'Lo dejáis para la pretemporada.' }
+      ] },
+    { id: 'f_estadio', cat: 'club', tone: 'pos', who: 'c', if: { g: 'F' }, p: 0.18, per: 'season', cd: 400,
+      t: 'El partido, en el estadio grande', b: 'El club te ofrece jugar el próximo partido en el estadio principal, el del equipo masculino. Puede ser una fiesta… o un estadio medio vacío en la tele.',
+      o: [
+        { l: '¡Al estadio grande!', odds: [{ p: 0.65, fx: { team: 6, fans: 0.012, gain: 0.25, teamConf: [1.04, 1] }, r: 'Récord de asistencia. Las jugadoras salen al túnel con la piel de gallina.' }, { p: 0.35, fx: { team: -2, fans: 0.002 }, r: 'Media entrada y mucho cemento a la vista. Sabor agridulce.' }] },
+        { l: 'Mejor en casa', fx: { team: 1 }, r: 'Vuestra gente, vuestro campo. Ambiente de siempre.' }
+      ] },
+    { id: 'f_estudios', cat: 'personal', tone: 'neu', who: 'p', if: { g: 'F', age: [18, 26] }, p: 0.05, per: 'season', cdp: 400,
+      t: '{s} tiene exámenes', b: '{n} estudia Fisioterapia a distancia por si el fútbol no le da para vivir. Esta semana tiene exámenes y te pide faltar a un par de entrenamientos.',
+      o: [
+        { l: 'Que estudie, es su futuro', fx: { mor: 10, boss: 10, fit: -3 }, r: 'Aprueba todo. Te trae un café el lunes.' },
+        { l: 'Entrenar por la mañana, estudiar por la tarde', fx: { mor: 4, fit: -2 }, r: 'Llega reventada, pero sale adelante.' },
+        { l: 'El fútbol va primero', fx: { mor: -8, boss: -10 }, r: '«Con lo que cobro, el fútbol no me paga el alquiler.» Se lo toma mal.' }
+      ] },
+    { id: 'f_redes', cat: 'escandalo', tone: 'neg', who: 'p', if: { g: 'F' }, p: 0.08, per: 'season', cdp: 300,
+      t: 'Acoso en redes a {s}', b: 'Tras un error en el último partido, {n} recibe cientos de mensajes machistas y amenazas en redes. No quiere ni mirar el móvil.',
+      now: { mor: -8 },
+      o: [
+        { l: 'Denunciarlo con el club', d: 'Comunicado y denuncia a los peores.', fx: { mor: 8, boss: 12, team: 3, fans: 0.003 }, r: 'El club la arropa en público. Ella te da las gracias en el vestuario.' },
+        { l: 'Que se desconecte unos días', fx: { mor: 4, conf: [0.97, 1] }, r: 'Le viene bien, aunque no se olvida de lo que leyó.' },
+        { l: 'No hacerle caso a las redes', fx: { mor: -3 }, r: '«No es tan fácil, míster.»' }
+      ] },
+    { id: 'f_blanco', cat: 'club', tone: 'neu', who: 'c', if: { g: 'F' }, p: 0.12, per: 'season', cd: 600,
+      t: 'Fuera el pantalón blanco', b: 'Las capitanas piden cambiar el pantalón blanco de la equipación por uno oscuro: con la regla, muchas juegan con miedo a mancharse. La marca deportiva pone pegas.',
+      o: [
+        { l: 'Pantalón oscuro desde ya', fx: { team: 6, cost: 0.03, fans: 0.003 }, r: 'La marca acaba cediendo. Las jugadoras juegan más tranquilas.' },
+        { l: 'Para la próxima temporada', fx: { team: 1 }, r: 'Les parece bien, aunque querían que fuera antes.' },
+        { l: 'La equipación no se toca', fx: { team: -5, boss: -3 }, r: 'Se sienten ignoradas. Sale en la prensa.' }
+      ] },
+    { id: 'f_prensa', cat: 'prensa', tone: 'neu', who: 'c', if: { g: 'F' }, p: 0.2, per: 'season', cd: 300,
+      t: 'Una pregunta fuera de lugar', b: 'En la rueda de prensa, un periodista pregunta a tu capitana si tiene novio y si «sabe cocinar tan bien como juega». Toda la sala te mira.',
+      o: [
+        { l: 'Cortarle en seco', fx: { team: 5, fans: 0.005, board: 1 }, r: '«Aquí hablamos de fútbol.» El vídeo da la vuelta a las redes.' },
+        { l: 'Que conteste ella', odds: [{ p: 0.7, fx: { team: 4, fans: 0.006 }, r: 'Le contesta con una sonrisa y una frase que se hace viral.' }, { p: 0.3, fx: { team: -1 }, r: 'Se queda en blanco y lo pasa mal.' }] },
+        { l: 'Pasar a la siguiente pregunta', fx: { team: -3 }, r: 'El vestuario esperaba que dijeras algo.' }
+      ] },
+    { id: 'f_referente', cat: 'personal', tone: 'pos', who: 'p', if: { g: 'F', ovr: [70, 99] }, p: 0.06, per: 'season', cdp: 400,
+      t: 'Las niñas quieren ser {s}', b: 'Un colegio ha hecho un mural con la cara de {n}: «De mayor quiero ser como ella», dicen las niñas. La invitan a visitarlas.',
+      o: [
+        { l: 'Que vaya, con todo el equipo', fx: { mor: 10, team: 4, fans: 0.006, fit: -2 }, r: 'Una tarde inolvidable. Vuelven todas con dibujos y una sonrisa enorme.' },
+        { l: 'Que vaya ella sola', fx: { mor: 8, fans: 0.003 }, r: 'Firma todos los balones del colegio.' },
+        { l: 'Ahora no, hay que centrarse', fx: { mor: -4 }, r: 'Le da pena. Les manda un vídeo.' }
+      ] },
+
     // ============================================================ VIDA PERSONAL
     { id: 'hijo', cat: 'personal', tone: 'pos', who: 'p', if: { age: [22, 38] }, p: 0.025, per: 'season', cdp: 300,
       t: '¡{s} ha sido papá!', tF: '¡{s} ha sido mamá!',
