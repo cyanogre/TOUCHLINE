@@ -532,7 +532,7 @@
     if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); TL.Staff.migrate(S); if (TL.Events) TL.Events.init(S); }
     if (S.user != null && !S.cups && S.fixtures && TL.Cups) TL.Cups.build(S);
     TL.Manager.init(S);
-    S.settings = Object.assign({ speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
+    S.settings = Object.assign({ narr: true, speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
     S.news = S.news || [];
     S.log = S.log || { crowd: {} };
     S.fin = Object.assign(newFin(), S.fin || {});

@@ -37,3 +37,20 @@ TL_I18N_ADD([
   ['Está tocada: lo va a acusar en el campo.', 'Shaken: it will show on the pitch.', 'Elle est touchée : ça va se voir.', 'Angeschlagen: man wird es sehen.', 'È scossa: si vedrà in campo.'],
   ['Con dudas: llega con un punto menos.', 'Doubting: a step behind.', 'Dans le doute : un cran en dessous.', 'Zweifelt: einen Tick schwächer.', 'Dubbioso: una marcia in meno.']
 ]);
+TL_I18N_ADD([
+  ['📻 En directo', '📻 Live', '📻 En direct', '📻 Live', '📻 In diretta'], ['En directo', 'Live', 'En direct', 'Live', 'In diretta'],
+  ['Los equipos saltan al campo.', 'The teams walk out.', 'Les équipes entrent sur le terrain.', 'Die Teams betreten den Platz.', 'Le squadre entrano in campo.'],
+  ['▶ Jugada clave', '▶ Key moment', '▶ Action clé', '▶ Schlüsselszene', '▶ Azione chiave'],
+  ['¡Atención, que llega {}!', 'Watch out, here come {}!', 'Attention, voilà {} !', 'Achtung, {} kommt!', 'Attenzione, arriva il {}!'],
+  ['¡Cuidado con {}…!', 'Careful with {}…!', 'Attention à {}… !', 'Vorsicht vor {}…!', 'Occhio al {}…!'],
+  ['¡Se mete en el área {}!', '{} get into the box!', '{} entre dans la surface !', '{} dringt in den Strafraum ein!', 'Il {} entra in area!'],
+  ['Ver el partido entero', 'Watch the whole match', 'Voir tout le match', 'Ganzes Spiel ansehen', 'Guarda tutta la partita'],
+  ['Solo narración y jugadas clave', 'Commentary and key moments only', 'Commentaire et actions clés', 'Nur Kommentar und Schlüsselszenen', 'Solo cronaca e azioni chiave'],
+  ['Partido narrado: verás las jugadas clave.', 'Commentary mode: you will see the key moments.', 'Match commenté : tu verras les actions clés.', 'Kommentar-Modus: du siehst die Schlüsselszenen.', 'Partita raccontata: vedrai le azioni chiave.'],
+  ['Partido completo en el campo.', 'Full match on the pitch.', 'Match complet sur le terrain.', 'Ganzes Spiel auf dem Platz.', 'Partita intera in campo.'],
+  ['El equipo sale enchufado.', 'The team comes out fired up.', 'L’équipe ressort survoltée.', 'Das Team kommt heiß raus.', 'La squadra esce carica.'],
+  ['El mensaje cala a medias.', 'The message half lands.', 'Le message passe à moitié.', 'Die Botschaft kommt halb an.', 'Il messaggio arriva a metà.'],
+  ['A los jugadores no les ha gustado.', 'The players did not like it.', 'Les joueurs n’ont pas aimé.', 'Den Spielern hat es nicht gefallen.', 'Ai giocatori non è piaciuto.'],
+  ['Esto es la **radio**: te cuento el partido jugada a jugada. Cuando pase algo gordo (un gol, un penalti, una roja…) verás la **jugada clave** en el campo.', 'This is the **radio**: I tell you the match play by play. When something big happens (a goal, a penalty, a red card…) you will see the **key moment** on the pitch.', 'Voici la **radio** : je te raconte le match action par action. Quand il se passe quelque chose de gros (but, penalty, rouge…), tu verras l’**action clé** sur le terrain.', 'Das ist das **Radio**: Ich erzähle dir das Spiel Szene für Szene. Wenn etwas Großes passiert (Tor, Elfmeter, Rot…), siehst du die **Schlüsselszene** auf dem Platz.', 'Questa è la **radio**: ti racconto la partita azione per azione. Quando succede qualcosa di grosso (gol, rigore, rosso…) vedrai l’**azione chiave** in campo.'],
+  ['Si prefieres ver **todo el partido** en el campo, toca aquí. Y vuelves a la radio cuando quieras.', 'If you prefer to watch **the whole match** on the pitch, tap here. You can go back to the radio any time.', 'Si tu préfères voir **tout le match** sur le terrain, touche ici. Tu reviens à la radio quand tu veux.', 'Wenn du lieber **das ganze Spiel** auf dem Platz sehen willst, tippe hier. Zurück zum Radio jederzeit.', 'Se preferisci vedere **tutta la partita** in campo, tocca qui. Torni alla radio quando vuoi.']
+]);
