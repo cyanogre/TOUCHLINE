@@ -51,6 +51,103 @@
   ];
 
   const EVENTS = [
+    // ============================================================ CANON: lo que todo el mundo conoce del fútbol (con nombres cambiados)
+    { id: 'c_beso', cat: 'escandalo', tone: 'neg', who: 'p', if: { g: 'F', rank: [0, 10] }, p: 0.08, per: 'season', cdp: 900, news: 'sucesos',
+      t: 'El beso del presidente', b: 'En la entrega de medallas, el presidente de la federación, Luis Ruviales, agarra la cabeza de {n} y le da un beso en la boca delante de todas las cámaras. Ella no lo ha consentido. Él dice que fue «un piquito de nada» y que se trata de «falso feminismo».',
+      now: { mor: -10 },
+      o: [
+        { l: 'Respaldarla en público: #SeAcabó', d: 'La federación no te lo perdonará.', fx: { mor: 14, boss: 18, team: 8, fans: 0.008, board: -3 }, r: 'Todo el vestuario se planta a su lado. El presidente acaba dimitiendo y {s} se convierte en un símbolo.' },
+        { l: 'Pedir a la federación que actúe', fx: { mor: 6, boss: 8, team: 3 }, r: 'Comunicado firme del club. La federación abre un expediente… muy despacio.' },
+        { l: 'No meterte en política', fx: { mor: -12, boss: -15, team: -8, fans: -0.004 }, r: '«¿En serio, míster?» Tus jugadoras no lo olvidarán.' }
+      ] },
+    { id: 'c_cumple', cat: 'escandalo', tone: 'neg', who: 'p', if: { g: 'M', age: [17, 20], ovr: [72, 99] }, p: 0.06, per: 'season', cdp: 900, news: 'ocio',
+      t: 'El cumpleaños de {s}', b: '{n} celebra sus 18 con una fiesta por todo lo alto… y contrata a personas con enanismo como «animación». Se filtran los vídeos y una asociación le denuncia por trato humillante. Hace dos años, Lasime Yanar ya lió una parecida.',
+      now: { mor: -4 },
+      o: [
+        { l: 'Que pida perdón en público', fx: { mor: -4, fans: 0.002, board: 2 }, r: 'Un comunicado escrito por el club. «No era mi intención ofender a nadie.»' },
+        { l: 'Multa interna y charla seria', fx: { mor: -8, fine: 2, boss: -4, board: 3 }, r: 'Se lo toma a mal, pero aprende la lección.' },
+        { l: '«Es un chaval, que disfrute»', fx: { mor: 6, fans: -0.006, board: -4 }, r: 'Las tertulias te crucifican a ti también.' }
+      ] },
+    { id: 'c_streamer', cat: 'prensa', tone: 'pos', who: 'p', if: { ovr: [70, 99] }, p: 0.12, per: 'season', cdp: 400,
+      t: 'Ivai Yanos quiere a {s}', b: 'El streamer más famoso del país, Ivai Yanos, invita a {n} a su directo de la noche y a jugar un partido de su liga de fútbol 7, la Liga de Reyes. Tres millones de chavales mirando.',
+      o: [
+        { l: 'Que vaya, es buena publicidad', fx: { mor: 8, fans: 0.01, fit: -3 }, r: 'Récord de audiencia. Mete un gol de rabona y el clip se hace viral.' },
+        { l: 'Al directo sí, al partido no', fx: { mor: 4, fans: 0.005 }, r: 'Charla, risas y un par de anécdotas del vestuario. Funciona.' },
+        { l: 'Nada de streamers', fx: { mor: -5 }, r: '«Míster, que esto es el futuro.»' }
+      ] },
+    { id: 'c_velada', cat: 'personal', tone: 'neu', who: 'p', if: { age: [19, 30] }, p: 0.05, per: 'season', cdp: 600,
+      t: '{s} quiere subirse al ring', b: 'Un grupo de youtubers organiza una velada de boxeo entre creadores de contenido y le ofrecen a {n} pelear en el combate estelar. Dicen que lo verán más personas que una final de Champions.',
+      o: [
+        { l: 'Ni loco: te puedes lesionar', fx: { mor: -6 }, r: 'Se queda con las ganas.' },
+        { l: 'Que haga de padrino del combate', fx: { mor: 6, fans: 0.006 }, r: 'Sube al ring con los guantes de otro y se lleva la ovación.' },
+        { l: 'Adelante, ¡que pelee!', odds: [{ p: 0.6, fx: { mor: 12, fans: 0.012, gain: 0.1 }, r: 'Gana por KO en el segundo asalto. Media ciudad lleva su camiseta.' }, { p: 0.4, fx: { inj: [2, 4], mor: -6, fans: 0.004 }, r: 'Se lleva un derechazo y una ceja abierta. Baja unas semanas.' }] }
+      ] },
+    { id: 'c_cripto', cat: 'club', tone: 'neu', who: 'c', p: 0.12, per: 'season', cd: 600,
+      t: 'Patrocinio cripto', b: 'LunaToken, una criptomoneda que «va a la luna», ofrece una fortuna por poner su logo en la camiseta y pagarte la mitad en tokens. El director financiero no entiende nada, pero los números marean.',
+      o: [
+        { l: 'Firmar, todo en euros', fx: { gain: 0.3, fans: -0.002 }, r: 'Cobras a tiempo. Seis meses después, LunaToken vale cero y tú ya tienes el dinero.' },
+        { l: 'Firmar, mitad en tokens', odds: [{ p: 0.3, fx: { gain: 0.9 }, r: '¡El token se dispara! Vendes en el pico y el club nada en dinero.' }, { p: 0.7, fx: { gain: 0.1, fans: -0.006, board: -4 }, r: 'El token se hunde un 98 %. La afición se ríe de vuestra camiseta en las redes.' }] },
+        { l: 'Ni tocarlo', fx: { board: 1 }, r: 'Prudencia. Otro club se lo queda… y se arruina.' }
+      ] },
+    { id: 'c_saudi', cat: 'club', tone: 'neu', who: 'p', if: { age: [27, 36], ovr: [76, 99] }, p: 0.08, per: 'season', cdp: 500, x: [30, 90],
+      t: 'Un jeque quiere a {s}', b: 'Al Nazr, el club de Crisdiamo Romardo, ofrece {x} por {n} y un sueldo diez veces mayor. El jugador te pide que le dejes ir: «Es el contrato de mi vida».',
+      o: [
+        { l: 'Venderle', d: 'Te quedas sin una pieza clave.', fx: { gain: 'x', list: 1, team: -3, mor: 10 }, r: 'Se despide con lágrimas en el vestuario. El dinero ya está en la cuenta.' },
+        { l: 'Pedir más y negociar', odds: [{ p: 0.5, fx: { gain: 'x', list: 1, team: -2, mor: 8 }, r: 'Los jeques suben la oferta sin pestañear.' }, { p: 0.5, fx: { mor: -8, boss: -8 }, r: 'Se cansan y fichan a otro. Él se queda… con cara larga.' }] },
+        { l: 'No se vende', fx: { mor: -14, boss: -12 }, r: '«Me has quitado el futuro de mis hijos.» Ojo con él.' }
+      ] },
+    { id: 'c_miami', cat: 'personal', tone: 'neu', who: 'p', if: { age: [32, 40] }, p: 0.08, per: 'season', cdp: 600,
+      t: '{s} sueña con Miami', b: '{n} te confiesa que quiere acabar su carrera en Estados Unidos, al sol, como hizo Liomer Mezi. Ya ha mirado casas con piscina.',
+      o: [
+        { l: 'Prometerle la carta de libertad en verano', fx: { mor: 12, boss: 10 }, r: 'Juega los últimos meses con una sonrisa enorme.' },
+        { l: 'Convencerle de que se retire aquí', odds: [{ p: 0.5, fx: { mor: 6, team: 3 }, r: '«Tienes razón: este es mi club.»' }, { p: 0.5, fx: { mor: -6 }, r: 'Se lo piensa… y sigue mirando casas.' }] }
+      ] },
+    { id: 'c_botellas', cat: 'prensa', tone: 'neu', who: 'p', if: { ovr: [74, 99] }, p: 0.06, per: 'season', cdp: 500, news: 'redes',
+      t: '¡Agua!', b: 'En rueda de prensa, {n} aparta las dos botellas de refresco del patrocinador y levanta una de agua: «¡Agua!». El patrocinador pierde millones en bolsa en una hora.',
+      o: [
+        { l: 'Apoyarle: es un ejemplo de vida sana', fx: { mor: 6, fans: 0.006, cost: 0.05 }, r: 'El patrocinador os pone una multa. Los chavales lo imitan en el patio.' },
+        { l: 'Pedir disculpas al patrocinador', fx: { mor: -6, boss: -4 }, r: 'Arreglas lo del dinero, pero él se siente traicionado.' }
+      ] },
+    { id: 'c_cancion', cat: 'escandalo', tone: 'neg', who: 'p', if: { g: 'M', age: [26, 36] }, p: 0.04, per: 'season', cdp: 900, news: 'ocio',
+      t: 'La canción de la ex de {s}', b: 'La estrella del pop Shakiza, ex de {n}, saca una canción contra él: «Cambiaste un Ferrari por un Twingo, un Rolex por un Casio». Número uno en todo el mundo. En cada estadio rival se la cantan.',
+      now: { mor: -6 },
+      o: [
+        { l: 'Que se ría y lo use de motivación', odds: [{ p: 0.5, fx: { mor: 8, fans: 0.006 }, r: 'Aparece en el entrenamiento con un Twingo. Las redes se rinden.' }, { p: 0.5, fx: { conf: [0.95, 2] }, r: 'Le está afectando más de lo que dice.' }] },
+        { l: 'Prohibir el tema en el vestuario', fx: { mor: 2, team: -2 }, r: 'Nadie la canta… delante de él.' },
+        { l: 'Darle unos días libres', fx: { mor: 6, away: 4 }, r: 'Desconecta lejos de los focos.' }
+      ] },
+    { id: 'c_bobo', cat: 'prensa', tone: 'pos', who: 'p', if: { ovr: [74, 99] }, p: 0.05, per: 'season', cdp: 500,
+      t: '«¿Qué miras, bobo?»', b: 'Tras un partido caliente, {n} le suelta a un rival delante de la cámara: «¿Qué miras, bobo? Anda pa\'llá». La frase ya está en camisetas, tazas y memes.',
+      o: [
+        { l: 'Sacar la camiseta oficial', fx: { gain: 0.08, fans: 0.008, mor: 6 }, r: 'Se agotan en dos horas.' },
+        { l: 'Pedirle que modere el lenguaje', fx: { mor: -3, board: 2 }, r: '«Vale, míster… pero es que me miraba.»' }
+      ] },
+    { id: 'c_hackeo', cat: 'escandalo', tone: 'neg', who: 'p', p: 0.03, per: 'season', cdp: 600, news: 'redes',
+      t: 'Le han hackeado la cuenta a {s}', b: 'Un mensaje rarísimo aparece en las redes de {n} y lo borra a los veinte minutos. Él jura que le han hackeado. Nadie se lo cree, pero tampoco nadie lo puede demostrar.',
+      o: [
+        { l: 'Creerle y cerrar el tema', fx: { mor: 6, boss: 6 }, r: 'Comunicado del club: «La cuenta fue hackeada». Fin de la historia.' },
+        { l: 'Prohibirle tocar el móvil una temporada', fx: { mor: -8, fans: 0.003 }, r: 'Lo cumple a regañadientes. La gente se ríe con la medida.' }
+      ] },
+    { id: 'c_superliga', cat: 'club', tone: 'neu', who: 'c', if: { cash: 'poor' }, p: 0.06, per: 'season', cd: 900,
+      t: 'La Superliga', b: 'El presidente del Real Matled te llama de madrugada: quiere montar una Superliga cerrada con los grandes de Europa y que tu club entre. «Es para salvar el fútbol», dice. La afición está que trina.',
+      o: [
+        { l: 'Apuntarse', odds: [{ p: 0.3, fx: { gain: 0.6, fans: -0.02, board: 4 }, r: 'Entra el dinero, pero la grada se llena de pancartas en contra.' }, { p: 0.7, fx: { fans: -0.02, board: -6 }, r: 'El proyecto se cae en 48 horas y quedas fatal.' }] },
+        { l: 'Plantarse con la afición', fx: { fans: 0.01, team: 2 }, r: 'Tus aficionados te hacen una pancarta de agradecimiento.' }
+      ] },
+    { id: 'c_balon', cat: 'prensa', tone: 'neu', who: 'p', if: { ovr: [84, 99] }, p: 0.1, per: 'season', cdp: 400,
+      t: '{s} no ganará el Balón de Oro', b: 'Horas antes de la gala se filtra que {n} no ganará el Balón de Oro: será para Aidama Bonnadí o para Kiriam Mvabpé, depende de a quién preguntes. El club piensa no ir a la gala.',
+      o: [
+        { l: 'Boicot: nadie va a la gala', fx: { mor: 6, fans: -0.004, board: -2 }, r: 'Butacas vacías y polémica mundial. Él te lo agradece.' },
+        { l: 'Ir y aplaudir al ganador', fx: { mor: -4, fans: 0.004, board: 2 }, r: 'Elegancia. Él aplaude con la mandíbula apretada.' }
+      ] },
+    { id: 'c_culebron', cat: 'club', tone: 'neu', who: 'p', if: { age: [21, 28], ovr: [80, 99] }, p: 0.06, per: 'season', cdp: 600,
+      t: 'El culebrón de {s}', b: 'Cada verano, lo mismo: el Real Matled quiere a {n}, él dice que «ya veremos», su madre-agente pide la luna y la prensa abre los telediarios con su cara. Como con Kiriam Mvabpé, pero en tu club.',
+      o: [
+        { l: 'Renovarle y cortar el culebrón', fx: { cost: 0.2, mor: 10, boss: 6, team: 2 }, r: 'Firma por cinco años. La prensa busca otro culebrón.' },
+        { l: 'Que se vaya libre si quiere', fx: { mor: 4, team: -2 }, r: 'Se queda… de momento.' },
+        { l: 'Ponerle en venta antes de perderlo gratis', fx: { list: 1, mor: -6 }, r: 'Ya está en el mercado. El culebrón continúa en otra serie.' }
+      ] },
+
     // ============================================================ FÚTBOL FEMENINO (solo en la partida femenina)
     { id: 'f_embarazo', cat: 'personal', tone: 'pos', who: 'p', if: { g: 'F', age: [24, 35] }, p: 0.03, per: 'season', cdp: 600,
       t: '{s} va a ser mamá', b: '{n} te pide hablar a solas: está embarazada. Quiere seguir en el club y volver después del parto, pero tiene miedo de que la temporada que viene no cuentes con ella.',
