@@ -1508,3 +1508,37 @@ body.shake-s { animation: shake-s .35s; }
 .res-box span { font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .res-box .btn { align-self: flex-start; margin-top: 4px; }
 .res-box .res-full { color: var(--warn); font-weight: 700; }
+/* Partido narrado: la radio arriba y el campo solo en las jugadas clave */
+.narr-call { display: none; }
+.match.narr .narr-call { display: block; margin: 10px 12px 0; padding: 14px 16px 16px; border-radius: 16px; background: linear-gradient(180deg, #14281d, #0e1d15);
+  border: 1px solid var(--line); box-shadow: inset 4px 0 0 var(--muted); min-height: 96px; }
+.match.narr .narr-call.side-0 { box-shadow: inset 4px 0 0 var(--accent); }
+.match.narr .narr-call.side-1 { box-shadow: inset 4px 0 0 #8fc4ff; }
+.match.narr .narr-call.goal { background: radial-gradient(120% 140% at 0% 0%, rgb(184 245 61 / 0.25), transparent 60%), #13281d; border-color: var(--accent); }
+.narr-call small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.narr-call p { margin: 6px 0 0; font: 600 18px/1.35 var(--font, inherit); color: var(--text); }
+.narr-call.goal p { font-family: var(--font-c); font-size: 24px; font-weight: 800; text-transform: uppercase; }
+.narr-call.in p { animation: narrIn .35s ease-out both; }
+@keyframes narrIn { from { opacity: 0; transform: translateY(6px); } }
+.key-tag { display: none; }
+.match.narr .pitch-box { display: none; }
+.match.narr.narr-show .pitch-box { display: flex; animation: keyIn .3s ease-out both; }
+.match.narr.narr-show .narr-call { min-height: 0; padding: 8px 14px; }
+.match.narr.narr-show .narr-call p { font-size: 15px; }
+.match.narr .pitch-box .key-tag { display: block; position: absolute; left: 16px; top: 12px; z-index: 2; font: 800 12px/1 var(--font-c); letter-spacing: 0.08em; text-transform: uppercase;
+  color: #0b1606; background: var(--accent); padding: 5px 9px; border-radius: 99px; }
+.match.narr .pitch-toggle, .match.narr .pip-size, .match.narr .pip-grip { display: none; }
+.match.narr.mini .pitch-box { position: relative; inset: auto; width: auto; transform: none; box-shadow: none; }
+@keyframes keyIn { from { opacity: 0; transform: scale(0.97); } }
+.narr-btn { font-size: 18px; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .match.narr .narr-call { grid-column: 1; grid-row: 2 / span 3; margin: 10px; }
+  .match.narr.narr-show .narr-call { display: none; }
+}
+/* Ficha: lo de hoy, destacado */
+.info.now > div { background: color-mix(in srgb, var(--accent) 7%, var(--surface2, var(--surface))); }
+.info .warn .v { color: var(--warn); }
+.feel { font-weight: 700; }
+.feel.ok { color: var(--accent2); } .feel.mid { color: var(--warn); } .feel.low { color: var(--danger); }
+.narr-call.tense p { color: var(--warn); }
+.office-follow .office-opt b { font-style: italic; }

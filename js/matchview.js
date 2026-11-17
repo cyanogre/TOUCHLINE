@@ -43,7 +43,8 @@
         </div>
         <div class="mprog"><i id="mv-prog" style="width:0%"></i></div>
       </div>
-      <div class="pitch-box"><canvas id="pitch" aria-label="Vista del partido"></canvas>
+      <div class="narr-call" id="mv-call" aria-live="polite"><small id="mv-call-k">📻 En directo</small><p id="mv-call-t">Los equipos saltan al campo.</p></div>
+      <div class="pitch-box"><span class="key-tag">▶ Jugada clave</span><canvas id="pitch" aria-label="Vista del partido"></canvas>
         <i class="pip-grip" aria-hidden="true"></i>
         <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
@@ -63,6 +64,7 @@
     MV.pitch.speed = settings().speed || 1;
     setupPip();
     if (settings().mini) setMini(true);
+    setNarr(narrOn());
     renderFoot();
     TL.SFX.startCrowd();
     TL.SFX.whistle(false);
@@ -85,6 +87,61 @@
     d.innerHTML = `<span class="m">${e.min ? e.min + "'" : ''}</span><span class="i">${EV_ICON[e.type] || '•'}</span>
       <span class="x grow">${club ? `<b>${esc(club.code)}</b> · ` : ''}${e.text}</span>`;
     feed.prepend(d);
+    if (!big || e.type !== 'ko') call(e);
+  }
+  /** La frase del narrador, grande, arriba (como en la radio). */
+  function call(e) {
+    const t = el('mv-call-t'), k = el('mv-call-k');
+    if (!t || !e.text) return;
+    const club = e.team >= 0 ? G.S.clubs[MV.m.teams[e.team].club] : null;
+    t.innerHTML = e.text;
+    k.textContent = `${e.min ? e.min + "' · " : ''}${EV_ICON[e.type] || '📻'} ${club ? club.name : 'En directo'}`;
+    const box = el('mv-call');
+    box.className = `narr-call ${e.type === 'goal' ? 'goal' : ''} side-${e.team === MV.me ? 0 : e.team < 0 ? 'n' : 1}`;
+    void box.offsetWidth; box.classList.add('in');
+  }
+
+  // ------------------------------------------------------------ Partido narrado: solo se ve la jugada clave
+  const narrOn = () => settings().narr !== false;
+  function setNarr(on) {
+    const root = el('match');
+    if (!root) return;
+    root.classList.toggle('narr', on);
+    root.classList.remove('narr-show');
+    MV.showing = false;
+    if (on && MV.pitch) MV.pitch.flush();
+    requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
+  }
+  /** ¿Merece la pena enseñar esta jugada en el campo? */
+  function keyPlay(evs) {
+    return evs.some(e => ['goal', 'pen', 'penmiss', 'disallowed', 'red'].includes(e.type) ||
+      ((e.type === 'save' || e.type === 'miss') && (e.team === MV.me ? Math.random() < 0.45 : Math.random() < 0.3)));
+  }
+  /** Mientras se ve la jugada: suspense, sin destripar el final. */
+  function tease(e) {
+    const t = el('mv-call-t'), k = el('mv-call-k'), box = el('mv-call');
+    if (!t) return;
+    const club = e ? G.S.clubs[MV.m.teams[e.team].club] : null;
+    k.textContent = `${MV.m.min}' · ⚡ ${club ? club.name : ''}`;
+    t.textContent = U.pick(club ? [`¡Atención, que llega ${club.name}!`, `¡Cuidado con ${club.name}…!`, `¡Se mete en el área ${club.name}!`] : ['¡Atención!']);
+    box.className = `narr-call tense side-${e && e.team === MV.me ? 0 : 1} in`;
+  }
+  /** Al acabar la jugada clave: ahora sí, lo que ha pasado. */
+  function reveal() {
+    const evs = MV.held; MV.held = null;
+    if (!evs) return;
+    evs.forEach(addEvent);
+    if (evs.some(e => e.type === 'goal')) TL.FX.pop(el('mv-score'));
+    updateHead(); crowdSongs(evs);
+    if (MV.tab !== 'feed') renderTab();
+    finishStep(evs);
+  }
+  function showKey(on) {
+    const root = el('match');
+    if (!root || MV.showing === on) return;
+    MV.showing = on;
+    root.classList.toggle('narr-show', on);
+    if (on) requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
 
   function updateHead() {
@@ -125,14 +182,35 @@
     const m = MV.m;
     if (!m || MV.paused || m.done) return;
     // El reloj espera a que el campo termine de escenificar la jugada en curso
-    if (MV.pitch && !MV.skip && MV.pitch.busy()) { schedule(70); return; }
+    const narr = narrOn();
+    if (MV.pitch && !MV.skip && MV.pitch.busy() && (!narr || MV.showing)) { schedule(70); return; }
+    // Narrado: acaba de terminar la jugada clave → el campo se esconde y sigue la radio
+    if (narr && MV.showing) { showKey(false); reveal(); schedule(500); return; }
     const evs = m.step();
+    const show = MV.pitch && narr && !MV.skip && keyPlay(evs);
+    if (show) {
+      // Primero se ve la jugada; el narrador y el marcador lo cuentan cuando termina
+      MV.held = evs;
+      const k = evs.find(e => e.team >= 0);
+      tease(k);
+      MV.pitch.flush(); showKey(true);
+      MV.pitch.push(evs, false);
+      if (MV.tab !== 'feed') renderTab();
+      schedule(120);
+      return;
+    }
     evs.forEach(addEvent);
-    if (MV.pitch) MV.pitch.push(evs, !!MV.skip);
+    if (MV.pitch) MV.pitch.push(evs, !!MV.skip || narr);
     if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
     crowdSongs(evs);
     if (MV.tab !== 'feed') renderTab();
+    finishStep(evs);
+  }
+
+  /** Descanso, final, saltos y pausas automáticas después de cada minuto. */
+  function finishStep(evs) {
+    const m = MV.m;
     if (m.min === 45 && !MV.htDone) {
       MV.htDone = true;
       MV.skip = null;
@@ -199,7 +277,7 @@
       case 'ht': {
         title = `Descanso · ${m.score[0]}-${m.score[1]}`;
         if (t.talk) {
-          body = `Charla: ${E.TALKS[t.talk.kind].name} (${t.talk.pct >= 0 ? '+' : ''}${t.talk.pct.toFixed(1)}% de rendimiento).`;
+          body = `Charla: ${E.TALKS[t.talk.kind].name}. ${t.talk.pct >= 1.5 ? 'El equipo sale enchufado.' : t.talk.pct >= 0 ? 'El mensaje cala a medias.' : 'A los jugadores no les ha gustado.'}`;
           acts = btn('mv-resume', '▶ 2ª parte', '', true) + btn('mv-subs', 'Cambios') + btn('mv-tactic', 'Táctica');
         } else {
           body = diff > 0 ? 'Vas ganando. ¿Qué les dices en el vestuario?' : diff < 0 ? 'Vas perdiendo. Es momento de reaccionar.' : 'Empate al descanso. ¿Cómo motivas al equipo?';
@@ -241,6 +319,7 @@
       <div class="row" style="gap:6px">
         <div class="seg grow speeds" role="group" aria-label="Velocidad">${SPEEDS.map(v =>
           `<button class="${sp === v ? 'on' : ''}" data-act="mv-speed" data-v="${v}">x${v}</button>`).join('')}</div>
+        <button class="icon-btn narr-btn" data-act="mv-narr" aria-label="${narrOn() ? 'Ver el partido entero' : 'Solo narración y jugadas clave'}" title="${narrOn() ? 'Ver el partido entero' : 'Solo narración y jugadas clave'}">${narrOn() ? '🎥' : '📻'}</button>
         <button class="icon-btn" data-act="mv-settings" aria-label="Pausas automáticas" title="Pausas automáticas">⚙</button>
       </div>
       <div class="btn-row ctl">
@@ -424,6 +503,7 @@
       if (el('match') && el('match').classList.contains('mini')) { const r = pipBox().getBoundingClientRect(); placePip(r.left, r.top, true); MV.pitch && MV.pitch.resize(); }
     });
   }
+  A['mv-narr'] = () => { const on = !narrOn(); settings().narr = on; setNarr(on); renderFoot(); G.save(); UI.toast(on ? 'Partido narrado: verás las jugadas clave.' : 'Partido completo en el campo.'); };
   A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
   A['mv-pip-size'] = () => {
     if (MV.pipDragged) return;
@@ -498,7 +578,7 @@
       <div class="group-title">Mentalidad</div>
       <div class="seg">${UI.MENT.map((x, i) => `<button class="${t.mentality === i ? 'on' : ''}" data-act="mv-ment2" data-m="${i}">${x}</button>`).join('')}</div>
       <div class="group-title">En el campo</div>
-      ${t.onPitch.map(o => { const p = G.S.players[o.pid]; return `<div class="row" style="padding:5px 0">${UI.posB(o.slot)}<span class="grow">${esc(p.name)}</span><span class="note">${Math.round(E.fit(p, o.slot) * 100)}%</span></div>`; }).join('')}
+      ${t.onPitch.map(o => { const p = G.S.players[o.pid]; return `<div class="row" style="padding:5px 0">${UI.posB(o.slot)}<span class="grow">${esc(p.name)}</span><span class="note">${TL.Feel.posFit(G.S, E.fit(p, o.slot)).word}</span></div>`; }).join('')}
       <button class="btn primary block mt" data-act="close-sheet">Listo</button>`,
     { onClose: () => { if (!wasPaused) resume(); else renderFoot(); } });
     MV.tacticWasPaused = wasPaused;
@@ -536,13 +616,13 @@
       html += `<p class="note sub-rule">${rule}</p>`;
       html += '<p class="note">¿Quién sale? Los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
-        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · energía ${Math.round(m.energy(o.pid))}%${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
+        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · ${TL.Feel.fit(S, m.energy(o.pid)).word.toLowerCase()}${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
       }).join('');
     } else {
       const o = t.onPitch.find(x => x.pid === MV.subOut);
       html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]}). ¿Quién entra?</p>` +
         (t.bench.length ? t.bench.map(id => S.players[id]).sort((a, b) => E.eff(b, o.slot) - E.eff(a, o.slot)).map(p =>
-          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${Math.round(E.fit(p, o.slot) * 100)}% en ${F.POS_ES[o.slot]} · energía ${p.fit}%` })).join('')
+          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${TL.Feel.posFit(S, E.fit(p, o.slot)).word} · ${TL.Feel.fit(S, p.fit).word.toLowerCase()}` })).join('')
           : '<div class="empty">No quedan suplentes.</div>');
     }
     UI.sheet(html, { onClose: done });

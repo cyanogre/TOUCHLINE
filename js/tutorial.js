@@ -23,7 +23,8 @@
       { text: 'Primer consejo gratis: firma ya los **patrocinios libres** en Club → Comercial. Es dinero que entra sin jugar. ¡A trabajar, míster!', emo: 'proud' }
     ],
     match: [
-      { sel: '#pitch', text: 'Bienvenido al **césped**. Cada círculo es un jugador con su dorsal; los tuyos llevan borde blanco. El balón va donde va la jugada.' },
+      { sel: '#mv-call', text: 'Esto es la **radio**: te cuento el partido jugada a jugada. Cuando pase algo gordo (un gol, un penalti, una roja…) verás la **jugada clave** en el campo.' },
+      { sel: '.narr-btn', text: 'Si prefieres ver **todo el partido** en el campo, toca aquí. Y vuelves a la radio cuando quieras.' },
       { sel: '.speeds', text: 'La **velocidad**, de x1 a x16. Yo veo los partidos tranquilo, pero tú haz lo que quieras.' },
       { sel: '[data-act="mv-skipmenu"]', text: '**Saltar** avanza hasta el próximo momento clave, el descanso, un minuto o el final.' },
       { sel: '[data-act="mv-settings"]', text: 'El partido se **para solo** en goles, rojas, lesiones, penaltis o VAR, para que decidas. Aquí lo configuras.', emo: 'thinking' },
