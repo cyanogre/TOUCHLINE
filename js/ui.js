@@ -88,7 +88,11 @@
   function posB(pos) { return `<span class="pos l${F.LINE[pos]}">${F.POS_ES[pos]}</span>`; }
   function ovrCls(v) { return v >= 85 ? 't1' : v >= 75 ? 't2' : v >= 65 ? 't3' : 't4'; }
   function ovrB(v) { return `<span class="ovr ${ovrCls(v)}">${v}</span>`; }
-  function fitB(f) { return `<span class="fit ${f < 60 ? 'low' : f < 80 ? 'mid' : ''}" title="Forma física ${f}%"><i style="width:${f}%"></i></span>`; }
+  function fitB(f) { return `<span class="fit ${f < 60 ? 'low' : f < 80 ? 'mid' : ''}" title="${TL.Feel.fit(G.S, f).word}"><i style="width:${f}%"></i></span>`; }
+  /** Barra de forma y su palabra («Fresco», «Cansado»…): nunca el número. */
+  function fitW(S, f) { const w = TL.Feel.fit(S, f); return `${fitB(f)} <span class="feel ${w.cls}">${w.word}</span>`; }
+  /** Horquilla de potencial («78–85»), o la cifra si ya no hay duda. */
+  function potTxt(S, p) { return TL.Feel.potential(S, p).txt; }
   function flagImg(code, title) {
     return code ? `<img class="flagi" src="assets/flags/${code}.svg" alt="${esc(title || '')}" title="${esc(title || '')}" loading="lazy" width="18" height="13">` : '';
   }
@@ -122,7 +126,7 @@
       if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${so.def.icon}</span>`);
       // Confianza tras un momento en el despacho: subidón o bajón de unas jornadas
       const cf = TL.Social && p.club === S.user ? TL.Social.conf(S, p.id) : null;
-      if (cf) t.push(`<span class="tag cf ${cf.mult > 1 ? 'up' : 'down'}" title="${cf.mult > 1 ? 'Subidón' : 'Bajón'}: ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)} % (${cf.n} ${cf.n === 1 ? 'jornada' : 'jornadas'})">${cf.mult > 1 ? '🔥' : '🌧️'} ${cf.mult > 1 ? '+' : ''}${Math.round((cf.mult - 1) * 100)}%</span>`);
+      if (cf) t.push(`<span class="tag cf ${cf.mult > 1 ? 'up' : 'down'}" title="${cf.mult > 1 ? 'Subidón' : 'Bajón'}">${cf.mult > 1 ? '🔥' : '🌧️'}</span>`);
     }
     return t.join('');
   }
@@ -580,19 +584,17 @@
 
   // ------------------------------------------------------------ Almas y objetos
   const EFF_TXT = { shot: 'Disparos', conv: 'Acierto', assist: 'Asistencias', fouled: 'Faltas recibidas', save: 'Paradas', mid: 'Centro del campo', att: 'Ataque', def: 'Defensa', team: 'Todo el equipo', foul: 'Faltas cometidas', card: 'Tarjetas' };
-  /** «Acierto +6 %», «Defensa +7»… (y si es malo, marcado). */
+  /** «Acierto ▲», «Defensa ▲▲», «Tarjetas ▲» (malo)…: hacia dónde empuja, sin decir cuánto. */
   function effList(eff) {
     return Object.entries(eff || {}).map(([k, v]) => {
-      if (typeof v === 'boolean') return null;
-      let pct, good;
-      if (['mid', 'att', 'def'].includes(k)) { pct = Math.round(v * 10); good = v > 0; return [`${EFF_TXT[k]}: ${pct > 0 ? '+' : ''}${pct}`, good]; }
-      if (k === 'save') { pct = Math.round((1 - v) * 100); return [`${EFF_TXT[k]}: +${pct} %`, true]; }
-      pct = Math.round((v - 1) * 1000) / 10;
-      good = k === 'foul' || k === 'card' ? pct < 0 : pct > 0;
-      return [`${EFF_TXT[k]}: ${pct > 0 ? '+' : ''}${String(pct).replace('.', ',')} %`, good];
+      const lv = TL.Feel.effLevel(k, v);
+      if (!lv || !EFF_TXT[k]) return null;
+      const dir = k === 'foul' || k === 'card' ? -lv : lv;   // la flecha dice si sube o baja; el color, si conviene
+      return [EFF_TXT[k], TL.Feel.arrows(dir), lv > 0];
     }).filter(Boolean);
   }
-  const effChips = eff => effList(eff).map(([t, g]) => `<span class="ev-chip ${g ? 'up' : 'down'}">${esc(t)}</span>`).join('');
+  const effTxt = e => `<span>${esc(e[0])}</span> ${e[1]}`;
+  const effChips = eff => effList(eff).map(e => `<span class="ev-chip ${e[2] ? 'up' : 'down'}">${effTxt(e)}</span>`).join('');
   const LINES = ['Porteros', 'Defensas', 'Medios', 'Delanteros'];
   function gearDef(kind, k) { const D = TL.Events.DB(); return kind === 'soul' ? D.souls[k] : D.items[k]; }
   function rewardHtml(S, rw) {
@@ -659,7 +661,7 @@
     const freeSouls = fan ? S.ev.souls.filter(x => x.pid == null && EV.canEquip(S, 'soul', x.k, p)) : [];
     const freeItems = S.ev.items.filter(x => x.pid == null && EV.canEquip(S, 'item', x.k, p));
     if (!so && !it && !freeSouls.length && !freeItems.length) return '';
-    const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(e => `<span>${esc(e[0])}</span>`).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+    const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     const pickers = [];
     if (!so && freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ Equipar un alma (${freeSouls.length})</button>`);
     if (!it && freeItems.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="item" data-id="${p.id}">🎒 Equipar un objeto (${freeItems.length})</button>`);
@@ -670,7 +672,7 @@
     const list = (kind === 'soul' ? S.ev.souls : S.ev.items).filter(x => x.pid == null && EV.canEquip(S, kind, x.k, p));
     sheet(sheetHead(kind === 'soul' ? '✨ Elige un alma' : '🎒 Elige un objeto') + `<p class="note">Para ${esc(p.name)} (${F.POS_ES[p.pos]}).</p>` + list.map(x => {
       const d = gearDef(kind, x.k);
-      return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(e => `<span>${esc(e[0])}</span>`).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+      return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     }).join(''));
   };
 
@@ -721,11 +723,11 @@
         })()}
         ${(() => {
           // Aviso: titulares que llegan cansados (el cansancio se acumula si no rotas)
-          const tired = (S.tactics.slots || []).map(id => S.players[id]).filter(p => p && p.club === S.user && p.fit < 75 && p.inj <= 0);
+          const tired = (S.tactics.slots || []).map(id => S.players[id]).filter(p => p && p.club === S.user && TL.Feel.tired(p.fit) && p.inj <= 0);
           if (!tired.length) return '';
           const fem = S.gender === 'F';
           const head = tired.length === 1 ? (fem ? '1 titular llega cansada' : '1 titular llega cansado') : tired.length + (fem ? ' titulares llegan cansadas' : ' titulares llegan cansados');
-          return `<button class="nm-warn" data-act="tab" data-tab="tactics">⚠️ <span><b>${head}</b> (${tired.slice(0, 4).map(p => esc(p.short) + ' ' + p.fit + '%').join(', ')}${tired.length > 4 ? '…' : ''}). <i>Rota o rendirán menos y se lesionarán más.</i></span></button>`;
+          return `<button class="nm-warn" data-act="tab" data-tab="tactics">⚠️ <span><b>${head}</b> (${tired.slice(0, 4).map(p => esc(p.short)).join(', ')}${tired.length > 4 ? '…' : ''}). <i>Rota o rendirán menos y se lesionarán más.</i></span></button>`;
         })()}
         ${expiringWarn(S)}
         <div class="nm-actions"><button class="btn primary" data-act="play-live">▶ Jugar partido</button>
@@ -736,7 +738,7 @@
     const played = tab.some(r => r.pj > 0);
     const board = `<section class="card"><div class="card-head"><h2>Directiva</h2><span class="muted">${played ? posOf(S.user) + 'º de ' + tab.length : 'Pretemporada'}</span></div>
       <div style="font-weight:700;font-size:16px">${esc(S.board.text)}</div>
-      <div class="row between mt"><span class="muted" style="font-size:13px">Confianza</span><b class="num">${Math.round(conf)}%</b></div>
+      <div class="row between mt"><span class="muted" style="font-size:13px">Confianza</span><b class="feel ${TL.Feel.board(conf).cls}">${TL.Feel.board(conf).word}</b></div>
       <div class="bar ${conf < 30 ? 'bad' : conf < 50 ? 'warn' : ''}" style="margin-top:6px"><i style="width:${conf}%"></i></div>
       <button class="row between mt mgr-line" data-act="go-manager"><span>🎓 Mánager nivel <b>${S.mgr.level}</b></span>
         ${S.mgr.points ? `<span class="tag new">${S.mgr.points} punto${S.mgr.points > 1 ? 's' : ''} por gastar</span>` : '<span class="faint">Ver habilidades</span>'}</button></section>`;
@@ -868,7 +870,7 @@
     if (!LK || !S.lk) return '';
     const sq = W.squad(S, S.user);
     const avgMor = sq.length ? U.sum(sq, p => (p.mor == null ? 70 : p.mor)) / sq.length : 70;
-    const [ml, me] = TL.News.moraleLabel(avgMor);
+    const [ml, me] = TL.Feel.morale(null, avgMor);
     const acts = Object.entries(LK.ACT).map(([k, a]) => {
       const ready = LK.actReady(S, k), cost = LK.actCost(S, k);
       return `<button class="act-btn" data-act="lk-act" data-k="${k}" ${ready ? '' : 'disabled'} title="${esc(a.desc)}">
@@ -897,7 +899,7 @@
         const K = SO.KINDS[m.k], p = S.players[m.pid], left2 = m.exp - S.week;
         return `<button class="mo mo-${m.k}" data-act="mo-open" data-id="${m.id}"><span class="mo-ic">${K.icon}</span><span class="grow"><b>${esc(K.title(S, p, m.d))}</b><small>${left2 <= 0 ? 'Última semana para hablarlo' : 'Quedan ' + (left2 + 1) + ' semanas'}</small></span><span class="go">›</span></button>`;
       }).join('')}</div>` : `<p class="note mo-empty">Sin momentos ahora. Surgen de lo que pasa en el campo: un partidazo, un error, el banquillo, un pique…</p>`;
-      const heavy = SO.heavyweights(S).map(([p, inf]) => { const [ml2, me2] = TL.News.moraleLabel(p.mor == null ? 70 : p.mor); return li(me2, `${pl(p)} · <em>peso ${inf} · ${ml2.toLowerCase()}</em>`); }).join('');
+      const heavy = SO.heavyweights(S).map(([p, inf]) => { const [ml2, me2] = TL.Feel.morale(S, p.mor == null ? 70 : p.mor); return li(me2, `${pl(p)} · <em><span>${TL.Feel.weight(inf)}</span> · <span>${ml2}</span></em>`); }).join('');
       alive = `<div class="mo-head"><div class="group-title">Momentos</div>${agenda}</div>${momHtml}`;
       alive += `<div class="lk-heavy">${block('Pesos pesados', heavy)}</div>`;
     }
@@ -947,9 +949,9 @@
       const ch = pr.known >= 2 ? `<b>${pr.icon} ${esc(pr.name)}</b><small>${esc(pr.desc)}</small>`
         : pr.known === 1 ? `<b>❔ Por descubrir</b><small>Intuyes que ${esc(pr.hint)}. Una charla más y lo sabrás.</small>`
           : `<b>❔ Sin descubrir</b><small>Lo irás conociendo al hablar en el despacho.</small>`;
-      const mems = pr.memories.slice(0, 6).map(m => `<li class="${m[1] >= 0 ? 'good' : 'bad'}"><span class="mem-v">${m[1] > 0 ? '+' : ''}${Math.round(m[1])}</span><span>${esc(m[3])}</span><em>${m[2]} sem</em></li>`).join('');
-      out.push(`<div class="char-row"><div class="char">${ch}</div><div class="infl" title="Peso en el vestuario">Peso <b>${pr.influence}</b></div></div>`);
-      if (pr.conf) out.push(`<p class="cf-line ${pr.conf.mult > 1 ? 'up' : 'down'}">${pr.conf.mult > 1 ? '🔥 <b>Subidón</b>' : '🌧️ <b>Bajón</b>'} <span>${pr.conf.n === 1 ? `Rinde un ${pr.conf.mult > 1 ? '+' : ''}${Math.round((pr.conf.mult - 1) * 100)} % la próxima jornada.` : `Rinde un ${pr.conf.mult > 1 ? '+' : ''}${Math.round((pr.conf.mult - 1) * 100)} % durante ${pr.conf.n} jornadas.`}</span></p>`);
+      const mems = pr.memories.slice(0, 6).map(m => { const f = TL.Feel.memory(m[1], m[2]); return `<li class="${m[1] >= 0 ? 'good' : 'bad'}"><span class="mem-v">${f.arrows}</span><span>${esc(m[3])}</span><em>${f.fade}</em></li>`; }).join('');
+      out.push(`<div class="char-row"><div class="char">${ch}</div><div class="infl" title="Peso en el vestuario"><b>${TL.Feel.weight(pr.influence)}</b></div></div>`);
+      if (pr.conf) out.push(`<p class="cf-line ${pr.conf.mult > 1 ? 'up' : 'down'}">${pr.conf.mult > 1 ? '🔥 <b>Subidón</b>' : '🌧️ <b>Bajón</b>'} <span>${TL.Feel.confLine(S, pr.conf)}</span> <span class="cf-for">Le dura ${TL.Feel.forWeeks(pr.conf.n)}.</span></p>`);
       out.push(`<div class="mem-box"><div class="group-title">Lo que lleva dentro</div>${mems ? `<ul class="mem-list">${mems}</ul>` : '<p class="note" style="margin:0">Nada especial: ni euforia ni rencores.</p>'}</div>`);
     }
     const b = LK.boss(S, p.id);
@@ -1060,11 +1062,11 @@
     });
     const row = p => {
       const st = S.stats[p.id];
-      const [ml, me] = TL.News.moraleLabel(p.mor);
+      const [ml, me] = TL.Feel.morale(S, p.mor);
       if (resTab) {
-        const cap = AC.capOf(p);
-        const cols = `<span class="w-s">${p.age}</span><span class="w-s">${cap}</span><span class="w-s">${p.pot}</span><span>${U.money(p.wage)}</span><span class="w-s">${p.contract}</span>`;
-        const sub = `${flag(S, p)} ${p.age} años · <span class="res-cap ${AC.atCap(p) ? 'full' : ''}">techo en el filial ${cap}</span> · <span title="Moral: ${ml}">${me}</span>`;
+        const room = TL.Feel.reserveRoom(S, p);
+        const cols = `<span class="w-s">${p.age}</span><span class="w-pot">${potTxt(S, p)}</span><span>${U.money(p.wage)}</span><span class="w-s">${p.contract}</span>`;
+        const sub = `${flag(S, p)} <span class="res-cap ${room.cls}">${room.word}</span> · <span title="Moral: ${ml}">${me}</span>`;
         return playerRow(S, p, { cols, sub });
       }
       const cols = `<span class="w-s">${p.age}</span><span class="w-s">${fitB(p.fit)}</span><span>${U.money(W.value(S, p))}</span>
@@ -1086,16 +1088,16 @@
     if (resTab) {
       const bill = U.sum(sq, p => p.wage), cap = sq.filter(p => AC.atCap(p)).length;
       return pageTitle('Plantilla', `Filial · ${sq.length}/${AC.MAX_RES} jugadores`) + seg +
-        `<section class="card res-intro"><p>${S.gender === 'F' ? 'Las canteranas nuevas llegan aquí cada verano.' : 'Los canteranos nuevos llegan aquí cada verano.'} En el filial juegan cada semana y crecen como si estuvieran ${S.gender === 'F' ? 'cedidas' : 'cedidos'}, pero solo hasta el ${Math.round(AC.CAP * 100)} % de su potencial. ${S.gender === 'F' ? 'Para que pasen de ahí, súbelas al primer equipo o cédelas.' : 'Para que pasen de ahí, súbelos al primer equipo o cédelos.'} A los ${AC.PROMOTE_AGE} años suben obligatoriamente.</p>
+        `<section class="card res-intro"><p>${S.gender === 'F' ? 'Las canteranas nuevas llegan aquí cada verano.' : 'Los canteranos nuevos llegan aquí cada verano.'} En el filial juegan cada semana y crecen como si estuvieran ${S.gender === 'F' ? 'cedidas' : 'cedidos'}, pero solo hasta cierto punto: el filial se les queda pequeño. ${S.gender === 'F' ? 'Para que lleguen a su techo, súbelas al primer equipo o cédelas.' : 'Para que lleguen a su techo, súbelos al primer equipo o cédelos.'} A los ${AC.PROMOTE_AGE} años suben obligatoriamente.</p>
           <p class="note">Cobran ${U.money(AC.RES_WAGE)}/sem hasta que les renuevas. ${S.gender === 'F' ? `Desde la ficha de cada jugadora puedes subirla o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarla.` : `Desde la ficha de cada jugador puedes subirle o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarle.`}</p></section>
         <div class="kpis" style="margin:12px 0">
           <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
-          <div class="kpi"><div class="k">En su techo</div><div class="v">${cap}</div></div>
+          <div class="kpi"><div class="k">Ya no crecen aquí</div><div class="v">${cap}</div></div>
           <div class="kpi"><div class="k">Salarios/sem</div><div class="v">${U.money(bill)}</div></div></div>
         <div class="chips" role="tablist">${SQ_SORTS.filter(([k]) => k !== 'fit' && k !== 'value').map(([k, l]) => `<button class="chip ${key === k ? 'on' : ''}" data-act="sq-sort" data-k="${k}">${l}</button>`).join('')}</div>
         <div class="card" style="margin-top:12px;padding:6px 8px">
           <div class="pcols" style="justify-content:flex-end;padding:6px 60px 6px 0;font-size:11px;text-transform:uppercase;letter-spacing:.05em">
-            <span class="w-s">Edad</span><span class="w-s">Techo</span><span class="w-s">Pot.</span><span>Salario</span><span class="w-s">Fin</span></div>
+            <span class="w-s">Edad</span><span class="w-pot">Potencial</span><span>Salario</span><span class="w-s">Fin</span></div>
           <div class="plist">${list || `<div class="empty">El filial está vacío. Llegarán ${S.gender === 'F' ? 'canteranas' : 'canteranos'} en verano.</div>`}</div></div>`;
     }
     return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + seg + (S.mode === 'tour' ? '' : lockerCard(S) + gearCard(S) + devCard(S)) +
@@ -1137,7 +1139,7 @@
     const rest = sq.filter(p => !inXI.has(p.id)).sort((a, b) => (E.available(b) - E.available(a)) || b.ovr - a.ovr);
     const restRows = rest.map(p => playerRow(S, p, {
       cls: E.available(p) ? '' : 'off',
-      sub: `${flag(S, p)} ${p.age} años · ${fitB(p.fit)} ${p.fit}%`
+      sub: `${flag(S, p)} ${p.age} años · ${fitW(S, p.fit)}`
     })).join('');
     return pageTitle('Tácticas', `Once titular · fuerza ${xiScore.toFixed(1)}`,
       `<button class="btn sm" data-act="tac-best">Mejor once</button>`) +
@@ -1249,10 +1251,10 @@
     const sq = W.squad(S, S.user).slice().sort((a, b) => (E.available(b) - E.available(a)) || E.eff(b, pos) - E.eff(a, pos));
     const cur = S.tactics.slots[i];
     const rows = sq.map(p => {
-      const f = Math.round(E.fit(p, pos) * 100);
+      const pf = TL.Feel.posFit(S, E.fit(p, pos));
       const where = S.tactics.slots.indexOf(p.id);
       const sub = (where >= 0 ? `En el once (${F.POS_ES[E.FORMATIONS[S.tactics.formation][where][0]]}) · ` : '') +
-        `${fitB(p.fit)} ${p.fit}% · <span class="fitpct" style="color:${f >= 95 ? 'var(--accent2)' : f >= 85 ? 'var(--warn)' : 'var(--danger)'}">${f}% en ${F.POS_ES[pos]}</span>`;
+        `${fitW(S, p.fit)} · <span class="feel ${pf.cls}">${pf.word}</span>`;
       return playerRow(S, p, {
         act: 'tac-assign', attrs: ` data-i="${i}"`, sub, cls: (p.id === cur ? 'sel ' : '') + (E.available(p) ? '' : 'off'),
         right: `<span class="num" style="font-size:18px;font-weight:700;width:30px;text-align:right">${Math.round(E.eff(p, pos))}</span>`
@@ -1450,7 +1452,7 @@
       .map(([k, l]) => `<option value="${k}" ${f.line === k ? 'selected' : ''}>${l}</option>`).join('');
     return `<section class="card"><div class="card-head"><h2>${fem(S) ? 'Tus cedidas' : 'Tus cedidos'} · ${out.length}</h2></div>
         ${out.length ? out.map(l => loanCard(S, l, true)).join('') : `<div class="empty">${fem(S) ? 'No tienes ninguna jugadora cedida. Cede desde la ficha de una jugadora con el mercado abierto: las jóvenes que no juegan crecen más jugando fuera.' : 'No tienes a nadie cedido. Cede desde la ficha de un jugador con el mercado abierto: los jóvenes que no juegan crecen más jugando fuera.'}</div>`}
-        ${idle.length ? `<div class="group-title mt">Necesitan minutos</div><div class="plist">${idle.map(p => playerRow(S, p, { sub: `${p.age} años · pot. ${p.pot} · ${(S.stats[p.id] || [0])[0]} partidos` })).join('')}</div>` : ''}</section>
+        ${idle.length ? `<div class="group-title mt">Necesitan minutos</div><div class="plist">${idle.map(p => playerRow(S, p, { sub: `${p.age} años · pot. ${potTxt(S, p)} · ${(S.stats[p.id] || [0])[0]} partidos` })).join('')}</div>` : ''}</section>
       ${inn.length ? `<section class="card mt"><div class="card-head"><h2>${fem(S) ? 'Cedidas en tu plantilla' : 'Cedidos en tu plantilla'} · ${inn.length}</h2></div>${inn.map(l => loanCard(S, l, false)).join('')}</section>` : ''}
       <section class="card mt"><div class="card-head"><h2>Pedir ${fem(S) ? 'cedidas' : 'cedidos'}</h2></div>
         <p class="note">Talentos jóvenes que su club quiere que jueguen y ${fem(S) ? 'jugadoras' : 'jugadores'} que no están a gusto: refuerzan tu equipo hasta final de temporada sin pagar traspaso y, a veces, su club paga parte de la ficha.${M.windowOpen(S) ? '' : ' <b>Con el mercado cerrado puedes mirar, pero no cerrar la cesión.</b>'}</p>
@@ -1468,7 +1470,7 @@
     box.innerHTML = `<div class="group-title">${U.num(res.length)} ${fem(S) ? 'disponibles' : 'disponibles'}</div><div class="plist">${shown.map(([p, t]) => {
       const club = S.clubs[p.club];
       const sub = `${crest(club, 'sm')} ${esc(club.name)} · ${p.age} años · <span class="loan-why ${t.why}">${tag[t.why]}</span> · pagas ${U.money(t.wage)}/sem${t.fee ? ' + ' + U.money(t.fee) : ''}`;
-      return playerRow(S, p, { sub, cols: `<span class="w-s">${p.pot > p.ovr ? '↑' + p.pot : ''}</span>` });
+      return playerRow(S, p, { sub, cols: `<span class="w-s">${p.pot > p.ovr ? '↑' : ''}</span>` });
     }).join('') || '<div class="empty">Nadie encaja con estos filtros ahora mismo.</div>'}</div>
       ${res.length > shown.length ? `<button class="btn block mt" data-act="lc-more">Mostrar más</button>` : ''}`;
   }
@@ -1616,9 +1618,9 @@
         <td><b>${h.pos}º</b>/${h.n} ${h.moved === 'up' ? '<span class="pos-ok">↑</span>' : h.moved === 'down' ? '<span class="neg">↓</span>' : ''}</td><td class="hide-m l">${esc(h.top)}</td></tr>`).join('')}
       </tbody></table>` : '<div class="empty">Tu primera temporada aún está en juego.</div>';
     const R = TL.News.risk(S);
-    const pct = v => (v * 100 < 1 ? (v * 100).toFixed(1) : Math.round(v * 100)) + '%';
-    const riskRows = R.rows.filter(r => r.tone === 'neg').sort((a, b) => b.p - a.p)
-      .map(r => `<tr><td class="l" style="text-align:left;width:auto">${esc(TL.News.LABEL[r.id] || r.id)}</td><td>${pct(r.p)}</td></tr>`).join('');
+    // Cómo de revuelto está el ambiente alrededor del club: palabras, no probabilidades
+    const riskW = v => (v < 0.12 ? ['Muy tranquilo', 'ok'] : v < 0.3 ? ['Tranquilo', 'ok'] : v < 0.55 ? ['Con ruido', 'mid'] : v < 0.8 ? ['Revuelto', 'low'] : ['Muy revuelto', 'low']);
+    const riskK = (t, v) => { const [w, c] = riskW(v); return `<div class="kpi"><div class="k">${t}</div><div class="v feel ${c}">${w}</div></div>`; };
     return `<div class="grid two">
       ${moneyCharts(S)}
       <section class="card span2"><div class="card-head"><h2>Finanzas</h2><span class="muted">Temporada ${U.seasonLabel(S.season)}</span></div>
@@ -1642,20 +1644,13 @@
         <div class="info mt"><div><div class="k">Aforo</div><div class="v">${U.num(c.capacity)}</div></div>
         <div><div class="k">Entrada media</div><div class="v">€${Math.round(c.price * S.com.ticketMult)}</div></div>
         <div><div class="k">Última asistencia</div><div class="v">${S.lastAttendance ? U.num(S.lastAttendance) : '—'}</div></div></div></section>
-      <section class="card"><div class="card-head"><h2>Directiva</h2><span class="muted">${Math.round(S.board.conf)}%</span></div>
+      <section class="card"><div class="card-head"><h2>Directiva</h2><span class="feel ${TL.Feel.board(S.board.conf).cls}">${TL.Feel.board(S.board.conf).word}</span></div>
         <div style="font-weight:700;font-size:16px">${esc(S.board.text)}</div>
         <div class="bar mt ${S.board.conf < 30 ? 'bad' : S.board.conf < 50 ? 'warn' : ''}"><i style="width:${S.board.conf}%"></i></div>
-        <p class="note mt">Si la confianza cae a cero, o por debajo del 15% al final de la temporada, serás destituido. Los escándalos, la deuda y las derrotas la erosionan.</p></section>
-      <section class="card span2"><div class="card-head"><h2>Riesgo de polémicas esta temporada</h2><span class="muted">por club</span></div>
-        <div class="kpis"><div class="kpi"><div class="k">Algún problema</div><div class="v">${pct(R.any)}</div></div>
-        <div class="kpi"><div class="k">Escándalo grave</div><div class="v">${pct(R.anyGrave)}</div></div>
-        <div class="kpi"><div class="k">Incidente de tu afición</div><div class="v">${pct(R.match.crowd)}</div></div>
-        <div class="kpi"><div class="k">Racismo en grada</div><div class="v">${pct(R.match.racism)}</div></div></div>
-        <details class="mt"><summary class="note" style="cursor:pointer">Ver todas las probabilidades (ajustadas por tus habilidades)</summary>
-          <table class="table mt"><tbody>${riskRows}
-          <tr><td class="l" style="text-align:left">Agresión entre jugadores en un partido</td><td>${pct(R.match.fight)}</td></tr>
-          <tr><td class="l" style="text-align:left">Jugador que se encara con el árbitro</td><td>${pct(R.match.confront)}</td></tr>
-          <tr><td class="l" style="text-align:left">Agresión al árbitro</td><td>${pct(R.match.refAssault)}</td></tr></tbody></table></details></section>
+        <p class="note mt">Si la directiva pierde la confianza en ti, o llega muy tocada al final de la temporada, te destituirá. Los escándalos, la deuda y las derrotas la erosionan.</p></section>
+      <section class="card span2"><div class="card-head"><h2>Ambiente alrededor del club</h2><span class="muted">esta temporada</span></div>
+        <div class="kpis">${riskK('Vestuario y prensa', R.any)}${riskK('Líos graves', R.anyGrave * 2.5)}${riskK('Tu grada', R.match.crowd)}</div>
+        <p class="note mt">Cuanto más revuelto, más fácil que salte una polémica. Lo calman un vestuario contento, tus habilidades de disciplina y el programa social del club.</p></section>
       <section class="card span2"><div class="card-head"><h2>Historial</h2></div>${hist}</section>
       <section class="card span2"><div class="card-head"><h2>Partida</h2></div>
         <div class="btn-grid"><button class="btn" data-act="save">💾 Guardar</button><button class="btn" data-act="export">📤 Exportar</button>
@@ -1869,8 +1864,7 @@
     const labels = p.pos === 'GK' ? F.CARD_LABELS_GK : F.CARD_LABELS;
     const stats6 = p.st.map((v, i) => `<div class="stat"><div class="k">${labels[i]} <b>${v}</b></div>
       <div class="bar"><i style="width:${v}%;background:${v >= 80 ? 'var(--accent2)' : v >= 65 ? 'var(--warn)' : 'var(--danger)'}"></i></div></div>`).join('');
-    const sm = TL.Staff.scoutMargin(S);
-    const potTxt = mine ? `${p.pot}` : p.pot <= p.ovr ? `${p.ovr}` : sm === 0 ? `${p.pot}` : `${Math.max(p.ovr, p.pot - sm)}–${Math.min(95, p.pot + sm)}`;
+    const pot = TL.Feel.potential(S, p);
     const status = p.inj > 0 ? `Lesionado (${p.inj} sem)` : p.sus > 0 ? `Sancionado (${p.sus})` : 'Disponible';
     const st = S.stats[id];
     const season = st ? `<div class="info mt"><div><div class="k">Partidos</div><div class="v">${st[0]}</div></div>
@@ -1887,13 +1881,13 @@
       <div><div class="k">Valor</div><div class="v">${U.money(W.value(S, p))}</div></div>
       <div><div class="k">Salario</div><div class="v">${free || retired ? '—' : U.money(p.wage) + '/sem'}</div></div>
       <div><div class="k">Contrato</div><div class="v">${free || retired ? '—' : 'Hasta ' + p.contract}</div></div>
-      <div><div class="k">Potencial</div><div class="v">${potTxt}</div></div>
+      <div><div class="k">Potencial</div><div class="v" title="${pot.exact ? '' : 'Lo que calcula tu cuerpo técnico'}">${pot.txt}</div></div>
       <div><div class="k">Pie</div><div class="v">${p.foot ? 'Diestro' : 'Zurdo'}</div></div>
       <div><div class="k">Estado</div><div class="v">${status}</div></div>
       <div><div class="k">Filigranas</div><div class="v">${starsN(p.sm)}</div></div>
       <div><div class="k">Pierna mala</div><div class="v">${starsN(p.wf)}</div></div>
-      <div><div class="k">Forma física</div><div class="v">${p.fit}%</div></div>
-      <div><div class="k">Moral</div><div class="v">${TL.News.moraleLabel(p.mor)[1]} ${TL.News.moraleLabel(p.mor)[0]}</div></div>
+      <div><div class="k">Forma física</div><div class="v">${fitW(S, p.fit)}</div></div>
+      <div><div class="k">Moral</div><div class="v">${TL.Feel.morale(S, p.mor)[1]} <span>${TL.Feel.morale(S, p.mor)[0]}</span></div></div>
       <div><div class="k">Faltas temporada</div><div class="v">${st ? st[7] || 0 : 0}</div></div>
       <div><div class="k">Ciclo amarillas</div><div class="v">${st ? st[4] % 5 : 0}/5</div></div></div>`;
     const pnews = S.news.filter(n => n.pid === p.id).slice(0, 4);
@@ -1917,17 +1911,18 @@
   /** Telaraña de atributos (con su techo y con tu mejor jugador en el puesto) y evolución. */
   function playerCharts(S, p, labels, stats6) {
     const mine = p.club === S.user || (TL.Locker.loanOf(S, p.id) || {}).from === S.user;
-    const ghost = mine && p.pot > p.ovr ? p.st.map(v => Math.min(99, v + (p.pot - p.ovr))) : null;
+    const est = TL.Feel.potential(S, p).mid;
+    const ghost = mine && est > p.ovr ? p.st.map(v => Math.min(99, v + (est - p.ovr))) : null;
     let compare = null, cmpName = '';
     if (!mine) {
       const best = W.squad(S, S.user).filter(q => q.pos === p.pos || F.LINE[q.pos] === F.LINE[p.pos]).sort((a, b) => b.ovr - a.ovr)[0];
       if (best) { compare = best.st; cmpName = best.short; }
     }
-    const legend = `<div class="ch-legend"><span><i style="background:var(--accent)"></i>${esc(p.short)}</span>${ghost ? `<span><i class="ghost"></i>Su techo (potencial)</span>` : ''}${compare ? `<span><i style="background:#8fc4ff"></i>Tu ${esc(cmpName)}</span>` : ''}</div>`;
+    const legend = `<div class="ch-legend"><span><i style="background:var(--accent)"></i>${esc(p.short)}</span>${ghost ? `<span><i class="ghost"></i>Su techo (estimado)</span>` : ''}${compare ? `<span><i style="background:#8fc4ff"></i>Tu ${esc(cmpName)}</span>` : ''}</div>`;
     let prog = '';
     const ph = S.lk && S.lk.ph && S.lk.ph[p.id];
     const rh = S.lk && S.lk.rh && S.lk.rh[p.id];
-    if (ph && ph.length >= 2) prog += `<div><div class="group-title">Evolución de su media</div>${TL.Charts.line([{ name: 'Media', color: 'var(--accent)', data: ph.map(x => x[2]) }], { h: 120, padL: 30, xl: ph.map(x => 'J' + (x[1] + 1)), min: Math.min(...ph.map(x => x[2])) - 2, max: Math.max(p.pot, ...ph.map(x => x[2])) + 1 })}</div>`;
+    if (ph && ph.length >= 2) prog += `<div><div class="group-title">Evolución de su media</div>${TL.Charts.line([{ name: 'Media', color: 'var(--accent)', data: ph.map(x => x[2]) }], { h: 120, padL: 30, xl: ph.map(x => 'J' + (x[1] + 1)), min: Math.min(...ph.map(x => x[2])) - 2, max: Math.max(est, ...ph.map(x => x[2])) + 1 })}</div>`;
     if (rh && rh.length) prog += `<div><div class="group-title">Notas de sus últimos partidos</div>${TL.Charts.bars(rh.map((v, i) => ({ v, l: String(i + 1), cls: v >= 7.5 ? 'pos' : v < 6 ? 'neg' : 'mid', t: v.toFixed(1) })), { h: 110, padL: 30, min: 4, max: 10, fmt: v => v.toFixed(0) })}</div>`;
     return `<div class="pl-top"><div class="radar-box">${TL.Charts.radar(p.st, labels, { ghost, compare, title: 'Atributos de ' + p.name })}${legend}</div><div class="stats6">${stats6}</div></div>
       ${prog ? `<div class="chart-grid">${prog}</div>` : ''}`;
@@ -1958,7 +1953,7 @@
     let fil = '';
     if (AC && AC.on(S) && p.res) {
       const fem = S.gender === 'F';
-      fil = `<div class="res-box mt"><b>🌱 Filial</b><span>Crece jugando cada semana, pero solo hasta ${AC.capOf(p)} (el ${Math.round(AC.CAP * 100)} % de su potencial, ${p.pot}).</span>
+      fil = `<div class="res-box mt"><b>🌱 Filial</b><span>Crece jugando cada semana, pero solo hasta cierto punto: el filial se le acaba quedando pequeño.</span>
         ${AC.atCap(p) ? '<span class="res-full">Ya ha llegado a su techo en el filial.</span>' : ''}
         <span>${fem ? 'Para pasar de ahí, súbela al primer equipo o cédela.' : 'Para pasar de ahí, súbelo al primer equipo o cédelo.'}</span>
         <span>Sube al primer equipo sí o sí a los ${AC.PROMOTE_AGE} años.</span>
@@ -2175,7 +2170,7 @@
       <div class="info">
         <div><div class="k">Campeón</div><div class="v">${esc(champ.name)}</div></div>
         <div><div class="k">Objetivo</div><div class="v ${ok ? 'pos-ok' : 'neg'}">${ok ? 'Cumplido' : 'No cumplido'}</div></div>
-        <div><div class="k">Confianza</div><div class="v">${sum.conf}% (${sum.confDelta >= 0 ? '+' : ''}${sum.confDelta})</div></div>
+        <div><div class="k">Confianza</div><div class="v"><span>${TL.Feel.board(sum.conf).word}</span> <small class="feel-note">${TL.Feel.boardTrend(sum.confDelta)}</small></div></div>
         <div><div class="k">Premio liga</div><div class="v">${U.money(sum.prize || 0)}</div></div>
         <div><div class="k">Experiencia</div><div class="v">+${sum.xp || 0} XP · nivel ${S.mgr.level}</div></div>
         <div><div class="k">Pichichi</div><div class="v">${sum.topScorer ? esc(sum.topScorer[0]) + ' (' + sum.topScorer[1] + ')' : '—'}</div></div>
@@ -2185,7 +2180,7 @@
       ${sum.left.length ? `<p class="note mt">Se van libres (fin de contrato): ${esc(sum.left.join(', '))}.</p>` : ''}
       ${sum.retired.length ? `<p class="note mt">Se retiran: ${esc(sum.retired.join(', '))}.</p>` : ''}
       ${sum.promoted && sum.promoted.length ? `<p class="note mt">Suben del filial al primer equipo (${TL.Academy.PROMOTE_AGE} años): ${esc(sum.promoted.join(', '))}.</p>` : ''}
-      ${youth.length ? `<div class="group-title">${TL.Academy && TL.Academy.on(S) ? 'Llegan al filial' : 'Llegan de la cantera'}</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${Math.max(p.ovr, p.pot - 3)}–${Math.min(95, p.pot + 3)}` })).join('')}` : ''}
+      ${youth.length ? `<div class="group-title">${TL.Academy && TL.Academy.on(S) ? 'Llegan al filial' : 'Llegan de la cantera'}</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${potTxt(S, p)}` })).join('')}` : ''}
       ${sum.lastChance ? '<p class="note bad mt">La directiva está muy descontenta, pero te da una última oportunidad. Otra temporada así y estarás fuera.</p>' : ''}
       ${sum.fired ? '<p class="note bad mt">La directiva ha decidido prescindir de ti.</p>' : ''}
       <p class="note mt">Reputación de mánager: ${S.mgr.rep} (${sum.repDelta >= 0 ? '+' : ''}${Math.round(sum.repDelta)}).</p>

@@ -199,7 +199,7 @@
       case 'ht': {
         title = `Descanso · ${m.score[0]}-${m.score[1]}`;
         if (t.talk) {
-          body = `Charla: ${E.TALKS[t.talk.kind].name} (${t.talk.pct >= 0 ? '+' : ''}${t.talk.pct.toFixed(1)}% de rendimiento).`;
+          body = `Charla: ${E.TALKS[t.talk.kind].name}. ${t.talk.pct >= 1.5 ? 'El equipo sale enchufado.' : t.talk.pct >= 0 ? 'El mensaje cala a medias.' : 'A los jugadores no les ha gustado.'}`;
           acts = btn('mv-resume', '▶ 2ª parte', '', true) + btn('mv-subs', 'Cambios') + btn('mv-tactic', 'Táctica');
         } else {
           body = diff > 0 ? 'Vas ganando. ¿Qué les dices en el vestuario?' : diff < 0 ? 'Vas perdiendo. Es momento de reaccionar.' : 'Empate al descanso. ¿Cómo motivas al equipo?';
@@ -498,7 +498,7 @@
       <div class="group-title">Mentalidad</div>
       <div class="seg">${UI.MENT.map((x, i) => `<button class="${t.mentality === i ? 'on' : ''}" data-act="mv-ment2" data-m="${i}">${x}</button>`).join('')}</div>
       <div class="group-title">En el campo</div>
-      ${t.onPitch.map(o => { const p = G.S.players[o.pid]; return `<div class="row" style="padding:5px 0">${UI.posB(o.slot)}<span class="grow">${esc(p.name)}</span><span class="note">${Math.round(E.fit(p, o.slot) * 100)}%</span></div>`; }).join('')}
+      ${t.onPitch.map(o => { const p = G.S.players[o.pid]; return `<div class="row" style="padding:5px 0">${UI.posB(o.slot)}<span class="grow">${esc(p.name)}</span><span class="note">${TL.Feel.posFit(G.S, E.fit(p, o.slot)).word}</span></div>`; }).join('')}
       <button class="btn primary block mt" data-act="close-sheet">Listo</button>`,
     { onClose: () => { if (!wasPaused) resume(); else renderFoot(); } });
     MV.tacticWasPaused = wasPaused;
@@ -536,13 +536,13 @@
       html += `<p class="note sub-rule">${rule}</p>`;
       html += '<p class="note">¿Quién sale? Los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
-        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · energía ${Math.round(m.energy(o.pid))}%${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
+        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · ${TL.Feel.fit(S, m.energy(o.pid)).word.toLowerCase()}${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
       }).join('');
     } else {
       const o = t.onPitch.find(x => x.pid === MV.subOut);
       html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]}). ¿Quién entra?</p>` +
         (t.bench.length ? t.bench.map(id => S.players[id]).sort((a, b) => E.eff(b, o.slot) - E.eff(a, o.slot)).map(p =>
-          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${Math.round(E.fit(p, o.slot) * 100)}% en ${F.POS_ES[o.slot]} · energía ${p.fit}%` })).join('')
+          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${TL.Feel.posFit(S, E.fit(p, o.slot)).word} · ${TL.Feel.fit(S, p.fit).word.toLowerCase()}` })).join('')
           : '<div class="empty">No quedan suplentes.</div>');
     }
     UI.sheet(html, { onClose: done });

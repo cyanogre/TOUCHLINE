@@ -402,34 +402,35 @@
     const c = S.clubs[S.user], bill = W().wageBill(S, S.user), L = LK();
     const sq = squad(S);
     const chip = (t, good) => out.chips.push([t, good == null ? 0 : good ? 1 : -1]);
-    const sign = v => (v > 0 ? '+' : '') + v;
+    // Las etiquetas dicen hacia dónde va cada cosa (▲, ▼▼…), no cuánto: los números son cosa del motor
+    const ar = (v, big) => TL.Feel.arrows(TL.Feel.level(v, big));
     const mor = (x, d) => { if (x) x.mor = U.clamp(Math.round((x.mor == null ? 70 : x.mor) + d), 0, 100); };
-    if (fx.mor && p) { mor(p, fx.mor); chip(`${sign(fx.mor)} moral (${p.short})`, fx.mor > 0); }
-    if (fx.mor2 && q) { mor(q, fx.mor2); chip(`${sign(fx.mor2)} moral (${q.short})`, fx.mor2 > 0); }
-    if (fx.team) { for (const x of sq) mor(x, fx.team); chip(`${sign(fx.team)} moral del vestuario`, fx.team > 0); }
-    if (fx.boss && p) { L.bossAdd(S, p.id, fx.boss); chip(`${sign(fx.boss)} relación con ${p.short}`, fx.boss > 0); }
-    if (fx.boss2 && q) { L.bossAdd(S, q.id, fx.boss2); chip(`${sign(fx.boss2)} relación con ${q.short}`, fx.boss2 > 0); }
+    if (fx.mor && p) { mor(p, fx.mor); chip(`Moral de ${p.short} ${ar(fx.mor, 8)}`, fx.mor > 0); }
+    if (fx.mor2 && q) { mor(q, fx.mor2); chip(`Moral de ${q.short} ${ar(fx.mor2, 8)}`, fx.mor2 > 0); }
+    if (fx.team) { for (const x of sq) mor(x, fx.team); chip(`Moral del vestuario ${ar(fx.team, 4)}`, fx.team > 0); }
+    if (fx.boss && p) { L.bossAdd(S, p.id, fx.boss); chip(`Relación con ${p.short} ${ar(fx.boss, 8)}`, fx.boss > 0); }
+    if (fx.boss2 && q) { L.bossAdd(S, q.id, fx.boss2); chip(`Relación con ${q.short} ${ar(fx.boss2, 8)}`, fx.boss2 > 0); }
     if (fx.bond && p && q) { L.bond(S, p.id, q.id, fx.bond); chip(`${p.short} y ${q.short}: ${fx.bond > 0 ? 'más unidos' : 'más distanciados'}`, fx.bond > 0); }
     let money = 0;
     if (fx.cost) money -= fx.cost === 'x' ? inst.v.x : Math.round(bill * fx.cost);
     if (fx.gain) money += fx.gain === 'x' ? inst.v.x : Math.round(bill * fx.gain);
     if (fx.fine && p) money += Math.round(p.wage * fx.fine);
     if (money) { c.cash += money; chip(`${money > 0 ? '+' : '−'}${U.money(Math.abs(money))}`, money > 0); }
-    if (fx.fans && S.com) { S.com.fans = Math.round(S.com.fans * (1 + fx.fans)); chip(`Afición: ${fx.fans > 0 ? '+' : '−'}${Math.round(Math.abs(fx.fans) * 1000) / 10} %`, fx.fans > 0); }
-    if (fx.board) { S.board.conf = U.clamp(Math.round((S.board.conf + fx.board) * 10) / 10, 0, 100); chip(`Directiva: ${sign(fx.board)}`, fx.board > 0); }
-    if (fx.fit && p) { p.fit = U.clamp(p.fit + fx.fit, 30, 100); chip(`${sign(fx.fit)} % forma (${p.short})`, fx.fit > 0); }
-    if (fx.teamFit) { for (const x of sq) x.fit = U.clamp(x.fit + fx.teamFit, 30, 100); chip(`${sign(fx.teamFit)} % forma del equipo`, fx.teamFit > 0); }
+    if (fx.fans && S.com) { S.com.fans = Math.round(S.com.fans * (1 + fx.fans)); chip(`Afición ${ar(fx.fans, 0.02)}`, fx.fans > 0); }
+    if (fx.board) { S.board.conf = U.clamp(Math.round((S.board.conf + fx.board) * 10) / 10, 0, 100); chip(`Directiva ${ar(fx.board, 5)}`, fx.board > 0); }
+    if (fx.fit && p) { p.fit = U.clamp(p.fit + fx.fit, 30, 100); chip(`Forma de ${p.short} ${ar(fx.fit, 8)}`, fx.fit > 0); }
+    if (fx.teamFit) { for (const x of sq) x.fit = U.clamp(x.fit + fx.teamFit, 30, 100); chip(`Forma del equipo ${ar(fx.teamFit, 6)}`, fx.teamFit > 0); }
     if (fx.inj && p) { const w = Array.isArray(fx.inj) ? U.int(fx.inj[0], fx.inj[1]) : fx.inj; p.inj = Math.max(p.inj, w); chip(`${p.short}: baja ${w} sem.`, false); }
     if (fx.sus && p) { p.sus = Math.max(p.sus, fx.sus); chip(`${p.short}: ${fx.sus} partido${fx.sus > 1 ? 's' : ''} sin jugar`, false); }
     if (fx.away && p) { sendAway(S, p, fx.away); chip(`${p.short}: fuera ${fx.away} días`, null); }
-    if (fx.conf && p && TL.Social) { TL.Social.setConf(S, p, fx.conf[0], fx.conf[1]); chip(`${p.short}: ${fx.conf[0] > 1 ? 'subidón' : 'bajón'} ${fx.conf[1]} jornada${fx.conf[1] > 1 ? 's' : ''}`, fx.conf[0] > 1); }
+    if (fx.conf && p && TL.Social) { TL.Social.setConf(S, p, fx.conf[0], fx.conf[1]); chip(`${p.short}: ${fx.conf[0] > 1 ? 'subidón' : 'bajón'}`, fx.conf[0] > 1); }
     if (fx.teamConf && TL.Social) {
       const xi = (S.tactics.slots || []).map(id => S.players[id]).filter(x => x && x.club === S.user);
       for (const x of xi) TL.Social.setConf(S, x, fx.teamConf[0], fx.teamConf[1]);
-      chip(`Once: ${fx.teamConf[0] > 1 ? 'subidón' : 'bajón'} ${fx.teamConf[1]} jornada${fx.teamConf[1] > 1 ? 's' : ''}`, fx.teamConf[0] > 1);
+      chip(`Once: ${fx.teamConf[0] > 1 ? 'subidón' : 'bajón'}`, fx.teamConf[0] > 1);
     }
-    if (fx.ovr && p) { L.raise(S, p, fx.ovr); if (p.pot < p.ovr) p.pot = p.ovr; chip(`${p.short}: media ${sign(fx.ovr)}`, fx.ovr > 0); }
-    if (fx.pot && p) { p.pot = U.clamp(p.pot + fx.pot, p.ovr, 95); chip(`${p.short}: potencial ${sign(fx.pot)}`, fx.pot > 0); }
+    if (fx.ovr && p) { L.raise(S, p, fx.ovr); if (p.pot < p.ovr) p.pot = p.ovr; chip(`${p.short}: media ${ar(fx.ovr, 2)}`, fx.ovr > 0); }
+    if (fx.pot && p) { p.pot = U.clamp(p.pot + fx.pot, p.ovr, 95); chip(`${p.short}: potencial ${ar(fx.pot, 3)}`, fx.pot > 0); }
     if (fx.trait && p) {
       const t = fx.trait === 'dna' ? U.pick(Object.values(L.DNA)).trait : fx.trait;
       L.addTrait(S, p.id, t); chip(`${p.short} gana «${L.traitInfo(S, t).name}»`, !CONFLICT.includes(t));
