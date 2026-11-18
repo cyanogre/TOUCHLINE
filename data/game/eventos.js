@@ -134,7 +134,7 @@
         { l: 'Apuntarse', odds: [{ p: 0.3, fx: { gain: 0.6, fans: -0.02, board: 4 }, r: 'Entra el dinero, pero la grada se llena de pancartas en contra.' }, { p: 0.7, fx: { fans: -0.02, board: -6 }, r: 'El proyecto se cae en 48 horas y quedas fatal.' }] },
         { l: 'Plantarse con la afición', fx: { fans: 0.01, team: 2 }, r: 'Tus aficionados te hacen una pancarta de agradecimiento.' }
       ] },
-    { id: 'c_balon', cat: 'prensa', tone: 'neu', who: 'p', if: { ovr: [84, 99] }, p: 0.1, per: 'season', cdp: 400,
+    { id: 'c_balon', cat: 'prensa', tone: 'neu', who: 'p', if: { ovr: [84, 99] }, p: 0.1, per: 'season', cdp: 400, once: true,
       t: '{s} no ganará el Balón de Oro', b: 'Horas antes de la gala se filtra que {n} no ganará el Balón de Oro: será para Aidama Bonnadí o para Kiriam Mvabpé, depende de a quién preguntes. El club piensa no ir a la gala.',
       o: [
         { l: 'Boicot: nadie va a la gala', fx: { mor: 6, fans: -0.004, board: -2 }, r: 'Butacas vacías y polémica mundial. Él te lo agradece.' },
