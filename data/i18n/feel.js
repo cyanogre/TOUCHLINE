@@ -73,3 +73,10 @@ TL_I18N_ADD([
   ['Le dices que es fijo: el equipo se construye a su alrededor.', 'You tell him he is a fixture: the team is built around him.', 'Tu lui dis qu’il est titulaire indiscutable : l’équipe se construit autour de lui.', 'Du sagst ihm, er ist gesetzt: Das Team wird um ihn herum gebaut.', 'Gli dici che è un titolare fisso: la squadra si costruisce attorno a lui.'],
   ['Le dices que es fija: el equipo se construye a su alrededor.', 'You tell her she is a fixture: the team is built around her.', 'Tu lui dis qu’elle est titulaire indiscutable : l’équipe se construit autour d’elle.', 'Du sagst ihr, sie ist gesetzt: Das Team wird um sie herum gebaut.', 'Le dici che è una titolare fissa: la squadra si costruisce attorno a lei.']
 ]);
+TL_I18N_ADD([
+  ['El estadio entero se pone en pie para despedir a {}. ¡Qué ovación!', 'The whole stadium rises to send {} off. What an ovation!', 'Tout le stade se lève pour saluer {}. Quelle ovation !', 'Das ganze Stadion erhebt sich für {}. Was für Ovationen!', 'Tutto lo stadio in piedi per salutare {}. Che ovazione!'],
+  ['Hasta parte de la grada local aplaude a {}.', 'Even some home fans applaud {}.', 'Même une partie du public local applaudit {}.', 'Sogar ein Teil der Heimfans applaudiert {}.', 'Anche parte del pubblico di casa applaude {}.'],
+  ['Aplausos para {} al salir.', 'Applause for {} going off.', 'Applaudissements pour {} à sa sortie.', 'Applaus für {} beim Rausgehen.', 'Applausi per {} all’uscita.'],
+  ['Su afición, en el fondo visitante, le aplaude.', 'The away end applauds.', 'Ses supporters, dans le parcage visiteur, l’applaudissent.', 'Der Gästeblock applaudiert.', 'Il settore ospiti lo applaude.'],
+  ['Algunos pitos para {} camino del banquillo.', 'Some whistles for {} on the way to the bench.', 'Quelques sifflets pour {} en rejoignant le banc.', 'Ein paar Pfiffe für {} auf dem Weg zur Bank.', 'Qualche fischio per {} verso la panchina.']
+]);

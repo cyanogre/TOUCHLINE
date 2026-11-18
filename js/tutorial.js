@@ -23,6 +23,7 @@
       { text: 'Primer consejo gratis: firma ya los **patrocinios libres** en Club → Comercial. Es dinero que entra sin jugar. ¡A trabajar, míster!', emo: 'proud' }
     ],
     match: [
+      { sel: '#pitch', text: 'Bienvenido al **césped**. Cada círculo es un jugador con su dorsal; los tuyos llevan borde blanco. El balón va donde va la jugada.' },
       { sel: '#mv-call', text: 'Esto es la **radio**: te cuento el partido jugada a jugada. Cuando pase algo gordo (un gol, un penalti, una roja…) verás la **jugada clave** en el campo.' },
       { sel: '.narr-btn', text: 'Si prefieres ver **todo el partido** en el campo, toca aquí. Y vuelves a la radio cuando quieras.' },
       { sel: '.speeds', text: 'La **velocidad**, de x1 a x16. Yo veo los partidos tranquilo, pero tú haz lo que quieras.' },
@@ -36,7 +37,9 @@
   function start(id, force) {
     if (!force && done(id)) return false;
     active = { id, onEnd: null };
-    TL.Mentor.say(TOURS[id], {
+    // Solo lo que se ve ahora mismo (en el partido narrado no hay campo; en el completo no hay radio)
+    const vis = st => { if (!st.sel) return true; const el = document.querySelector(st.sel); return !!(el && el.getClientRects().length); };
+    TL.Mentor.say(TOURS[id].filter(vis), {
       dim: true,
       voice: id === 'main' ? 'hola' : 'escucha',
       onEnd: () => {

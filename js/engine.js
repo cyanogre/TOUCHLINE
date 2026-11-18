@@ -959,8 +959,27 @@
       t.subs++;
       if (!this.atHalfTime()) { t.wins = t.wins || []; if (!t.wins.includes(this.min)) t.wins.push(this.min); }
       this._str = null;
-      if (this.detail) this._ev('sub', i, inPid, outPid, say('sub', { p: this.P(inPid).short, a: this.P(outPid).short }));
+      if (this.detail) {
+        // La grada despide al que sale: ovación si ha hecho un partidazo, pitos si ha estado fatal
+        const v = this.liveRating(outPid), rec = this.pl[outPid], home = i === 0, nm = this.P(outPid).short;
+        let crowd = null, extra = '';
+        if (v >= 7.6 || rec.g >= 2) { crowd = home ? 'ovation' : 'away'; extra = home ? ` El estadio entero se pone en pie para despedir a ${nm}. ¡Qué ovación!` : ` Hasta parte de la grada local aplaude a ${nm}.`; }
+        else if (v >= 6.9 || rec.g >= 1 || rec.a >= 1) { crowd = 'applause'; extra = home ? ` Aplausos para ${nm} al salir.` : ` Su afición, en el fondo visitante, le aplaude.`; }
+        else if (v < 5.6 && home && !rec.r) { crowd = 'whistles'; extra = ` Algunos pitos para ${nm} camino del banquillo.`; }
+        this._ev('sub', i, inPid, outPid, say('sub', { p: this.P(inPid).short, a: nm }) + extra, crowd ? { crowd } : null);
+      }
       return true;
+    }
+
+    /** Nota «en directo» de un jugador (sin el azar de la nota final). */
+    liveRating(id) {
+      const r = this.pl[id];
+      if (!r) return 6;
+      const p = this.P(+id), [g0, g1] = this.score;
+      const mine = r.team === 0 ? g0 : g1, opp = r.team === 0 ? g1 : g0;
+      let v = 6.2 + (p.ovr - 72) / 30 + r.g * 1.0 + r.a * 0.6 + r.sv * 0.15 - r.y * 0.3 - (r.r ? 1.6 : 0) + r.pw * 0.3 - r.pm * 0.6 + r.ps * 0.8 - r.f * 0.04;
+      v += Math.min(1, (this.min - r.on) / 90) * ((mine > opp ? 0.4 : mine < opp ? -0.3 : 0) + mine * 0.08);
+      return U.clamp(v, 3.5, 10);
     }
 
     /** En el descanso (los cambios de ahí no gastan parada). */
