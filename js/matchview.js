@@ -79,6 +79,11 @@
   function addEvent(e) {
     const feed = el('mv-feed');
     if (!feed || !e.text) return;
+    if (e.type === 'sub' && e.crowd && !MV.skip && TL.SFX) {
+      if (e.crowd === 'ovation') { TL.SFX.ovation(1.4); TL.SFX.applause(4, 0.6); }
+      else if (e.crowd === 'applause' || e.crowd === 'away') TL.SFX.applause(e.crowd === 'away' ? 2 : 3, e.crowd === 'away' ? 0.3 : 0.45);
+      else if (e.crowd === 'whistles') TL.SFX.whistles(5, 0.35);
+    }
     const d = document.createElement('div');
     const big = e.type === 'ht' || e.type === 'ft' || e.type === 'ko';
     const hot = e.controversy || ['red', 'refmiss', 'heated', 'crowd', 'disallowed'].includes(e.type);
@@ -404,7 +409,7 @@
     const goals = m.events.filter(e => e.type === 'goal');
     if (!goals.length) return '';
     return `<div class="card mt">${goals.map(e =>
-      `<div class="row" style="padding:4px 0"><span class="num faint" style="width:32px">${e.min}'</span><span>${e.kind === 'pen' ? '🎯' : '⚽'}</span>
+      `<div class="sc-row"><span class="num faint">${e.min}'</span><span>${e.kind === 'pen' ? '🎯' : '⚽'}</span>
        <b>${esc(S.players[e.pid].short)}</b><span class="note">${esc(S.clubs[m.teams[e.team].club].code)}${e.kind === 'pen' ? ' · penalti' : e.kind === 'fk' ? ' · falta directa' : ''}${e.pid2 != null ? ' · asist. ' + esc(S.players[e.pid2].short) : ''}</span></div>`).join('')}</div>`;
   }
 
@@ -649,6 +654,9 @@
     if (!m || MV.summary) return;
     MV.summary = true;
     G.completeRound(m);
+    // En el resumen manda la lectura: fuera el campo y la radio
+    const root = el('match'); if (root) root.classList.add('over');
+    updateHead();
     const cp = m.cup;
     const res = cp ? [m.teams[0].club, m.teams[1].club, m.score[0], m.score[1]] : S.fixtures[S.week - 1].find(x => x[0] === S.user || x[1] === S.user);
     const t = m.teams[MV.me];

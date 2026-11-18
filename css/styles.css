@@ -643,7 +643,7 @@ details summary { list-style: revert; }
 .match .score .res { font-size: 38px; }
 .match .score .t { flex-direction: row; justify-content: center; gap: 8px; }
 .match .score .t:last-child { flex-direction: row-reverse; }
-.match .score .t b { font-size: 15px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match .score .t b { font-size: 15px; text-align: left; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .match .score .t:last-child b { text-align: right; }
 .pitch-box { background: #10301e; padding: 6px 10px; display: flex; justify-content: center; position: relative; }
 .pitch-toggle { position: absolute; right: 14px; top: 10px; z-index: 2; font-size: 12px; font-weight: 700; color: #fff; padding: 4px 9px; border-radius: 99px;
@@ -1542,3 +1542,17 @@ body.shake-s { animation: shake-s .35s; }
 .feel.ok { color: var(--accent2); } .feel.mid { color: var(--warn); } .feel.low { color: var(--danger); }
 .narr-call.tense p { color: var(--warn); }
 .office-follow .office-opt b { font-style: italic; }
+/* Filas desplazables: aviso de que hay más; con ratón, todo a la vista en varias líneas */
+.chips.more:not(.at-end), .seg.more:not(.at-end) { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.chips.more:not(.at-start).at-end, .seg.more:not(.at-start).at-end { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
+.chips.more:not(.at-start):not(.at-end), .seg.more:not(.at-start):not(.at-end) { -webkit-mask-image: linear-gradient(90deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(90deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); }
+@media (hover: hover) and (pointer: fine) {
+  .chips { flex-wrap: wrap; overflow-x: visible; }
+  .seg { flex-wrap: wrap; overflow-x: visible; }
+  .seg > button { flex: 1 1 auto; }
+  .chips.more, .seg.more { -webkit-mask-image: none; mask-image: none; }
+}
+/* Resumen del partido: sin campo ni radio, todo para leer */
+.match.over .pitch-box, .match.over .narr-call, .match.over .mtabs { display: none !important; }
+.sc-row { display: grid; grid-template-columns: 34px 22px auto 1fr; align-items: baseline; gap: 6px; padding: 4px 0; }
+.sc-row .note { min-width: 0; }

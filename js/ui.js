@@ -383,6 +383,21 @@
     Music.mood(S);
   }
   UI.render = render;
+  // Filas que se desplazan de lado (chips, pestañas): una sombra avisa de que hay más a la derecha o a la izquierda
+  function markScrollers(root) {
+    (root || document).querySelectorAll('.chips, .seg').forEach(el => {
+      const more = el.scrollWidth > el.clientWidth + 4;
+      el.classList.toggle('more', more);
+      if (!more) return;
+      el.classList.toggle('at-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+      el.classList.toggle('at-start', el.scrollLeft <= 4);
+      if (!el._mk) { el._mk = 1; el.addEventListener('scroll', () => { el.classList.toggle('at-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 4); el.classList.toggle('at-start', el.scrollLeft <= 4); }, { passive: true }); }
+    });
+  }
+  UI.markScrollers = markScrollers;
+  let mkT = 0;
+  new MutationObserver(() => { clearTimeout(mkT); mkT = setTimeout(() => markScrollers(), 60); }).observe(document.body, { childList: true, subtree: true });
+  addEventListener('resize', () => markScrollers());
   UI.refresh = () => render(true);
   A.tab = el => { UI.tab = el.dataset.tab; TL.SFX && TL.SFX.tab(); render(false); };
   A['face-edit'] = () => {
