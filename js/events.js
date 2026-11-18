@@ -292,7 +292,7 @@
     const E = st(S), def = byId(inst.id), D = full(def, inst);
     const now = ABS(S, E.d);
     E.pend = inst; E.n++; E.lastStop = now;
-    E.cd[def.id] = now + (def.cd != null ? def.cd : 21);
+    E.cd[def.id] = now + (def.cd != null ? def.cd : def.per === 'season' ? 200 : 21);   // lo de una vez por temporada no se repite a las pocas semanas, aunque toque a otro jugador
     if (inst.pid != null) {
       E.cd[def.id + ':' + inst.pid] = now + (def.cdp != null ? def.cdp : 70);
       E.cd['p:' + inst.pid] = now + 6;

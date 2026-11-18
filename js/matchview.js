@@ -115,7 +115,7 @@
   /** ¿Merece la pena enseñar esta jugada en el campo? */
   function keyPlay(evs) {
     return evs.some(e => ['goal', 'pen', 'penmiss', 'disallowed', 'red'].includes(e.type) ||
-      ((e.type === 'save' || e.type === 'miss') && (e.team === MV.me ? Math.random() < 0.45 : Math.random() < 0.3)));
+      ((e.type === 'save' || e.type === 'miss') && (e.team === MV.me ? Math.random() < 0.25 : Math.random() < 0.15)));
   }
   /** Mientras se ve la jugada: suspense, sin destripar el final. */
   function tease(e) {
@@ -141,6 +141,8 @@
     if (!root || MV.showing === on) return;
     MV.showing = on;
     root.classList.toggle('narr-show', on);
+    // La jugada clave se ve a ritmo de repetición, no a x16
+    if (MV.pitch) MV.pitch.speed = on ? Math.min(settings().speed || 1, 2) : settings().speed || 1;
     if (on) requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
 
@@ -213,8 +215,10 @@
     const m = MV.m;
     if (m.min === 45 && !MV.htDone) {
       MV.htDone = true;
+      const sk = MV.skip;
       MV.skip = null;
-      if (settings().pause.ht) { pause('ht', null); return; }
+      // Si saltabas al descanso, o la pausa del descanso está activada, el partido se para aquí: los cambios son gratis
+      if (settings().pause.ht || (sk && (sk.type === 'event' || sk.min <= 45))) { pause('ht', null); return; }
       m.teamTalk(MV.me, 'calm');
     }
     if (m.done) { onFinal(); return; }

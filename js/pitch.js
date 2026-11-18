@@ -498,12 +498,16 @@
       if (a.state === 'down' || a.state === 'sit') { a.vx *= 0.8; a.vy *= 0.8; if (a.until && a.until < this.t) a.state = null; return; }
       if (a.until && a.until < this.t && a.state !== 'walk') a.state = null;
       const e = a.kind === 'pl' ? this.energy(a) : 1;
-      const top = a.kind === 'pl' ? 7.8 * a.pace * (0.55 + 0.45 * e) : a.kind === 'ref' ? 6.6 : a.kind === 'ar' ? 6 : 4.5;
+      const top = a.kind === 'pl' ? 7 * a.pace * (0.55 + 0.45 * e) : a.kind === 'ref' ? 6.6 : a.kind === 'ar' ? 6 : 4.5;
       const speed = a.state === 'walk' || a.state === 'sad' ? Math.min(a.leave ? 2.6 : 1.6, top) : top * (a.run || 0.5);
-      const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
-      const want = Math.min(speed, d * 1.9);
+      // El destino se sigue con algo de retraso: si la jugada cambia de golpe, el jugador no da un volantazo
+      if (a.sx == null || Math.hypot(a.tx - a.sx, a.ty - a.sy) > 30) { a.sx = a.tx; a.sy = a.ty; }
+      const kt = a.kind === 'pl' && a.state !== 'walk' ? Math.min(1, dt * 3.2) : 1;
+      a.sx += (a.tx - a.sx) * kt; a.sy += (a.ty - a.sy) * kt;
+      const dx = a.sx - a.x, dy = a.sy - a.y, d = Math.hypot(dx, dy);
+      const want = Math.min(speed, d * 1.3);
       const ux = d > 0.01 ? dx / d : 0, uy = d > 0.01 ? dy / d : 0;
-      const k = Math.min(1, dt * 4.2);
+      const k = Math.min(1, dt * 2.6);
       a.vx += (ux * want - a.vx) * k; a.vy += (uy * want - a.vy) * k;
       a.x += a.vx * dt; a.y += a.vy * dt;
     }
