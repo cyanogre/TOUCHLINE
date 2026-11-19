@@ -442,16 +442,16 @@
       // Quién ataca: el equipo de quien lleva el balón (si nadie lo lleva, el último que lo tuvo)
       const car = b.owner != null ? this.A[b.owner] : null;
       const att = car ? car.team : this.poss, def = 1 - att;
-      const dtT = clamp(this.t - (this._tt == null ? this.t : this._tt), 0, 0.2); this._tt = this.t;
+      let dtT = this.t - (this._tt == null ? this.t : this._tt); this._tt = this.t; dtT = isFinite(dtT) ? clamp(dtT, 0, 0.2) : 0;
       for (const id in this.A) {
         const a = this.A[id];
         const h = this._home(a);
         // Cada una reacciona al movimiento del bloque a su ritmo: unas van ya, otras se descuelgan un poco
-        if (a.shift == null) a.shift = 0.7 + ((a.pid * 0.618) % 1) * 1.8;
-        if (a.hx == null || Math.hypot(h[0] - a.hx, h[1] - a.hy) > 30) { a.hx = h[0]; a.hy = h[1]; }
+        if (!(a.shift > 0)) { let hsh = 0; for (const c of String(a.pid)) hsh = (hsh * 31 + c.charCodeAt(0)) % 997; a.shift = 0.7 + ((hsh * 0.618) % 1) * 1.8; }
+        if (!isFinite(a.hx) || !isFinite(a.hy) || Math.hypot(h[0] - a.hx, h[1] - a.hy) > 30) { a.hx = h[0]; a.hy = h[1]; }
         const k = Math.min(1, dtT * a.shift);
         a.hx += (h[0] - a.hx) * k; a.hy += (h[1] - a.hy) * k;
-        a.tx = a.hx; a.ty = a.hy; a.run = 0.33;
+        if (isFinite(a.hx) && isFinite(a.hy)) { a.tx = a.hx; a.ty = a.hy; } else { a.tx = a.hx = h[0]; a.ty = a.hy = h[1]; } a.run = 0.33;
         a.role = null;
       }
       if (!this.ov || !this.ov.all) {
@@ -589,6 +589,7 @@
     }
 
     _move(a, dt) {
+      if (!(dt > 0)) return;
       if (a.state === 'down' || a.state === 'sit') { a.vx *= 0.8; a.vy *= 0.8; if (a.until && a.until < this.t) a.state = null; return; }
       if (a.until && a.until < this.t && a.state !== 'walk') a.state = null;
       const e = a.kind === 'pl' ? this.energy(a) : 1;
