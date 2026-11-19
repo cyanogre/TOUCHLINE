@@ -1,10 +1,10 @@
 # Laboratorio 3D (prueba, fuera del juego)
 
-Abre `lab/3d/` (en GitHub Pages: `https://cyanogre.github.io/TOUCHLINE/lab/3d/`). Si el navegador no tiene WebGPU, añade `?gl=1`.
+Abre `https://cyanogre.github.io/TOUCHLINE/lab/3d/` y elige partido femenino o masculino.
 
-- **El partido es el del juego**: lo simula `TL.Engine` y lo escenifica el campo 2D (`TL.Pitch`), el mismo que en el juego; se ve abajo a la derecha.
-- **`data.js` (MatchData)** graba lo que pasa en ese campo, fotograma a fotograma: posiciones de jugadores, árbitro y balón (en metros, con el origen en el centro) y eventos (pase, pase largo, tiro, cabezazo, estirada, segada, caída, celebración).
-- **`index.html` (Renderer3D)** dibuja esa grabación **con 1 s de retraso**. Así cada acción empieza antes de su contacto con el balón (`c` de cada acción en `rig.js`) y cualquier jugada se puede **repetir** (botón, o solo tras cada gol).
-- **`rig.js`**: jugadoras procedurales con esqueleto, material por zonas, locomoción y acciones del prototipo original, sin su simulación.
+- **El partido es el del juego**: lo simula `TL.Engine` y lo escenifica el campo 2D (`TL.Pitch`), igual que en el juego. Va narrado (la radio) y, cuando llega una **jugada clave** (gol, penalti, roja, gol anulado, paradón, alguna ocasión), el partido se para y la jugada se ve en 3D. Después sigue. «Repetir la última» la vuelve a poner.
+- **`data.js` (MatchData)** graba lo que pasa en el 2D: posiciones de jugadoras, árbitra y balón, y los golpeos y gestos (pase, pase largo, globo, vaselina, tiro, cabezazo, saque de banda, entrada, segada, blocaje, estirada, caída, celebración).
+- **`index.html` (render)**: cuerpos de **Xbot** (el maniquí genérico de Mixamo) con sus animaciones de captura de movimiento (reposo, paso, carrera) y el baile de celebración de Michelle. Cada jugadora es distinta (altura, complexión, piel, pelo, botas) y lleva la equipación de su club, pintada por zonas del cuerpo. Las acciones se añaden como gestos encima del mocap, empezando antes para que el golpeo coincida con la salida del balón. Velocidad máxima de carrera (sin teletransportes), separación entre cuerpos (sin solapes) y apoyo en el césped.
+- `models/`: Xbot.glb y Michelle.glb, de los ejemplos de three.js (personajes y animaciones de Mixamo).
 
-Pendiente para una versión buena: animaciones de mocap (CMU, Quaternius, Mixamo) en lugar de las curvas a mano, y las equipaciones reales de cada club.
+Para que las acciones (pases, tiros, cabezazos, estiradas, segadas, saques…) tengan la calidad de un FIFA o un PES hacen falta sus animaciones de mocap: se descargan gratis de Mixamo (con cuenta de Adobe), en FBX o GLB, y se cargan igual que las de carrera.

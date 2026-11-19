@@ -11,17 +11,21 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#0b1510;color:#fff;font:15px/1.4 Inter,system-ui,sans-serif}
 #gl{position:fixed;inset:0}
 #gl canvas{display:block;width:100%;height:100%}
-.score{position:fixed;top:12px;left:12px;display:flex;border-radius:8px;overflow:hidden;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.35);z-index:2}
+.score{position:fixed;top:12px;left:12px;display:flex;border-radius:8px;overflow:hidden;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.35);z-index:3}
 .score span{padding:7px 11px;white-space:nowrap}
-#hN{background:#c81e36}#aN{background:#1f4fa8}.n{background:#141618;font-variant-numeric:tabular-nums}.t{background:#eee;color:#141618;font-variant-numeric:tabular-nums}
-#feed{position:fixed;top:56px;left:12px;max-width:min(420px,calc(100vw - 24px));background:rgba(12,16,14,.78);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.35;z-index:2}
-#feed div{opacity:.75}#feed div:first-child{opacity:1;font-weight:600}
-#replay{position:fixed;top:12px;right:12px;background:#ffd23f;color:#141618;font:800 13px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;padding:8px 12px;border-radius:99px;display:none;z-index:2}
-#fps{position:fixed;top:44px;right:12px;font:600 12px ui-monospace,monospace;color:#b9d6c4;background:rgba(12,16,14,.7);padding:4px 8px;border-radius:6px;z-index:2}
-#mini{position:fixed;right:12px;bottom:84px;width:min(300px,40vw);aspect-ratio:117/85;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2;background:#10301e}
+.n{background:#141618;font-variant-numeric:tabular-nums}.t{background:#eee;color:#141618;font-variant-numeric:tabular-nums}
+#tag{position:fixed;top:12px;right:12px;background:#b8f53d;color:#0b1606;font:900 13px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;padding:8px 12px;border-radius:99px;display:none;z-index:3;text-transform:uppercase}
+#fps{position:fixed;top:44px;right:12px;font:600 12px ui-monospace,monospace;color:#b9d6c4;background:rgba(12,16,14,.7);padding:4px 8px;border-radius:6px;z-index:3}
+/* La radio: el partido narrado entre jugada y jugada */
+#radio{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);width:min(640px,calc(100vw - 24px));background:rgba(10,18,13,.86);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:14px 18px;z-index:3;transition:opacity .4s, transform .4s}
+#radio small{display:block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9cb9a7}
+#radio p{margin:6px 0 0;font:600 19px/1.35 Inter,system-ui,sans-serif}
+#radio .old{font-size:13px;color:#9cb9a7;margin-top:8px}
+body.clip #radio{opacity:.0;transform:translateX(-50%) translateY(10px);pointer-events:none}
+#mini{position:fixed;right:12px;bottom:76px;width:min(260px,36vw);aspect-ratio:117/85;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2;background:#10301e;opacity:.0;pointer-events:none}
+#mini.on{opacity:1}
 #mini canvas{width:100%;height:100%;display:block}
-#mini.off{display:none}
-.bar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;background:rgba(20,22,24,.85);padding:7px;border-radius:12px;max-width:calc(100vw - 24px);z-index:3}
+.bar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;background:rgba(20,22,24,.85);padding:7px;border-radius:12px;max-width:calc(100vw - 24px);z-index:4}
 .bar button{min-height:38px;padding:0 12px;border:0;border-radius:8px;background:#3a3e44;color:#fff;font:600 14px Inter,system-ui,sans-serif;cursor:pointer}
 .bar button.on{background:#ff6a1a}
 #start{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(120% 80% at 50% 30%,#18402a,#07110b);z-index:5;padding:24px;text-align:center}
@@ -29,13 +33,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b1510;color:#fff;fon
 #start p{color:#b9d6c4;max-width:560px;margin:0 auto 18px}
 #start button{min-height:46px;padding:0 20px;margin:4px;border:0;border-radius:10px;background:#b8f53d;color:#0b1606;font:800 16px Inter,system-ui,sans-serif;cursor:pointer}
 #start .err{color:#ff8a8a}
-@media (max-width:600px){#feed{top:52px;font-size:12px}#mini{bottom:120px}}
+@media (max-width:600px){#radio p{font-size:16px}#radio{bottom:118px}}
 </style>
 <script type="importmap">
 {"imports":{
-"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
-"three/webgpu":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
-"three/tsl":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.tsl.js",
+"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
 "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
 }}
 </script>
@@ -43,22 +45,21 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b1510;color:#fff;fon
 <body>
 <div id="gl"></div>
 <div class="score"><span id="hN">—</span><span class="n" id="sc">0 – 0</span><span id="aN">—</span><span class="t" id="clk">0'</span></div>
-<div id="feed"></div>
-<div id="replay">REPETICIÓN</div>
+<div id="tag">Jugada clave</div>
 <div id="fps"></div>
+<div id="radio"><small id="rk">En directo</small><p id="rt">Los equipos saltan al campo.</p><div class="old" id="ro"></div></div>
 <div id="mini"><canvas id="p2d"></canvas></div>
 <div class="bar">
   <button id="tv" class="on">Cámara TV</button>
   <button id="cl">Cercana</button>
-  <button id="fr">Libre</button>
-  <button id="rp">Repetir jugada</button>
+  <button id="bh">Detrás</button>
+  <button id="rp">Repetir la última</button>
   <button id="ps">Pausa</button>
-  <button id="sp">Velocidad ×1</button>
-  <button id="mn" class="on">Vista 2D</button>
+  <button id="mn">Ver el 2D</button>
 </div>
 <div id="start"><div>
   <h1>Laboratorio 3D</h1>
-  <p>Prueba aparte del juego: el partido lo simula el motor de TOUCHLINE y lo escenifica el campo 2D de siempre (abajo a la derecha). El 3D lee esos puntitos con un segundo de retraso, elige la animación de cada jugadora y puede repetir cualquier jugada.</p>
+  <p>Prueba aparte del juego. El partido es el del motor de TOUCHLINE y va narrado, como en el juego; cuando llega una jugada clave (gol, penalti, roja, paradón…), se ve en 3D. Las jugadoras usan animaciones de captura de movimiento (Mixamo).</p>
   <button data-g="F">Partido femenino</button><button data-g="M">Partido masculino</button>
   <p class="err" id="err"></p>
 </div></div>
@@ -100,95 +101,280 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b1510;color:#fff;fon
 <script src="js/mentor.js"></script>
 <script src="js/pitch.js"></script>
 <script src="lab/3d/data.js"></script>
+
 <script type="module">
-import {
-	Mesh, SkinnedMesh, Skeleton, Bone, PlaneGeometry, BoxGeometry, CylinderGeometry, SphereGeometry, Color, Scene,
-	PerspectiveCamera, DirectionalLight, HemisphereLight, MeshStandardMaterial, WebGPURenderer, CanvasTexture, SRGBColorSpace, Vector3
-} from 'three';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildPlayerGeometry, createPlayerMaterial, RIG, NB, ROOT, GW, PLEN, HIPS, NK, HD, FTR, FTL, UPPER, loco, neutral, ACT, startAction, clamp, wrapA, V } from './lab/3d/rig.js';
 
 const TL = window.TL, LAB = TL.Lab;
 const L = 52.5, W = 34, GOAL_W = 3.66, GOAL_H = 2.44;
-const DELAY = 1.0;          // segundos de partido que va el 3D por detrás del 2D (para anticipar las acciones)
 const $ = id => document.getElementById( id );
+const clamp = ( v, a = 0, b = 1 ) => Math.max( a, Math.min( b, v ) );
+const wrapA = a => Math.atan2( Math.sin( a ), Math.cos( a ) );
+const lerp = ( a, b, k ) => a + ( b - a ) * k;
+const smooth = ( a, b, x ) => { const t = clamp( ( x - a ) / ( b - a ) ); return t * t * ( 3 - 2 * t ); };
+const MAX_V = 8.5;          // m/s: nadie corre más que esto (si los datos saltan, se corre, no se teletransporta)
+const HEIGHT = 1.70;        // altura de las jugadoras
 
-// ================= RENDER 3D: solo lee LAB.frames y LAB.events =================
-async function boot() {
-	// ?gl=1 fuerza WebGL2 (móviles o navegadores sin WebGPU)
-	const renderer = new WebGPURenderer( { antialias: true, forceWebGL: /[?&]gl=1/.test( location.search ) } );
-	renderer.setPixelRatio( Math.min( devicePixelRatio, 2 ) );
-	renderer.setSize( innerWidth, innerHeight );
-	renderer.shadowMap.enabled = true;
-	$( 'gl' ).appendChild( renderer.domElement );
-	await renderer.init();
+// =====================================================================================
+// Personajes: Michelle (Mixamo) con las animaciones de captura de Xbot (Mixamo, mismo esqueleto)
+// =====================================================================================
+const loader = new GLTFLoader();
+const load = url => new Promise( ( ok, ko ) => loader.load( url, ok, undefined, ko ) );
 
-	const scene = new Scene();
-	scene.background = new Color( 0x9fc3e0 );
-	const camera = new PerspectiveCamera( 38, innerWidth / innerHeight, 0.1, 500 );
-	camera.position.set( 0, 26, 50 );
-	const controls = new OrbitControls( camera, renderer.domElement );
-	controls.enabled = false; controls.enableDamping = true;
-	scene.add( new HemisphereLight( 0xeaf2ff, 0x3a5a30, 1.5 ) );
-	const sun = new DirectionalLight( 0xfff1dc, 2.8 );
-	sun.position.set( 30, 50, 25 ); sun.castShadow = true;
-	sun.shadow.mapSize.set( 2048, 2048 );
-	Object.assign( sun.shadow.camera, { left: - 70, right: 70, top: 50, bottom: - 50, far: 150 } );
-	scene.add( sun );
+/** Las animaciones de Xbot llevan la cadera en otro sistema de ejes que Michelle: se corrige solo esa pieza. */
+function retarget( clip, from, to ) {
+	const hf = from.getObjectByName( 'mixamorigHips' ), ht = to.getObjectByName( 'mixamorigHips' );
+	const qFix = ht.quaternion.clone().multiply( hf.quaternion.clone().invert() );
+	const up = new THREE.Vector3( 0, 1, 0 ).applyQuaternion( qFix ).normalize();
+	const s = ht.position.length() / Math.max( 1e-6, hf.position.length() );
+	const c = clip.clone();
+	for ( const tr of c.tracks ) {
+		const bone = tr.name.split( '.' )[ 0 ], v = tr.values;
+		if ( tr.name.endsWith( '.scale' ) ) { tr.values = v.slice( 0, 0 ); continue; }
+		if ( tr.name.endsWith( '.quaternion' ) ) {
+			// Cada hueso: el giro respecto a la postura de reposo de Xbot, aplicado sobre el reposo de Michelle
+			const bf = from.getObjectByName( bone ), bt = to.getObjectByName( bone );
+			if ( ! bf || ! bt ) { tr.values = v.slice( 0, 0 ); continue; }
+			const fix = bt.quaternion.clone().multiply( bf.quaternion.clone().invert() ), q = new THREE.Quaternion();
+			for ( let i = 0; i < v.length; i += 4 ) { q.fromArray( v, i ).premultiply( fix ); q.toArray( v, i ); }
+			continue;
+		}
+		if ( bone !== 'mixamorigHips' ) { tr.values = v.slice( 0, 0 ); continue; }
+		if ( tr.name.endsWith( '.position' ) ) {
+			// Solo el bote vertical de la zancada: la jugadora no se desplaza sola, la mueven los datos
+			const p0 = new THREE.Vector3( v[ 0 ], v[ 1 ], v[ 2 ] ), d = new THREE.Vector3();
+			for ( let i = 0; i < v.length; i += 3 ) {
+				d.set( v[ i ], v[ i + 1 ], v[ i + 2 ] ).sub( p0 ).applyQuaternion( qFix ).multiplyScalar( s );
+				const k = d.dot( up );
+				d.copy( ht.position ).addScaledVector( up, k * 0.6 );
+				d.toArray( v, i );
+			}
+		}
+	}
+	c.tracks = c.tracks.filter( t => t.values.length );
+	return c;
+}
 
-	// Campo
-	const cv = document.createElement( 'canvas' ); const PXM = 16;
-	cv.width = 105 * PXM; cv.height = 68 * PXM;
+/** Zona del cuerpo de cada hueso: 0 piel · 1 camiseta · 2 pantalón · 3 medias · 4 botas · 5 manos (guantes) · 6 muslo (pantalón arriba, piel abajo) */
+function boneRegion( name ) {
+	const n = name.replace( 'mixamorig', '' );
+	if ( /Hand|Thumb|Index|Middle|Ring|Pinky/.test( n ) ) return 5;
+	if ( /ForeArm/.test( n ) ) return 0;
+	if ( /Spine|Shoulder|Arm/.test( n ) ) return 1;
+	if ( /Hips/.test( n ) ) return 2;
+	if ( /UpLeg/.test( n ) ) return 6;
+	if ( /Leg/.test( n ) ) return 3;
+	if ( /Foot|Toe/.test( n ) ) return 4;
+	return 0;
+}
+/** Un material por jugadora: colorea por zonas según el hueso que mueve cada vértice (sin texturas, muy ligero). */
+function playerMaterial( skeleton, cols, thighCut ) {
+	const region = new Float32Array( 96 );
+	skeleton.bones.forEach( ( b, i ) => { if ( i < 96 ) region[ i ] = boneRegion( b.name ); } );
+	const m = new THREE.MeshStandardMaterial( { roughness: 0.72, metalness: 0 } );
+	const uCol = cols.map( c => new THREE.Color( c ) );
+	m.onBeforeCompile = sh => {
+		sh.uniforms.uRegion = { value: region }; sh.uniforms.uCol = { value: uCol }; sh.uniforms.uCut = { value: thighCut };
+		sh.vertexShader = sh.vertexShader.replace( '#include <common>', '#include <common>\nuniform float uRegion[96];\nuniform float uCut;\nvarying float vRegion;' )
+			.replace( '#include <begin_vertex>', `#include <begin_vertex>
+			int bi = int( skinIndex.x ); float bw = skinWeight.x;
+			if ( skinWeight.y > bw ) { bi = int( skinIndex.y ); bw = skinWeight.y; }
+			if ( skinWeight.z > bw ) { bi = int( skinIndex.z ); bw = skinWeight.z; }
+			if ( skinWeight.w > bw ) { bi = int( skinIndex.w ); }
+			float r = uRegion[ bi ];
+			if ( r > 5.5 ) r = position.y > uCut ? 2.0 : 0.0;
+			vRegion = r;` );
+		sh.fragmentShader = sh.fragmentShader.replace( '#include <common>', '#include <common>\nuniform vec3 uCol[6];\nvarying float vRegion;' )
+			.replace( 'vec4 diffuseColor = vec4( diffuse, opacity );', `int ri = int( vRegion + 0.5 ); vec3 cc = uCol[0];
+			if ( ri == 1 ) cc = uCol[1]; else if ( ri == 2 ) cc = uCol[2]; else if ( ri == 3 ) cc = uCol[3]; else if ( ri == 4 ) cc = uCol[4]; else if ( ri == 5 ) cc = uCol[5];
+			vec4 diffuseColor = vec4( cc, opacity );` );
+	};
+	return m;
+}
+const SKIN = [ '#f1c9a5', '#e0ac85', '#c68863', '#a96f4c', '#8a5535', '#6b3d24', '#4a2a19' ];
+const HAIR = [ '#1a1512', '#2e2119', '#4a3121', '#6b4423', '#a8763d', '#d9b46a', '#7a3a1a', '#3a3a3a' ];
+const BOOTS = [ '#151515', '#f2f2f2', '#ff5a1f', '#2a6df4', '#e8e030', '#ff3c8e', '#21d07a' ];
+const rnd = ( seed, k ) => { const x = Math.sin( seed * 127.1 + k * 311.7 ) * 43758.5453; return x - Math.floor( x ); };
+
+// =====================================================================================
+// Escena: estadio, césped y porterías
+// =====================================================================================
+function buildStadium( scene ) {
+	// Césped: franjas de corte, ruido y líneas reglamentarias (en metros, a 20 px/m)
+	const PXM = 20, cv = document.createElement( 'canvas' );
+	cv.width = 115 * PXM; cv.height = 78 * PXM;
 	const c = cv.getContext( '2d' );
-	for ( let i = 0; i < 14; i ++ ) { c.fillStyle = i % 2 ? '#3f8a37' : '#4a9a41'; c.fillRect( i * cv.width / 14, 0, cv.width / 14 + 1, cv.height ); }
-	const X = x => ( x + L ) * PXM, Y = z => ( z + W ) * PXM;
-	c.strokeStyle = '#f2f2f2'; c.fillStyle = '#f2f2f2'; c.lineWidth = 3;
-	c.strokeRect( 2, 2, cv.width - 4, cv.height - 4 );
-	c.beginPath(); c.moveTo( X( 0 ), 0 ); c.lineTo( X( 0 ), cv.height ); c.stroke();
+	const OX = 5 * PXM, OY = 5 * PXM;
+	for ( let i = 0; i < 23; i ++ ) { c.fillStyle = i % 2 ? '#3d8a3a' : '#469a42'; c.fillRect( i * cv.width / 23, 0, cv.width / 23 + 1, cv.height ); }
+	const id = c.getImageData( 0, 0, cv.width, cv.height ), px = id.data;
+	for ( let i = 0; i < px.length; i += 4 ) { const n = ( Math.random() - 0.5 ) * 14; px[ i ] += n; px[ i + 1 ] += n * 1.2; px[ i + 2 ] += n * 0.6; }
+	c.putImageData( id, 0, 0 );
+	const X = x => OX + ( x + L ) * PXM, Y = z => OY + ( z + W ) * PXM;
+	c.strokeStyle = 'rgba(255,255,255,.92)'; c.fillStyle = 'rgba(255,255,255,.92)'; c.lineWidth = 0.12 * PXM;
+	c.strokeRect( X( - L ), Y( - W ), 105 * PXM, 68 * PXM );
+	c.beginPath(); c.moveTo( X( 0 ), Y( - W ) ); c.lineTo( X( 0 ), Y( W ) ); c.stroke();
 	c.beginPath(); c.arc( X( 0 ), Y( 0 ), 9.15 * PXM, 0, Math.PI * 2 ); c.stroke();
+	c.beginPath(); c.arc( X( 0 ), Y( 0 ), 0.25 * PXM, 0, 7 ); c.fill();
 	for ( const s of [ - 1, 1 ] ) {
 		const gx = s * L;
 		c.strokeRect( Math.min( X( gx ), X( gx - s * 16.5 ) ), Y( - 20.16 ), 16.5 * PXM, 40.32 * PXM );
 		c.strokeRect( Math.min( X( gx ), X( gx - s * 5.5 ) ), Y( - 9.16 ), 5.5 * PXM, 18.32 * PXM );
-		c.beginPath(); c.arc( X( gx - s * 11 ), Y( 0 ), 9.15 * PXM, s > 0 ? Math.PI - 0.93 : - 0.93, s > 0 ? Math.PI + 0.93 : 0.93 ); c.stroke();
+		c.beginPath(); c.arc( X( gx - s * 11 ), Y( 0 ), 9.15 * PXM, s > 0 ? Math.PI - 0.927 : - 0.927, s > 0 ? Math.PI + 0.927 : 0.927 ); c.stroke();
+		c.beginPath(); c.arc( X( gx - s * 11 ), Y( 0 ), 0.2 * PXM, 0, 7 ); c.fill();
+		for ( const z of [ - W, W ] ) { c.beginPath(); c.arc( X( gx ), Y( z ), 1 * PXM, 0, Math.PI * 2 ); c.stroke(); }
 	}
-	const tex = new CanvasTexture( cv ); tex.colorSpace = SRGBColorSpace; tex.anisotropy = 8;
-	const field = new Mesh( new PlaneGeometry( 105, 68 ).rotateX( - Math.PI / 2 ), new MeshStandardMaterial( { map: tex, roughness: 0.95 } ) );
-	field.receiveShadow = true; scene.add( field );
-	const outer = new Mesh( new PlaneGeometry( 160, 120 ).rotateX( - Math.PI / 2 ), new MeshStandardMaterial( { color: 0x3a7a34, roughness: 1 } ) );
-	outer.position.y = - 0.01; outer.receiveShadow = true; scene.add( outer );
-	const white = new MeshStandardMaterial( { color: 0xffffff, roughness: 0.4 } );
-	const net = new MeshStandardMaterial( { color: 0xffffff, wireframe: true, transparent: true, opacity: 0.35 } );
+	const tex = new THREE.CanvasTexture( cv ); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+	const grass = new THREE.Mesh( new THREE.PlaneGeometry( 115, 78 ).rotateX( - Math.PI / 2 ), new THREE.MeshStandardMaterial( { map: tex, roughness: 0.92 } ) );
+	grass.receiveShadow = true; scene.add( grass );
+	const apron = new THREE.Mesh( new THREE.PlaneGeometry( 150, 112 ).rotateX( - Math.PI / 2 ), new THREE.MeshStandardMaterial( { color: 0x2f6e30, roughness: 1 } ) );
+	apron.position.y = - 0.02; apron.receiveShadow = true; scene.add( apron );
+
+	// Porterías con red
+	const white = new THREE.MeshStandardMaterial( { color: 0xffffff, roughness: 0.35 } );
+	const netTex = ( () => { const n = document.createElement( 'canvas' ); n.width = n.height = 64; const g = n.getContext( '2d' ); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; for ( let i = 0; i <= 64; i += 8 ) { g.beginPath(); g.moveTo( i, 0 ); g.lineTo( i, 64 ); g.moveTo( 0, i ); g.lineTo( 64, i ); g.stroke(); } const t = new THREE.CanvasTexture( n ); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set( 18, 6 ); return t; } )();
+	const netM = new THREE.MeshStandardMaterial( { map: netTex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide, roughness: 1 } );
 	for ( const s of [ - 1, 1 ] ) {
-		for ( const z of [ - GOAL_W, GOAL_W ] ) { const post = new Mesh( new CylinderGeometry( 0.06, 0.06, GOAL_H, 8 ), white ); post.position.set( s * L, GOAL_H / 2, z ); post.castShadow = true; scene.add( post ); }
-		const bar = new Mesh( new CylinderGeometry( 0.06, 0.06, GOAL_W * 2, 8 ).rotateX( Math.PI / 2 ), white ); bar.position.set( s * L, GOAL_H, 0 ); scene.add( bar );
-		const nm = new Mesh( new BoxGeometry( 2, GOAL_H, GOAL_W * 2, 4, 6, 16 ), net ); nm.position.set( s * ( L + 1 ), GOAL_H / 2, 0 ); scene.add( nm );
+		for ( const z of [ - GOAL_W, GOAL_W ] ) { const post = new THREE.Mesh( new THREE.CylinderGeometry( 0.06, 0.06, GOAL_H, 12 ), white ); post.position.set( s * L, GOAL_H / 2, z ); post.castShadow = true; scene.add( post ); }
+		const bar = new THREE.Mesh( new THREE.CylinderGeometry( 0.06, 0.06, GOAL_W * 2 + 0.12, 12 ).rotateX( Math.PI / 2 ), white ); bar.position.set( s * L, GOAL_H, 0 ); bar.castShadow = true; scene.add( bar );
+		const back = new THREE.Mesh( new THREE.PlaneGeometry( GOAL_W * 2, GOAL_H ), netM ); back.rotation.y = Math.PI / 2; back.position.set( s * ( L + 2 ), GOAL_H / 2, 0 ); scene.add( back );
+		const top = new THREE.Mesh( new THREE.PlaneGeometry( 2, GOAL_W * 2 ), netM ); top.rotation.x = - Math.PI / 2; top.position.set( s * ( L + 1 ), GOAL_H, 0 ); scene.add( top );
+		for ( const z of [ - GOAL_W, GOAL_W ] ) { const side = new THREE.Mesh( new THREE.PlaneGeometry( 2, GOAL_H ), netM ); side.position.set( s * ( L + 1 ), GOAL_H / 2, z ); scene.add( side ); }
 	}
-	const ballMesh = new Mesh( new SphereGeometry( 0.11, 16, 12 ), new MeshStandardMaterial( { color: 0xf8f8f8, roughness: 0.5 } ) );
+	// Banderines de córner
+	for ( const sx of [ - 1, 1 ] ) for ( const sz of [ - 1, 1 ] ) {
+		const pole = new THREE.Mesh( new THREE.CylinderGeometry( 0.02, 0.02, 1.5, 6 ), white ); pole.position.set( sx * L, 0.75, sz * W ); scene.add( pole );
+		const flag = new THREE.Mesh( new THREE.PlaneGeometry( 0.4, 0.3 ), new THREE.MeshStandardMaterial( { color: 0xffd23f, side: THREE.DoubleSide } ) ); flag.position.set( sx * L + 0.2, 1.35, sz * W ); scene.add( flag );
+	}
+
+	// Gradas: cuatro tribunas inclinadas con público (puntitos de colores) y publicidad
+	const crowdTex = ( () => {
+		const n = document.createElement( 'canvas' ); n.width = 1024; n.height = 256; const g = n.getContext( '2d' );
+		g.fillStyle = '#20262c'; g.fillRect( 0, 0, 1024, 256 );
+		const cols = [ '#e8e8e8', '#c81e36', '#1f4fa8', '#ffd23f', '#2b2b2b', '#d98a5b', '#6e8fbf', '#a33' ];
+		for ( let y = 4; y < 256; y += 8 ) for ( let x = 2; x < 1024; x += 6 ) { g.fillStyle = cols[ ( Math.random() * cols.length ) | 0 ]; g.fillRect( x + Math.random() * 2, y + Math.random() * 2, 4, 5 ); }
+		const t = new THREE.CanvasTexture( n ); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t;
+	} )();
+	const standM = new THREE.MeshStandardMaterial( { map: crowdTex, roughness: 1 } );
+	const roofM = new THREE.MeshStandardMaterial( { color: 0x2a3138, roughness: 0.8, metalness: 0.2 } );
+	const adTex = ( () => {
+		const n = document.createElement( 'canvas' ); n.width = 1024; n.height = 32; const g = n.getContext( '2d' );
+		const ads = [ [ 'TOUCHLINE', '#0b1606', '#b8f53d' ], [ 'LUNATOKEN', '#fff', '#5a2ec8' ], [ 'CERVEZAS EL PROFE', '#141618', '#ffd23f' ], [ 'RADIO PACO', '#fff', '#c81e36' ] ];
+		ads.forEach( ( [ t, fg, bg ], i ) => { g.fillStyle = bg; g.fillRect( i * 256, 0, 256, 32 ); g.fillStyle = fg; g.font = '900 20px Inter, sans-serif'; g.textAlign = 'center'; g.fillText( t, i * 256 + 128, 23 ); } );
+		const t = new THREE.CanvasTexture( n ); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t;
+	} )();
+	const stand = ( len, x, z, rotY ) => {
+		const g = new THREE.Group();
+		const tier = new THREE.Mesh( new THREE.PlaneGeometry( len, 22 ), standM.clone() );
+		tier.material.map = crowdTex.clone(); tier.material.map.repeat.set( len / 30, 1 ); tier.material.map.needsUpdate = true;
+		tier.rotation.x = - Math.PI / 2 + 0.55; tier.position.set( 0, 7.5, - 9 ); g.add( tier );
+		const roof = new THREE.Mesh( new THREE.BoxGeometry( len + 4, 0.6, 14 ), roofM ); roof.position.set( 0, 18, - 12 ); g.add( roof );
+		const wall = new THREE.Mesh( new THREE.BoxGeometry( len, 2.2, 0.4 ), roofM ); wall.position.set( 0, 1.1, 0 ); g.add( wall );
+		const t = adTex.clone(); t.repeat.set( len / 40, 1 ); t.needsUpdate = true;
+		const ad = new THREE.Mesh( new THREE.PlaneGeometry( len - 6, 0.9 ), new THREE.MeshBasicMaterial( { map: t } ) ); ad.position.set( 0, 0.45, 2.6 ); g.add( ad );
+		g.position.set( x, 0, z ); g.rotation.y = rotY; scene.add( g );
+	};
+	stand( 128, 0, - W - 6, 0 ); // el lado de la cámara de TV, sin grada (como en la tele)
+	stand( 90, - L - 8, 0, Math.PI / 2 ); stand( 90, L + 8, 0, - Math.PI / 2 );
+}
+
+// =====================================================================================
+async function boot() {
+	const renderer = new THREE.WebGLRenderer( { antialias: true } );
+	renderer.setPixelRatio( Math.min( devicePixelRatio, 2 ) );
+	renderer.setSize( innerWidth, innerHeight );
+	renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+	$( 'gl' ).appendChild( renderer.domElement );
+
+	const scene = new THREE.Scene();
+	scene.background = new THREE.Color( 0x8fb8dc ); scene.fog = new THREE.Fog( 0x8fb8dc, 120, 260 );
+	const camera = new THREE.PerspectiveCamera( 32, innerWidth / innerHeight, 0.1, 600 );
+	camera.position.set( 0, 24, 58 );
+	const controls = new OrbitControls( camera, renderer.domElement ); controls.enabled = false;
+	scene.add( new THREE.HemisphereLight( 0xe8f1ff, 0x3a5a30, 1.2 ) );
+	const sun = new THREE.DirectionalLight( 0xfff1dc, 2.6 );
+	sun.position.set( 40, 60, 20 ); sun.castShadow = true; sun.shadow.mapSize.set( 2048, 2048 ); sun.shadow.bias = - 0.0004;
+	Object.assign( sun.shadow.camera, { left: - 25, right: 25, top: 25, bottom: - 25, near: 10, far: 160 } );
+	scene.add( sun, sun.target );
+	buildStadium( scene );
+
+	const ballTex = ( () => { const n = document.createElement( 'canvas' ); n.width = 128; n.height = 64; const g = n.getContext( '2d' ); g.fillStyle = '#fafafa'; g.fillRect( 0, 0, 128, 64 ); g.fillStyle = '#1a1a1a'; for ( let i = 0; i < 12; i ++ ) { g.beginPath(); g.arc( ( i * 23 ) % 128, ( i * 37 ) % 64, 6, 0, 7 ); g.fill(); } return new THREE.CanvasTexture( n ); } )();
+	const ballMesh = new THREE.Mesh( new THREE.SphereGeometry( 0.11, 24, 16 ), new THREE.MeshStandardMaterial( { map: ballTex, roughness: 0.45 } ) );
 	ballMesh.castShadow = true; scene.add( ballMesh );
 
-	// Jugadoras: se crean cuando aparecen en los datos (también las que entran en un cambio)
-	const geo = buildPlayerGeometry(), material = createPlayerMaterial();
-	const people = new Map();   // id -> estado de animación
-	function person( id, kit, seed ) {
+	// Modelos y animaciones: Xbot es el maniquí genérico de Mixamo (el de sus animaciones); de Michelle solo se usa el baile
+	const [ xbot, mich ] = await Promise.all( [ load( 'lab/3d/models/Xbot.glb' ), load( 'lab/3d/models/Michelle.glb' ) ] );
+	const base = xbot.scene;
+	const clips = {};
+	for ( const n of [ 'idle', 'walk', 'run' ] ) clips[ n ] = retarget( xbot.animations.find( a => a.name === n ), base, base );
+	clips.dance = retarget( mich.animations.find( a => a.name === 'SambaDance' ), mich.scene, base );
+	base.updateMatrixWorld( true );
+	const box = new THREE.Box3().setFromObject( base ), baseScale = HEIGHT / ( box.max.y - box.min.y );
+	// Altura (en el espacio del modelo) donde acaba el pantalón en el muslo
+	let thighCut = 72;
+	base.traverse( o => { if ( o.isSkinnedMesh && o.geometry.attributes.position ) { o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox; thighCut = bb.min.y + ( bb.max.y - bb.min.y ) * 0.46; } } );
+	const fem = TL.Game.S && TL.Game.S.gender === 'F';
+
+	/** Pelo y cara: piezas sueltas pegadas al hueso de la cabeza (en las unidades del modelo, centímetros). */
+	const hairGeo = {
+		cap: new THREE.SphereGeometry( 10.6, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55 ),
+		buzz: new THREE.SphereGeometry( 10.3, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42 ),
+		tail: new THREE.CylinderGeometry( 2.6, 1.2, 17, 8 ),
+		bun: new THREE.SphereGeometry( 4.6, 12, 10 ),
+		long: new THREE.BoxGeometry( 18, 20, 4 ),
+		eye: new THREE.SphereGeometry( 1.05, 8, 6 )
+	};
+	const eyeMat = new THREE.MeshStandardMaterial( { color: 0x15110e, roughness: 0.3 } );
+	function dress( obj, head, seed, ref ) {
+		const style = ref ? 1 : fem ? [ 0, 2, 2, 3, 3, 4 ][ ( rnd( seed, 3 ) * 6 ) | 0 ] : [ 0, 0, 1, 1, 5 ][ ( rnd( seed, 3 ) * 5 ) | 0 ];
+		const hm = new THREE.MeshStandardMaterial( { color: HAIR[ ( rnd( seed, 4 ) * HAIR.length ) | 0 ], roughness: 0.85 } );
+		const add = ( g, x, y, z, rx = 0, sx = 1, sy = 1, sz = 1 ) => { const m = new THREE.Mesh( g, hm ); m.position.set( x, y, z ); m.rotation.x = rx; m.scale.set( sx, sy, sz ); m.castShadow = true; head.add( m ); return m; };
+		// 0 corto · 1 rapado · 2 coleta · 3 moño · 4 melena · 5 calvo
+		if ( style === 0 ) add( hairGeo.cap, 0, 9, - 0.8, - 0.25, 1, 1, 1.08 );
+		if ( style === 1 ) add( hairGeo.buzz, 0, 9, - 0.5, - 0.25 );
+		if ( style === 2 ) { add( hairGeo.cap, 0, 9, - 0.8, - 0.25, 1, 1, 1.08 ); add( hairGeo.tail, 0, 6, - 12.5, 0.55 ); }
+		if ( style === 3 ) { add( hairGeo.cap, 0, 9, - 0.8, - 0.25, 1, 1, 1.08 ); add( hairGeo.bun, 0, 16, - 7 ); }
+		if ( style === 4 ) { add( hairGeo.cap, 0, 9, - 0.8, - 0.25, 1, 1, 1.08 ); add( hairGeo.long, 0, 2, - 8 ); }
+		for ( const sx of [ - 1, 1 ] ) { const e = new THREE.Mesh( hairGeo.eye, eyeMat ); e.position.set( sx * 3.3, 9.5, 9.2 ); head.add( e ); }
+	}
+
+	const people = new Map();
+	window.__lab = { people, base, clips, THREE };
+	/** Cada jugadora es distinta: altura, complexión, piel, pelo, botas; y su equipación. */
+	function person( id, kit, seed, gk, ref ) {
 		let p = people.get( id );
 		if ( p ) return p;
-		const mesh = new SkinnedMesh( geo, material );
-		const bones = RIG.map( ( [ , x, y, z ] ) => { const b = new Bone(); b.position.set( x, y, z ); return b; } );
-		RIG.forEach( ( [ par ], i ) => ( par < 0 ? mesh : bones[ par ] ).add( bones[ i ] ) );
-		mesh.updateMatrixWorld( true );
-		mesh.bind( new Skeleton( bones ) );
-		mesh.userData = { seed, kit };
-		mesh.castShadow = true; mesh.frustumCulled = false;
-		scene.add( mesh );
-		const h = ( ( seed * 2654435761 ) >>> 0 ) % 1000 / 1000;
-		p = { id, mesh, rig: bones, P: new Float32Array( PLEN ), A: new Float32Array( PLEN ), x: 0, z: 0, vx: 0, vz: 0, h: 0, ph: h * 6.28, speed: 0, lf: 0, ls: 0,
-			yawRate: 0, accF: 0, jockey: 0, act: null, seed, sc: 0.92 + h * 0.08, wd: 0.95 + h * 0.1, init: false, seen: 0 };
+		const obj = SkeletonUtils.clone( base );
+		const hf = 0.93 + rnd( seed, 1 ) * 0.13, wf = 0.92 + rnd( seed, 2 ) * 0.16;
+		obj.scale.set( baseScale * hf * wf, baseScale * hf, baseScale * hf * wf );
+		let skel = null; obj.traverse( o => { if ( o.isSkinnedMesh ) skel = o.skeleton; } );
+		const skin = SKIN[ ( rnd( seed, 5 ) * SKIN.length ) | 0 ];
+		const boots = ref ? '#111111' : BOOTS[ ( rnd( seed, 6 ) * BOOTS.length ) | 0 ];
+		const mat = playerMaterial( skel, [ skin, kit[ 0 ], kit[ 1 ], kit[ 2 ], boots, gk ? kit[ 3 ] : skin ], thighCut );
+		obj.traverse( o => { if ( o.isSkinnedMesh ) { o.material = mat; o.castShadow = true; o.frustumCulled = false; } } );
+		const bone = n => obj.getObjectByName( 'mixamorig' + n );
+		dress( obj, bone( 'Head' ), seed, ref );
+		const mixer = new THREE.AnimationMixer( obj );
+		const act = {};
+		for ( const k in clips ) { act[ k ] = mixer.clipAction( clips[ k ] ); act[ k ].play(); act[ k ].setEffectiveWeight( k === 'idle' ? 1 : 0 ); act[ k ].time = rnd( seed, 7 ) * clips[ k ].duration; }
+		p = { id, obj, mixer, act, x: 0, z: 0, vx: 0, vz: 0, h: 0, speed: 0, init: false, a: null, gait: 0.92 + rnd( seed, 8 ) * 0.16,
+			b: { hips: bone( 'Hips' ), spine: bone( 'Spine' ), spine2: bone( 'Spine2' ), head: bone( 'Head' ), neck: bone( 'Neck' ), rUp: bone( 'RightUpLeg' ), rLeg: bone( 'RightLeg' ), lUp: bone( 'LeftUpLeg' ), lLeg: bone( 'LeftLeg' ), rFoot: bone( 'RightFoot' ), lFoot: bone( 'LeftFoot' ), rToe: bone( 'RightToeBase' ), lToe: bone( 'LeftToeBase' ), rArm: bone( 'RightArm' ), lArm: bone( 'LeftArm' ), rFore: bone( 'RightForeArm' ), lFore: bone( 'LeftForeArm' ), rHand: bone( 'RightHand' ), lHand: bone( 'LeftHand' ) } };
+		scene.add( obj );
 		people.set( id, p );
 		return p;
 	}
 
-	// ---------- lectura de la grabación a un instante t (interpolando entre fotogramas)
+	// Equipaciones: camiseta, pantalón, medias (+ guantes para las porteras), con los colores del club
+	const hexOf = c => ( typeof c === 'string' && /^#?[0-9a-f]{6}$/i.test( c ) ? ( c[ 0 ] === '#' ? c : '#' + c ) : null );
+	const teamCol = LAB.clubs.map( ( cl, i ) => { const c1 = hexOf( cl.c1 ) || [ '#c81e36', '#1f4fa8' ][ i ], c2 = hexOf( cl.c2 ) || '#f4f4f4'; return [ c1, c2, c1 ]; } );
+	if ( teamCol[ 0 ][ 0 ] === teamCol[ 1 ][ 0 ] ) teamCol[ 1 ] = [ '#f4f4f4', '#202020', '#f4f4f4' ];
+	const GK = [ [ '#2fbf71', '#141618', '#2fbf71', '#f2f2f2' ], [ '#ff8a1a', '#141618', '#ff8a1a', '#f2f2f2' ] ], REF = [ '#141618', '#141618', '#141618' ];
+	$( 'hN' ).style.background = teamCol[ 0 ][ 0 ]; $( 'aN' ).style.background = teamCol[ 1 ][ 0 ];
+
+	// ---------- lectura de la grabación
 	function frameAt( t ) {
 		const F = LAB.frames;
 		if ( ! F.length ) return null;
@@ -196,178 +382,217 @@ async function boot() {
 		if ( t <= F[ 0 ].t ) return { a: F[ 0 ], b: F[ 0 ], k: 0 };
 		if ( t >= F[ hi ].t ) return { a: F[ hi ], b: F[ hi ], k: 0 };
 		while ( hi - lo > 1 ) { const mid = ( lo + hi ) >> 1; if ( F[ mid ].t <= t ) lo = mid; else hi = mid; }
-		const a = F[ lo ], b = F[ hi ];
-		return { a, b, k: ( t - a.t ) / Math.max( 1e-6, b.t - a.t ) };
+		return { a: F[ lo ], b: F[ hi ], k: ( t - F[ lo ].t ) / Math.max( 1e-6, F[ hi ].t - F[ lo ].t ) };
 	}
-	const lerp = ( a, b, k ) => a + ( b - a ) * k;
 
-	// ---------- acciones disparadas por evento, adelantadas a su fotograma de contacto
+	// ---------- acciones por evento: empiezan antes para que el golpeo coincida con la salida del balón
+	const ACTS = {
+		pass: { dur: 0.55, c: 0.5 }, long: { dur: 0.75, c: 0.5 }, lob: { dur: 0.7, c: 0.5 }, shot: { dur: 0.75, c: 0.5 }, chip: { dur: 0.7, c: 0.5 },
+		header: { dur: 0.8, c: 0.5 }, throw: { dur: 0.9, c: 0.62 }, tackle: { dur: 0.6, c: 0.45 }, catch: { dur: 0.9, c: 0.3 },
+		dive: { dur: 1.5, c: 0.25 }, slide: { dur: 1.3, c: 0.3 }, fall: { dur: 2.2, c: 0 }, celebrate: { dur: 4, c: 0 }
+	};
 	let evI = 0;
-	const lead = type => { const A = ACT[ type ]; return A ? ( A.c != null ? A.c * A.dur : A.win ? A.win[ 0 ] * A.dur : 0 ) : 0; };
-	function resetEvents( t ) { evI = 0; while ( evI < LAB.events.length && LAB.events[ evI ].t - lead( LAB.events[ evI ].type ) < t ) evI ++; for ( const p of people.values() ) p.act = null; }
+	const lead = t => ACTS[ t ] ? ACTS[ t ].c * ACTS[ t ].dur : 0;
+	function resetEvents( t ) { evI = 0; const E = LAB.events; while ( evI < E.length && E[ evI ].t - lead( E[ evI ].type ) < t ) evI ++; for ( const p of people.values() ) p.a = null; }
 	function fireEvents( t ) {
 		const E = LAB.events;
 		while ( evI < E.length && E[ evI ].t - lead( E[ evI ].type ) <= t ) {
 			const e = E[ evI ++ ], p = people.get( 'p' + e.pid );
-			if ( ! p || ! ACT[ e.type ] ) continue;
-			if ( p.act && [ 'slide', 'dive', 'fall' ].includes( p.act.type ) ) continue;
-			const extra = e.type === 'dive' ? { dir: e.dir || 1, reach: 1.6 } : e.type === 'slide' ? { sv: 5 } : {};
-			startAction( p, e.type, extra );
-			// el disparo y el pase miran hacia donde va el balón
-			if ( [ 'pass', 'long', 'shot', 'header' ].includes( e.type ) ) p.aimT = e.t;
+			if ( ! p || ! ACTS[ e.type ] ) continue;
+			if ( p.a && [ 'dive', 'slide', 'fall' ].includes( p.a.type ) ) continue;
+			p.a = { type: e.type, t: 0, dur: ACTS[ e.type ].dur, dir: e.dir || 1 };
 		}
 	}
 
-	// ---------- un fotograma del 3D
-	const pt = new Vector3(), HIPS_Y = RIG[ 0 ][ 2 ];
+	// ---------- movimiento: de los datos a la jugadora, con velocidad máxima y giro limitado
 	const ball = { x: 0, y: 0.11, z: 0 };
 	function place( fr, dt ) {
 		const { a, b, k } = fr;
 		ball.x = lerp( a.ball[ 0 ], b.ball[ 0 ], k ); ball.y = lerp( a.ball[ 1 ], b.ball[ 1 ], k ); ball.z = lerp( a.ball[ 2 ], b.ball[ 2 ], k );
 		const live = new Set();
-		const ids = Object.keys( a.pl );
-		for ( const id of ids ) {
+		for ( const id in a.pl ) {
 			const pa = a.pl[ id ], pb = b.pl[ id ] || pa;
-			const kit = pa[ 3 ] ? 2 + pa[ 2 ] : pa[ 2 ];
-			drive( person( 'p' + id, kit, + id ), lerp( pa[ 0 ], pb[ 0 ], k ), lerp( pa[ 1 ], pb[ 1 ], k ), dt );
+			const gk = !! pa[ 3 ], cols = gk ? GK[ pa[ 2 ] ] : teamCol[ pa[ 2 ] ];
+			move( person( 'p' + id, cols, + id, gk ), lerp( pa[ 0 ], pb[ 0 ], k ), lerp( pa[ 1 ], pb[ 1 ], k ), dt );
 			live.add( 'p' + id );
 		}
-		drive( person( 'ref', 4, 999 ), lerp( a.ref[ 0 ], b.ref[ 0 ], k ), lerp( a.ref[ 1 ], b.ref[ 1 ], k ), dt );
+		move( person( 'ref', REF, 9999, false, true ), lerp( a.ref[ 0 ], b.ref[ 0 ], k ), lerp( a.ref[ 1 ], b.ref[ 1 ], k ), dt );
 		live.add( 'ref' );
-		for ( const p of people.values() ) p.mesh.visible = live.has( p.id );
+		// Nadie se atraviesa: si dos cuerpos se solapan, se apartan un poco cada uno
+		const L2 = [ ...people.values() ].filter( p => live.has( p.id ) );
+		for ( let i = 0; i < L2.length; i ++ ) for ( let j = i + 1; j < L2.length; j ++ ) {
+			const p = L2[ i ], q = L2[ j ], dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot( dx, dz ), min = 0.62;
+			if ( d < min && d > 1e-4 ) { const push = ( min - d ) / 2, ux = dx / d, uz = dz / d; p.x -= ux * push; p.z -= uz * push; q.x += ux * push; q.z += uz * push; }
+		}
+		for ( const p of people.values() ) p.obj.visible = live.has( p.id ) && clipOn;
 	}
-	// De posición a locomoción: velocidad suavizada, giro limitado, fase de la zancada por distancia
-	function drive( p, x, z, dt ) {
-		if ( ! p.init || Math.hypot( x - p.x, z - p.z ) > 8 ) { p.x = x; p.z = z; p.vx = p.vz = 0; p.init = true; p.h = Math.atan2( ball.x - x, ball.z - z ); return; }
+	function move( p, x, z, dt ) {
+		if ( ! p.init || Math.hypot( x - p.x, z - p.z ) > 14 ) { p.x = x; p.z = z; p.vx = p.vz = 0; p.speed = 0; p.init = true; p.h = Math.atan2( ball.x - x, ball.z - z ); return; }
 		if ( dt <= 0 ) return;
-		const vx = ( x - p.x ) / dt, vz = ( z - p.z ) / dt, kv = Math.min( 1, dt * 10 );
+		// sigue al dato sin superar MAX_V: los saltos del 2D se convierten en carreras
+		let dx = x - p.x, dz = z - p.z;
+		const d = Math.hypot( dx, dz ), maxStep = MAX_V * dt;
+		if ( d > maxStep ) { dx *= maxStep / d; dz *= maxStep / d; }
+		const vx = dx / dt, vz = dz / dt, kv = Math.min( 1, dt * 6 );
 		p.vx += ( vx - p.vx ) * kv; p.vz += ( vz - p.vz ) * kv;
-		p.x = x; p.z = z;
-		const prev = p.speed;
+		p.x += dx; p.z += dz;
 		p.speed = Math.hypot( p.vx, p.vz );
-		p.accF = p.accF * 0.85 + ( ( p.speed - prev ) / dt ) * 0.15;
-		const a = p.act, locked = a && [ 'slide', 'dive', 'fall', 'tackle' ].includes( a.type );
+		const locked = p.a && [ 'dive', 'slide', 'fall' ].includes( p.a.type );
 		if ( ! locked ) {
-			let want = p.speed > 1.2 ? Math.atan2( p.vx, p.vz ) : Math.atan2( ball.x - p.x, ball.z - p.z );
-			if ( p.speed > 1.2 && p.speed < 4 && Math.hypot( ball.x - p.x, ball.z - p.z ) < 18 ) want = Math.atan2( ball.x - p.x, ball.z - p.z ); // de cara a la jugada
-			if ( a && [ 'pass', 'long', 'shot', 'header' ].includes( a.type ) ) want = Math.atan2( ball.x - p.x, ball.z - p.z );
-			const rate = ( 9 - 6 * clamp( p.speed / 8 ) ) * dt, dh = clamp( wrapA( want - p.h ), - rate, rate );
-			p.h += dh; p.yawRate = p.yawRate * 0.8 + ( dh / dt ) * 0.2;
-		} else p.yawRate *= 0.8;
-		p.lf = p.vx * Math.sin( p.h ) + p.vz * Math.cos( p.h );
-		p.ls = p.vx * Math.cos( p.h ) - p.vz * Math.sin( p.h );
-		p.ph += p.speed / ( 0.9 + 0.42 * p.speed ) * Math.PI * 2 * dt;
-		const near = Math.hypot( ball.x - p.x, ball.z - p.z );
-		p.jockey += ( ( near < 6 && p.speed < 3 ? 0.6 : 0 ) - p.jockey ) * Math.min( 1, dt * 5 );
-		if ( a ) { a.t += dt; if ( a.t >= a.dur ) p.act = null; }
-	}
-	function pose( p, t ) {
-		if ( ! p.mesh.visible ) return;
-		const P = p.P;
-		loco( P, p, t );
-		const a = p.act;
-		if ( a ) {
-			const A = p.A; neutral( A ); a.f( Math.min( 1, a.t / a.dur ), A, a, t );
-			const quick = [ 'slide', 'fall', 'dive' ].includes( a.type ) ? 0.06 : 0.1;
-			const w = clamp( Math.min( a.t / quick, ( a.dur - a.t ) / 0.15 ) );
-			if ( a.upper ) { for ( const b of UPPER ) for ( let k = 0; k < 3; k ++ ) P[ b * 3 + k ] += ( A[ b * 3 + k ] - P[ b * 3 + k ] ) * w; }
-			else for ( let i = 0; i < PLEN; i ++ ) P[ i ] += ( A[ i ] - P[ i ] ) * w;
+			const toBall = Math.atan2( ball.x - p.x, ball.z - p.z );
+			let want = p.speed > 2.2 ? Math.atan2( p.vx, p.vz ) : toBall;
+			if ( p.a && [ 'pass', 'long', 'shot', 'header' ].includes( p.a.type ) ) want = toBall;
+			const rate = ( 7 - 4 * clamp( p.speed / 7 ) ) * dt;
+			p.h += clamp( wrapA( want - p.h ), - rate, rate );
 		}
-		const bdx = ball.x - p.x, bdz = ball.z - p.z, bd = Math.hypot( bdx, bdz );
-		const yaw = clamp( wrapA( Math.atan2( bdx, bdz ) - p.h ), - 1.1, 1.1 ), pitchA = clamp( Math.atan2( 1.55 - ball.y, bd ) * 0.6, - 0.5, 0.6 );
-		P[ NK * 3 + 1 ] += yaw * 0.4; P[ HD * 3 + 1 ] += yaw * 0.6; P[ HD * 3 ] += pitchA * 0.6;
-		const m = p.mesh, bones = p.rig;
-		m.position.set( p.x, 0, p.z ); m.rotation.set( 0, p.h, 0 ); m.scale.set( p.sc * p.wd, p.sc, p.sc * p.wd );
-		for ( let b = 0; b < NB; b ++ ) bones[ b ].rotation.set( P[ b * 3 ], P[ b * 3 + 1 ], P[ b * 3 + 2 ] );
-		bones[ HIPS ].position.set( P[ ROOT ], HIPS_Y + P[ ROOT + 1 ], P[ ROOT + 2 ] );
-		m.updateMatrixWorld( true );
-		if ( P[ GW ] > 0.001 ) {
-			let minY = 1e9;
-			for ( const f of [ FTR, FTL ] ) for ( const [ x, y, z ] of [ [ 0, - 0.085, - 0.06 ], [ 0, - 0.075, 0.16 ] ] ) {
-				pt.set( x, y, z ).applyMatrix4( bones[ f ].matrixWorld ); m.worldToLocal( pt ); minY = Math.min( minY, pt.y );
-			}
-			bones[ HIPS ].position.y -= minY * P[ GW ];
-			bones[ HIPS ].updateMatrixWorld( true );
-		}
+		if ( p.a ) { p.a.t += dt; if ( p.a.t >= p.a.dur ) p.a = null; }
 	}
 
-	// ---------- controles
-	let camMode = 'tv', speed = 1, replay = null, renderT = 0, autoDone = 0;
-	const btn = { tv: $( 'tv' ), cl: $( 'cl' ), fr: $( 'fr' ) };
-	const setCam = mode => { camMode = mode; controls.enabled = mode === 'fr'; for ( const k in btn ) btn[ k ].classList.toggle( 'on', k === mode ); if ( mode === 'fr' ) controls.target.set( ball.x, 0.5, ball.z ); };
-	btn.tv.onclick = () => setCam( 'tv' ); btn.cl.onclick = () => setCam( 'cl' ); btn.fr.onclick = () => setCam( 'fr' );
-	$( 'ps' ).onclick = e => { const v = ! LAB.paused; LAB.setPaused( v ); e.target.textContent = v ? 'Seguir' : 'Pausa'; e.target.classList.toggle( 'on', v ); };
-	$( 'sp' ).onclick = e => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; LAB.setSpeed( speed ); e.target.textContent = 'Velocidad ×' + speed; };
-	$( 'mn' ).onclick = e => { $( 'mini' ).classList.toggle( 'off' ); e.target.classList.toggle( 'on' ); };
-	// Repetición: el partido se congela y el 3D vuelve atrás y lo enseña a cámara lenta, con cámara cercana
-	function startReplay( from, to ) {
-		const F = LAB.frames;
-		if ( ! F.length ) return;
-		from = Math.max( from, F[ 0 ].t ); to = Math.min( to, F[ F.length - 1 ].t );
-		if ( to - from < 1 ) return;
-		replay = { to, wasPaused: LAB.paused, cam: camMode };
-		LAB.setPaused( true );
-		renderT = from; resetEvents( from );
-		for ( const p of people.values() ) p.init = false;
-		$( 'replay' ).style.display = 'block'; setCam( 'cl' );
+	// ---------- pose: mezcla de animaciones de mocap + gesto de la acción + apoyo en el suelo
+	const tmp = new THREE.Vector3(), eul = new THREE.Euler(), qAdd = new THREE.Quaternion();
+	const addRot = ( bone, x, y, z ) => { if ( ! bone ) return; qAdd.setFromEuler( eul.set( x, y, z ) ); bone.quaternion.multiply( qAdd ); };
+	const kf = ( u, keys ) => { if ( u <= keys[ 0 ][ 0 ] ) return keys[ 0 ][ 1 ]; for ( let i = 1; i < keys.length; i ++ ) if ( u <= keys[ i ][ 0 ] ) { const [ u0, v0 ] = keys[ i - 1 ], [ u1, v1 ] = keys[ i ], t = ( u - u0 ) / ( u1 - u0 ); return v0 + ( v1 - v0 ) * t * t * ( 3 - 2 * t ); } return keys[ keys.length - 1 ][ 1 ]; };
+	function pose( p, dt ) {
+		if ( ! p.obj.visible ) return;
+		const v = p.speed, a = p.a;
+		const dance = a && a.type === 'celebrate';
+		const wIdle = dance ? 0 : 1 - smooth( 0.15, 1.3, v ), wRun = dance ? 0 : smooth( 1.9, 4.2, v ), wWalk = dance ? 0 : Math.max( 0, 1 - wIdle - wRun );
+		p.act.idle.setEffectiveWeight( wIdle ); p.act.walk.setEffectiveWeight( wWalk ); p.act.run.setEffectiveWeight( wRun ); p.act.dance.setEffectiveWeight( dance ? 1 : 0 );
+		p.act.walk.setEffectiveTimeScale( clamp( v / 1.35, 0.6, 1.5 ) );
+		p.act.run.setEffectiveTimeScale( clamp( v / 5.0, 0.75, 1.45 ) * p.gait );
+		p.mixer.update( dt );
+		const B = p.b;
+		let roll = 0, pitch = 0, lift = 0;
+		if ( a && ! dance ) {
+			const u = clamp( a.t / a.dur ), side = a.dir || 1;
+			if ( [ 'pass', 'long', 'shot', 'lob', 'chip' ].includes( a.type ) ) {
+				// pase: interior y corto · globo y vaselina: por debajo del balón, cuerpo hacia atrás · tiro y pase largo: armado completo
+				const big = a.type === 'pass' ? 0.6 : a.type === 'chip' ? 0.7 : 1;
+				if ( a.type === 'lob' || a.type === 'chip' ) addRot( B.spine, - 0.22 * Math.sin( Math.PI * u ), 0, 0 );
+				if ( a.type === 'pass' ) addRot( B.rUp, 0, kf( u, [ [ 0, 0 ], [ 0.5, 0.45 ], [ 1, 0 ] ] ), 0 );
+				// la pierna derecha arma hacia atrás y golpea hacia delante; el brazo contrario equilibra
+				addRot( B.rUp, kf( u, [ [ 0, 0 ], [ 0.35, 0.7 * big ], [ 0.5, - 0.5 * big ], [ 0.75, - 1.0 * big ], [ 1, 0 ] ] ), 0, 0 );
+				addRot( B.rLeg, kf( u, [ [ 0, 0 ], [ 0.35, - 1.3 * big ], [ 0.5, - 0.2 ], [ 1, 0 ] ] ), 0, 0 );
+				addRot( B.lArm, 0, 0, kf( u, [ [ 0, 0 ], [ 0.45, - 0.6 * big ], [ 1, 0 ] ] ) );
+				addRot( B.spine, kf( u, [ [ 0, 0 ], [ 0.5, 0.12 ], [ 1, 0 ] ] ), 0, 0 );
+			} else if ( a.type === 'header' ) {
+				lift = Math.sin( Math.PI * clamp( u / 0.8 ) ) * 0.45;
+				addRot( B.neck, kf( u, [ [ 0, 0 ], [ 0.4, - 0.5 ], [ 0.55, 0.5 ], [ 1, 0 ] ] ), 0, 0 );
+				addRot( B.spine, kf( u, [ [ 0, 0 ], [ 0.4, - 0.25 ], [ 0.55, 0.3 ], [ 1, 0 ] ] ), 0, 0 );
+			} else if ( a.type === 'throw' ) {
+				// saque de banda: balón por detrás de la cabeza con las dos manos y lanzamiento
+				const arm = kf( u, [ [ 0, 0 ], [ 0.45, 1 ], [ 0.62, 0.55 ], [ 1, 0 ] ] );
+				addRot( B.rArm, 0, 0, - 2.4 * arm ); addRot( B.lArm, 0, 0, 2.4 * arm );
+				addRot( B.rFore, 0, - 0.9 * arm, 0 ); addRot( B.lFore, 0, 0.9 * arm, 0 );
+				addRot( B.spine, kf( u, [ [ 0, 0 ], [ 0.45, - 0.3 ], [ 0.62, 0.25 ], [ 1, 0 ] ] ), 0, 0 );
+			} else if ( a.type === 'tackle' ) {
+				// entrada de pie: pierna que se estira y cuerpo agachado
+				addRot( B.rUp, kf( u, [ [ 0, 0 ], [ 0.45, - 0.9 ], [ 1, 0 ] ] ), 0, kf( u, [ [ 0, 0 ], [ 0.45, - 0.4 ], [ 1, 0 ] ] ) );
+				addRot( B.spine, kf( u, [ [ 0, 0 ], [ 0.45, 0.35 ], [ 1, 0 ] ] ), 0, 0 );
+			} else if ( a.type === 'catch' ) {
+				// blocaje: brazos al frente, recoge el balón al pecho
+				const arm = kf( u, [ [ 0, 0 ], [ 0.3, 1 ], [ 0.7, 0.8 ], [ 1, 0 ] ] );
+				addRot( B.rArm, 0, 0, - 1.1 * arm ); addRot( B.lArm, 0, 0, 1.1 * arm );
+				addRot( B.rArm, - 1.0 * arm, 0, 0 ); addRot( B.lArm, - 1.0 * arm, 0, 0 );
+				addRot( B.spine, 0.25 * arm, 0, 0 );
+			} else if ( a.type === 'dive' ) {
+				// estirada: se tumba hacia un lado con los brazos por encima de la cabeza
+				roll = side * kf( u, [ [ 0, 0 ], [ 0.3, 1.45 ], [ 0.8, 1.5 ], [ 1, 1.2 ] ] );
+				lift = kf( u, [ [ 0, 0 ], [ 0.25, 0.5 ], [ 0.45, 0.25 ], [ 0.6, 0 ] ] );
+				addRot( B.rArm, 0, 0, - 1.2 * kf( u, [ [ 0, 0 ], [ 0.25, 1 ], [ 0.9, 1 ], [ 1, 0.5 ] ] ) ); addRot( B.lArm, 0, 0, 1.2 * kf( u, [ [ 0, 0 ], [ 0.25, 1 ], [ 0.9, 1 ], [ 1, 0.5 ] ] ) );
+			} else if ( a.type === 'slide' ) {
+				pitch = - kf( u, [ [ 0, 0 ], [ 0.2, 1.2 ], [ 0.75, 1.25 ], [ 1, 0.2 ] ] );
+				addRot( B.rUp, - 0.5 * kf( u, [ [ 0, 0 ], [ 0.2, 1 ], [ 0.8, 1 ], [ 1, 0 ] ] ), 0, 0 );
+			} else if ( a.type === 'fall' ) {
+				pitch = kf( u, [ [ 0, 0 ], [ 0.2, 1.45 ], [ 0.75, 1.5 ], [ 1, 0.1 ] ] );
+			}
+		}
+		const o = p.obj;
+		o.position.set( p.x, 0, p.z );
+		o.rotation.set( 0, p.h, 0 );
+		if ( roll || pitch ) { o.rotateZ( - roll ); o.rotateX( pitch ); }
+		o.updateMatrixWorld( true );
+		// Apoyo: el punto más bajo del cuerpo toca el césped (nadie lo atraviesa; nadie flota salvo al saltar)
+		let minY = 1e9;
+		const pts = roll || pitch ? [ B.rToe, B.lToe, B.rFoot, B.lFoot, B.head, B.hips, B.rHand, B.lHand ] : [ B.rToe, B.lToe, B.rFoot, B.lFoot ];
+		for ( const bn of pts ) if ( bn ) { bn.getWorldPosition( tmp ); minY = Math.min( minY, tmp.y ); }
+		o.position.y += - minY + 0.02 + lift;
+		o.updateMatrixWorld( true );
 	}
-	function endReplay() {
-		$( 'replay' ).style.display = 'none';
-		LAB.setPaused( replay.wasPaused ); setCam( replay.cam );
-		replay = null;
-		renderT = LAB.t() - DELAY; resetEvents( renderT );
+
+	// ---------- jugadas clave: el partido se pausa y el 3D la enseña
+	let clipOn = false, clip = null, renderT = 0, lastClip = null, camMode = 'tv';
+	const btn = { tv: $( 'tv' ), cl: $( 'cl' ), bh: $( 'bh' ) };
+	const setCam = m => { camMode = m; for ( const k in btn ) btn[ k ].classList.toggle( 'on', k === m ); };
+	btn.tv.onclick = () => setCam( 'tv' ); btn.cl.onclick = () => setCam( 'cl' ); btn.bh.onclick = () => setCam( 'bh' );
+	const TITLES = { goal: '¡Gol!', save: 'Paradón', miss: 'Ocasión', pen: 'Penalti', penmiss: 'Penalti fallado', red: 'Roja', disallowed: 'Gol anulado' };
+	function playClip( c, again ) {
+		clip = c; lastClip = c; clipOn = true; renderT = c.from; resetEvents( c.from );
 		for ( const p of people.values() ) p.init = false;
+		document.body.classList.add( 'clip' );
+		$( 'tag' ).style.display = 'block'; $( 'tag' ).textContent = ( again ? 'Repetición · ' : 'Jugada clave · ' ) + ( TITLES[ c.type ] || '' );
 	}
-	$( 'rp' ).onclick = () => { if ( replay ) endReplay(); else { const now = LAB.t() - DELAY; startReplay( now - 9, now ); } };
+	function endClip() {
+		clipOn = false; clip = null;
+		document.body.classList.remove( 'clip' ); $( 'tag' ).style.display = 'none';
+		for ( const p of people.values() ) p.obj.visible = false;
+		if ( ! userPaused ) LAB.setPaused( false );
+	}
+	$( 'rp' ).onclick = () => { if ( lastClip && ! clipOn ) { LAB.setPaused( true ); playClip( lastClip, true ); } };
+	let userPaused = false;
+	$( 'ps' ).onclick = e => { userPaused = ! userPaused; if ( ! clipOn ) LAB.setPaused( userPaused ); e.target.textContent = userPaused ? 'Seguir' : 'Pausa'; e.target.classList.toggle( 'on', userPaused ); };
+	$( 'mn' ).onclick = e => { $( 'mini' ).classList.toggle( 'on' ); e.target.classList.toggle( 'on' ); };
 	addEventListener( 'resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize( innerWidth, innerHeight ); } );
 
 	// ---------- bucle
-	const look = new Vector3( 0, 0.5, 0 );
-	let last = performance.now(), fpsN = 0, fpsT = 0, feedN = - 1;
+	const look = new THREE.Vector3( 0, 0.5, 0 ), V = ( x, y, z ) => new THREE.Vector3( x, y, z );
+	let last = performance.now(), fpsN = 0, fpsT = 0, feedN = - 1, orbit = 0;
 	renderer.setAnimationLoop( () => {
 		const now = performance.now(), real = Math.min( 0.05, ( now - last ) / 1000 ); last = now;
 		fpsN ++; fpsT += real;
-		if ( fpsT > 0.5 ) { $( 'fps' ).textContent = `${Math.round( fpsN / fpsT )} FPS · ${[ ...people.values() ].filter( p => p.mesh.visible ).length} personas`; fpsN = 0; fpsT = 0; }
-		// Qué instante del partido se dibuja
-		let dt;
-		if ( replay ) { dt = real * 0.6; renderT += dt; if ( renderT >= replay.to ) endReplay(); }
-		else {
-			const target = LAB.t() - DELAY;
-			dt = Math.max( 0, target - renderT ); renderT = target;
-			// Repetición automática de cada gol, cuando el 2D termina de celebrarlo
-			const g = LAB.goals.find( x => x.t > autoDone && LAB.t() > x.t + 9 );
-			if ( g ) { autoDone = g.t; startReplay( g.t - 4, g.t + 6 ); }
+		if ( fpsT > 0.5 ) { $( 'fps' ).textContent = `${Math.round( fpsN / fpsT )} FPS · ${[ ...people.values() ].filter( p => p.obj.visible ).length} en el campo`; fpsN = 0; fpsT = 0; }
+		if ( ! clipOn && LAB.clips.length ) playClip( LAB.clips.shift() );
+		let dt = 0;
+		if ( clipOn ) {
+			dt = real * ( clip.type === 'goal' ? 0.85 : 1 );
+			renderT += dt;
+			const fr = frameAt( renderT );
+			if ( fr ) { fireEvents( renderT ); place( fr, dt ); for ( const p of people.values() ) pose( p, dt ); }
+			if ( renderT >= clip.to ) endClip();
 		}
-		const fr = frameAt( renderT );
-		if ( fr ) {
-			fireEvents( renderT );
-			place( fr, dt );
-			for ( const p of people.values() ) pose( p, renderT );
-		}
-		ballMesh.position.set( ball.x, ball.y, ball.z );
-		// Marcador y narración del juego
+		ballMesh.visible = clipOn;
+		ballMesh.position.set( ball.x, ball.y, ball.z ); ballMesh.rotation.x += real * 6;
+		sun.position.set( ball.x + 40, 60, ball.z + 20 ); sun.target.position.set( ball.x, 0, ball.z );
+		// Marcador y radio
 		const m = LAB.m;
 		$( 'sc' ).textContent = `${m.score[ 0 ]} – ${m.score[ 1 ]}`; $( 'clk' ).textContent = m.done ? 'Final' : m.min + "'";
-		if ( LAB.log.length !== feedN ) { feedN = LAB.log.length; $( 'feed' ).innerHTML = LAB.log.slice( - 3 ).reverse().map( e => `<div>${e.min}' · ${e.text}</div>` ).join( '' ); }
-		// Cámara
-		if ( camMode !== 'fr' ) {
-			const k = replay ? 0.08 : 0.05;
-			const tp = camMode === 'tv' ? V( ball.x * 0.85, 26, 50 ) : V( ball.x - 7, 5.5, ball.z + 12 );
+		if ( LAB.log.length !== feedN ) {
+			feedN = LAB.log.length;
+			const lg = LAB.log.slice( - 3 ).reverse();
+			if ( lg[ 0 ] ) { $( 'rk' ).textContent = `${lg[ 0 ].min}' · En directo`; $( 'rt' ).textContent = lg[ 0 ].text; $( 'ro' ).innerHTML = lg.slice( 1 ).map( e => `${e.min}' · ${e.text}` ).join( '<br>' ); }
+		}
+		// Cámara: entre jugadas, vista general del estadio; en la jugada, TV, cercana o detrás de la portería
+		if ( ! clipOn ) {
+			orbit += real * 0.04;
+			camera.position.lerp( V( Math.sin( orbit ) * 70, 34, Math.cos( orbit ) * 70 ), 0.02 );
+			look.lerp( V( 0, 0, 0 ), 0.05 );
+		} else {
+			const k = 0.07, gx = Math.sign( ball.x || 1 ) * L;
+			const tp = camMode === 'tv' ? V( ball.x * 0.8, 17, 44 ) : camMode === 'cl' ? V( ball.x - Math.sign( gx ) * 10, 6, ball.z + 14 ) : V( gx + Math.sign( gx ) * 14, 5, ball.z * 0.4 );
 			camera.position.lerp( tp, k );
-			look.lerp( V( camMode === 'tv' ? ball.x * 0.85 : ball.x, 0.6, camMode === 'tv' ? ball.z * 0.3 : ball.z ), k );
-			camera.lookAt( look );
-		} else controls.update();
+			look.lerp( V( camMode === 'tv' ? ball.x * 0.85 : ball.x, 0.8, camMode === 'tv' ? ball.z * 0.4 : ball.z ), k );
+		}
+		camera.lookAt( look );
 		renderer.render( scene, camera );
 	} );
-	return renderer;
 }
 
 // ================= ARRANQUE =================
 for ( const b of document.querySelectorAll( '#start button' ) ) b.onclick = async () => {
-	$( 'err' ).textContent = 'Cargando la base de datos y simulando el partido…';
+	$( 'err' ).textContent = 'Cargando la base de datos, los modelos y el partido…';
 	try {
 		await LAB.start( b.dataset.g, $( 'p2d' ) );
-		const [ h, a ] = LAB.names;
+		const [ h, a ] = LAB.clubs;
 		$( 'hN' ).textContent = h.code || h.name; $( 'aN' ).textContent = a.code || a.name;
 		await boot();
 		$( 'start' ).remove();
