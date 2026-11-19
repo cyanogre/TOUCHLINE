@@ -789,6 +789,13 @@
     }
 
     /** Disputa de un balón dividido o aéreo: se lo queda el más cercano. */
+    /** Lleva el balón a un punto (balón parado) sin teletransportes: viaja hasta allí como un pase suave. */
+    _placeBall(x, y, maxT, to) {
+      const b = this.ball, d = Math.hypot(x - b.x, y - b.y);
+      b.owner = null; b.roll = null;
+      if (this.instant || d < 1) { b.path = null; b.x = x; b.y = y; b.z = 0; return; }
+      b.path = { fx: b.x, fy: b.y, fz: b.z, tx: x, ty: y, tz: 0, h: Math.min(1.4, d * 0.05), T: clamp(d / 16, 0.25, maxT || 0.9), t: 0, to: to != null ? to : null, curve: 0, nx: 0, ny: 0, ease: 'out', done: to != null ? null : () => { b.z = 0; } };
+    }
     _contest() {
       const b = this.ball;
       const n = this.nearest(Object.values(this.A), b);
@@ -817,7 +824,7 @@
       if (!gk) return [];
       const [x, y] = this.world(i, 5.5, Wd / 2 + (Math.random() < 0.5 ? -6 : 6));
       return [
-        { d: 1.3, start: () => { this.ball.owner = null; this.ball.path = null; this.ball.roll = null; this.ball.x = x; this.ball.y = y; this.ball.z = 0; this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this._cut(0.6); } },
+        { d: 1.3, start: () => { this._placeBall(x, y, 1.1); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this._cut(0.6); } },
         { d: 0.3, start: () => { this.ov = null; const [tx, ty] = this.world(i, U.rand(48, 66), U.rand(10, Wd - 10)); this._kick(tx, ty, { h: 11, T: 1.8, by: gk.pid, done: () => this._contest() }); } }
       ];
     }
@@ -1244,7 +1251,7 @@
         const top = Math.random() < 0.5;
         const cy = top ? 0.4 : Wd - 0.4;
         const b = this.ball;
-        b.owner = null; b.path = null; b.roll = null; b.x = gx - dir * 0.4; b.y = cy; b.z = 0;
+        this._placeBall(gx - dir * 0.4, cy, 1.4);
         this.poss = i;
         const atts = this.team(i).filter(a => !this.isGK(a));
         const defs = this.team(1 - i).filter(a => !this.isGK(a));
@@ -1291,7 +1298,7 @@
       const beats = [{ d: 2.6, start: () => {
         this._banner('Falta peligrosa', '#ffffff', 1.2);
         if (!this.instant && TL.SFX) TL.SFX.whistle(false);
-        const b = this.ball; b.owner = null; b.path = null; b.roll = null; b.x = bx; b.y = by; b.z = 0;
+        this._placeBall(bx, by, 1.4);
         this.poss = i;
         const p = {};
         if (this.A[taker]) p[taker] = { x: bx - dir * 2.4, y: by + 1.2, run: 0.6 };
@@ -1356,7 +1363,7 @@
       } });
       beats.push(this._protestBeat(1 - i, 1.3));
       beats.push({ d: 2.4, start: () => {
-        const b = this.ball; b.owner = null; b.path = null; b.roll = null; b.x = spx; b.y = spy; b.z = 0;
+        this._placeBall(spx, spy, 1.2);
         const taker = (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] * 1.5 + this.P(c.pid).st[2] * 0.3) - (this.P(a.pid).st[1] * 1.5 + this.P(a.pid).st[2] * 0.3))[0] || {}).pid;
         this.penTaker = taker;
         const p = {};
@@ -1466,8 +1473,8 @@
       beats.push({ d: 0.8, start: () => {
         // Se saca la falta en corto
         this.refOv = null;
-        const b = this.ball; b.roll = null; b.path = null; b.x = spot.x; b.y = spot.y; b.z = 0;
         const taker = this.nearest(this.team(1 - i).filter(a => a !== victim), spot);
+        this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null);
         this.ov = null;
         if (taker) {
           this._receive(taker.pid);
@@ -1563,8 +1570,8 @@
         } },
         { d: 0.6, start: () => {
           this.ov = null;
-          const b = this.ball; b.path = null; b.roll = null; b.x = tx; b.y = ty; b.z = 0;
-          const taker = this.nearest(this.team(1 - i), b);
+          const taker = this.nearest(this.team(1 - i), { x: tx, y: ty });
+          this._placeBall(tx, ty, 0.5, taker ? taker.pid : null);
           if (taker) { this._receive(taker.pid); const [lx, ly] = this.world(1 - i, U.rand(45, 60), U.rand(10, Wd - 10)); setTimeout(() => { if (this.ball.owner === taker.pid) this._kick(lx, ly, { h: 7, T: 1.4, done: () => this._contest() }); }, 300); }
         } }
       ]);
