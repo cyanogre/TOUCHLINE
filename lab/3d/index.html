@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TOUCHLINE · laboratorio 3D</title>
+<!-- Todas las rutas relativas (scripts y datos del juego) parten de la raíz del repositorio -->
+<base href="../../">
+<style>
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1510;color:#fff;font:15px/1.4 Inter,system-ui,sans-serif}
+#gl{position:fixed;inset:0}
+#gl canvas{display:block;width:100%;height:100%}
+.score{position:fixed;top:12px;left:12px;display:flex;border-radius:8px;overflow:hidden;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.35);z-index:2}
+.score span{padding:7px 11px;white-space:nowrap}
+#hN{background:#c81e36}#aN{background:#1f4fa8}.n{background:#141618;font-variant-numeric:tabular-nums}.t{background:#eee;color:#141618;font-variant-numeric:tabular-nums}
+#feed{position:fixed;top:56px;left:12px;max-width:min(420px,calc(100vw - 24px));background:rgba(12,16,14,.78);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.35;z-index:2}
+#feed div{opacity:.75}#feed div:first-child{opacity:1;font-weight:600}
+#replay{position:fixed;top:12px;right:12px;background:#ffd23f;color:#141618;font:800 13px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;padding:8px 12px;border-radius:99px;display:none;z-index:2}
+#fps{position:fixed;top:44px;right:12px;font:600 12px ui-monospace,monospace;color:#b9d6c4;background:rgba(12,16,14,.7);padding:4px 8px;border-radius:6px;z-index:2}
+#mini{position:fixed;right:12px;bottom:84px;width:min(300px,40vw);aspect-ratio:117/85;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2;background:#10301e}
+#mini canvas{width:100%;height:100%;display:block}
+#mini.off{display:none}
+.bar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;background:rgba(20,22,24,.85);padding:7px;border-radius:12px;max-width:calc(100vw - 24px);z-index:3}
+.bar button{min-height:38px;padding:0 12px;border:0;border-radius:8px;background:#3a3e44;color:#fff;font:600 14px Inter,system-ui,sans-serif;cursor:pointer}
+.bar button.on{background:#ff6a1a}
+#start{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(120% 80% at 50% 30%,#18402a,#07110b);z-index:5;padding:24px;text-align:center}
+#start h1{font:900 clamp(30px,7vw,54px)/1 Inter,system-ui,sans-serif;margin:0 0 6px;letter-spacing:-.02em}
+#start p{color:#b9d6c4;max-width:560px;margin:0 auto 18px}
+#start button{min-height:46px;padding:0 20px;margin:4px;border:0;border-radius:10px;background:#b8f53d;color:#0b1606;font:800 16px Inter,system-ui,sans-serif;cursor:pointer}
+#start .err{color:#ff8a8a}
+@media (max-width:600px){#feed{top:52px;font-size:12px}#mini{bottom:120px}}
+</style>
+<script type="importmap">
+{"imports":{
+"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
+"three/webgpu":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.webgpu.js",
+"three/tsl":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.tsl.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="gl"></div>
+<div class="score"><span id="hN">—</span><span class="n" id="sc">0 – 0</span><span id="aN">—</span><span class="t" id="clk">0'</span></div>
+<div id="feed"></div>
+<div id="replay">REPETICIÓN</div>
+<div id="fps"></div>
+<div id="mini"><canvas id="p2d"></canvas></div>
+<div class="bar">
+  <button id="tv" class="on">Cámara TV</button>
+  <button id="cl">Cercana</button>
+  <button id="fr">Libre</button>
+  <button id="rp">Repetir jugada</button>
+  <button id="ps">Pausa</button>
+  <button id="sp">Velocidad ×1</button>
+  <button id="mn" class="on">Vista 2D</button>
+</div>
+<div id="start"><div>
+  <h1>Laboratorio 3D</h1>
+  <p>Prueba aparte del juego: el partido lo simula el motor de TOUCHLINE y lo escenifica el campo 2D de siempre (abajo a la derecha). El 3D lee esos puntitos con un segundo de retraso, elige la animación de cada jugadora y puede repetir cualquier jugada.</p>
+  <button data-g="F">Partido femenino</button><button data-g="M">Partido masculino</button>
+  <p class="err" id="err"></p>
+</div></div>
+
+<script>try { localStorage.setItem('touchline.sfx', '0'); localStorage.setItem('touchline.mentor', '0'); } catch (e) {}</script>
+<!-- El juego, tal cual (sin arrancar su interfaz) -->
+<script src="js/icons.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/formulas.js"></script>
+<script src="js/sfx.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/cine.js"></script>
+<script src="data/game/pyramid.js"></script>
+<script src="data/game/escudos.js"></script>
+<script src="data/game/eventos.js"></script>
+<script src="js/util.js"></script>
+<script src="js/events-data.js"></script>
+<script src="js/manager.js"></script>
+<script src="js/staff.js"></script>
+<script src="js/world.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/coach.js"></script>
+<script src="js/season.js"></script>
+<script src="js/market.js"></script>
+<script src="js/commerce.js"></script>
+<script src="js/news.js"></script>
+<script src="js/career.js"></script>
+<script src="js/feel.js"></script>
+<script src="js/locker.js"></script>
+<script src="js/academy.js"></script>
+<script src="js/face.js"></script>
+<script src="js/social.js"></script>
+<script src="js/events.js"></script>
+<script src="js/cups.js"></script>
+<script src="js/tournament.js"></script>
+<script src="js/game.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/mentor.js"></script>
+<script src="js/pitch.js"></script>
+<script src="lab/3d/data.js"></script>
+<script type="module">
+import {
+	Mesh, SkinnedMesh, Skeleton, Bone, PlaneGeometry, BoxGeometry, CylinderGeometry, SphereGeometry, Color, Scene,
+	PerspectiveCamera, DirectionalLight, HemisphereLight, MeshStandardMaterial, WebGPURenderer, CanvasTexture, SRGBColorSpace, Vector3
+} from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildPlayerGeometry, createPlayerMaterial, RIG, NB, ROOT, GW, PLEN, HIPS, NK, HD, FTR, FTL, UPPER, loco, neutral, ACT, startAction, clamp, wrapA, V } from './lab/3d/rig.js';
+
+const TL = window.TL, LAB = TL.Lab;
+const L = 52.5, W = 34, GOAL_W = 3.66, GOAL_H = 2.44;
+const DELAY = 1.0;          // segundos de partido que va el 3D por detrás del 2D (para anticipar las acciones)
+const $ = id => document.getElementById( id );
+
+// ================= RENDER 3D: solo lee LAB.frames y LAB.events =================
+async function boot() {
+	// ?gl=1 fuerza WebGL2 (móviles o navegadores sin WebGPU)
+	const renderer = new WebGPURenderer( { antialias: true, forceWebGL: /[?&]gl=1/.test( location.search ) } );
+	renderer.setPixelRatio( Math.min( devicePixelRatio, 2 ) );
+	renderer.setSize( innerWidth, innerHeight );
+	renderer.shadowMap.enabled = true;
+	$( 'gl' ).appendChild( renderer.domElement );
+	await renderer.init();
+
+	const scene = new Scene();
+	scene.background = new Color( 0x9fc3e0 );
+	const camera = new PerspectiveCamera( 38, innerWidth / innerHeight, 0.1, 500 );
+	camera.position.set( 0, 26, 50 );
+	const controls = new OrbitControls( camera, renderer.domElement );
+	controls.enabled = false; controls.enableDamping = true;
+	scene.add( new HemisphereLight( 0xeaf2ff, 0x3a5a30, 1.5 ) );
+	const sun = new DirectionalLight( 0xfff1dc, 2.8 );
+	sun.position.set( 30, 50, 25 ); sun.castShadow = true;
+	sun.shadow.mapSize.set( 2048, 2048 );
+	Object.assign( sun.shadow.camera, { left: - 70, right: 70, top: 50, bottom: - 50, far: 150 } );
+	scene.add( sun );
+
+	// Campo
+	const cv = document.createElement( 'canvas' ); const PXM = 16;
+	cv.width = 105 * PXM; cv.height = 68 * PXM;
+	const c = cv.getContext( '2d' );
+	for ( let i = 0; i < 14; i ++ ) { c.fillStyle = i % 2 ? '#3f8a37' : '#4a9a41'; c.fillRect( i * cv.width / 14, 0, cv.width / 14 + 1, cv.height ); }
+	const X = x => ( x + L ) * PXM, Y = z => ( z + W ) * PXM;
+	c.strokeStyle = '#f2f2f2'; c.fillStyle = '#f2f2f2'; c.lineWidth = 3;
+	c.strokeRect( 2, 2, cv.width - 4, cv.height - 4 );
+	c.beginPath(); c.moveTo( X( 0 ), 0 ); c.lineTo( X( 0 ), cv.height ); c.stroke();
+	c.beginPath(); c.arc( X( 0 ), Y( 0 ), 9.15 * PXM, 0, Math.PI * 2 ); c.stroke();
+	for ( const s of [ - 1, 1 ] ) {
+		const gx = s * L;
+		c.strokeRect( Math.min( X( gx ), X( gx - s * 16.5 ) ), Y( - 20.16 ), 16.5 * PXM, 40.32 * PXM );
+		c.strokeRect( Math.min( X( gx ), X( gx - s * 5.5 ) ), Y( - 9.16 ), 5.5 * PXM, 18.32 * PXM );
+		c.beginPath(); c.arc( X( gx - s * 11 ), Y( 0 ), 9.15 * PXM, s > 0 ? Math.PI - 0.93 : - 0.93, s > 0 ? Math.PI + 0.93 : 0.93 ); c.stroke();
+	}
+	const tex = new CanvasTexture( cv ); tex.colorSpace = SRGBColorSpace; tex.anisotropy = 8;
+	const field = new Mesh( new PlaneGeometry( 105, 68 ).rotateX( - Math.PI / 2 ), new MeshStandardMaterial( { map: tex, roughness: 0.95 } ) );
+	field.receiveShadow = true; scene.add( field );
+	const outer = new Mesh( new PlaneGeometry( 160, 120 ).rotateX( - Math.PI / 2 ), new MeshStandardMaterial( { color: 0x3a7a34, roughness: 1 } ) );
+	outer.position.y = - 0.01; outer.receiveShadow = true; scene.add( outer );
+	const white = new MeshStandardMaterial( { color: 0xffffff, roughness: 0.4 } );
+	const net = new MeshStandardMaterial( { color: 0xffffff, wireframe: true, transparent: true, opacity: 0.35 } );
+	for ( const s of [ - 1, 1 ] ) {
+		for ( const z of [ - GOAL_W, GOAL_W ] ) { const post = new Mesh( new CylinderGeometry( 0.06, 0.06, GOAL_H, 8 ), white ); post.position.set( s * L, GOAL_H / 2, z ); post.castShadow = true; scene.add( post ); }
+		const bar = new Mesh( new CylinderGeometry( 0.06, 0.06, GOAL_W * 2, 8 ).rotateX( Math.PI / 2 ), white ); bar.position.set( s * L, GOAL_H, 0 ); scene.add( bar );
+		const nm = new Mesh( new BoxGeometry( 2, GOAL_H, GOAL_W * 2, 4, 6, 16 ), net ); nm.position.set( s * ( L + 1 ), GOAL_H / 2, 0 ); scene.add( nm );
+	}
+	const ballMesh = new Mesh( new SphereGeometry( 0.11, 16, 12 ), new MeshStandardMaterial( { color: 0xf8f8f8, roughness: 0.5 } ) );
+	ballMesh.castShadow = true; scene.add( ballMesh );
+
+	// Jugadoras: se crean cuando aparecen en los datos (también las que entran en un cambio)
+	const geo = buildPlayerGeometry(), material = createPlayerMaterial();
+	const people = new Map();   // id -> estado de animación
+	function person( id, kit, seed ) {
+		let p = people.get( id );
+		if ( p ) return p;
+		const mesh = new SkinnedMesh( geo, material );
+		const bones = RIG.map( ( [ , x, y, z ] ) => { const b = new Bone(); b.position.set( x, y, z ); return b; } );
+		RIG.forEach( ( [ par ], i ) => ( par < 0 ? mesh : bones[ par ] ).add( bones[ i ] ) );
+		mesh.updateMatrixWorld( true );
+		mesh.bind( new Skeleton( bones ) );
+		mesh.userData = { seed, kit };
+		mesh.castShadow = true; mesh.frustumCulled = false;
+		scene.add( mesh );
+		const h = ( ( seed * 2654435761 ) >>> 0 ) % 1000 / 1000;
+		p = { id, mesh, rig: bones, P: new Float32Array( PLEN ), A: new Float32Array( PLEN ), x: 0, z: 0, vx: 0, vz: 0, h: 0, ph: h * 6.28, speed: 0, lf: 0, ls: 0,
+			yawRate: 0, accF: 0, jockey: 0, act: null, seed, sc: 0.92 + h * 0.08, wd: 0.95 + h * 0.1, init: false, seen: 0 };
+		people.set( id, p );
+		return p;
+	}
+
+	// ---------- lectura de la grabación a un instante t (interpolando entre fotogramas)
+	function frameAt( t ) {
+		const F = LAB.frames;
+		if ( ! F.length ) return null;
+		let lo = 0, hi = F.length - 1;
+		if ( t <= F[ 0 ].t ) return { a: F[ 0 ], b: F[ 0 ], k: 0 };
+		if ( t >= F[ hi ].t ) return { a: F[ hi ], b: F[ hi ], k: 0 };
+		while ( hi - lo > 1 ) { const mid = ( lo + hi ) >> 1; if ( F[ mid ].t <= t ) lo = mid; else hi = mid; }
+		const a = F[ lo ], b = F[ hi ];
+		return { a, b, k: ( t - a.t ) / Math.max( 1e-6, b.t - a.t ) };
+	}
+	const lerp = ( a, b, k ) => a + ( b - a ) * k;
+
+	// ---------- acciones disparadas por evento, adelantadas a su fotograma de contacto
+	let evI = 0;
+	const lead = type => { const A = ACT[ type ]; return A ? ( A.c != null ? A.c * A.dur : A.win ? A.win[ 0 ] * A.dur : 0 ) : 0; };
+	function resetEvents( t ) { evI = 0; while ( evI < LAB.events.length && LAB.events[ evI ].t - lead( LAB.events[ evI ].type ) < t ) evI ++; for ( const p of people.values() ) p.act = null; }
+	function fireEvents( t ) {
+		const E = LAB.events;
+		while ( evI < E.length && E[ evI ].t - lead( E[ evI ].type ) <= t ) {
+			const e = E[ evI ++ ], p = people.get( 'p' + e.pid );
+			if ( ! p || ! ACT[ e.type ] ) continue;
+			if ( p.act && [ 'slide', 'dive', 'fall' ].includes( p.act.type ) ) continue;
+			const extra = e.type === 'dive' ? { dir: e.dir || 1, reach: 1.6 } : e.type === 'slide' ? { sv: 5 } : {};
+			startAction( p, e.type, extra );
+			// el disparo y el pase miran hacia donde va el balón
+			if ( [ 'pass', 'long', 'shot', 'header' ].includes( e.type ) ) p.aimT = e.t;
+		}
+	}
+
+	// ---------- un fotograma del 3D
+	const pt = new Vector3(), HIPS_Y = RIG[ 0 ][ 2 ];
+	const ball = { x: 0, y: 0.11, z: 0 };
+	function place( fr, dt ) {
+		const { a, b, k } = fr;
+		ball.x = lerp( a.ball[ 0 ], b.ball[ 0 ], k ); ball.y = lerp( a.ball[ 1 ], b.ball[ 1 ], k ); ball.z = lerp( a.ball[ 2 ], b.ball[ 2 ], k );
+		const live = new Set();
+		const ids = Object.keys( a.pl );
+		for ( const id of ids ) {
+			const pa = a.pl[ id ], pb = b.pl[ id ] || pa;
+			const kit = pa[ 3 ] ? 2 + pa[ 2 ] : pa[ 2 ];
+			drive( person( 'p' + id, kit, + id ), lerp( pa[ 0 ], pb[ 0 ], k ), lerp( pa[ 1 ], pb[ 1 ], k ), dt );
+			live.add( 'p' + id );
+		}
+		drive( person( 'ref', 4, 999 ), lerp( a.ref[ 0 ], b.ref[ 0 ], k ), lerp( a.ref[ 1 ], b.ref[ 1 ], k ), dt );
+		live.add( 'ref' );
+		for ( const p of people.values() ) p.mesh.visible = live.has( p.id );
+	}
+	// De posición a locomoción: velocidad suavizada, giro limitado, fase de la zancada por distancia
+	function drive( p, x, z, dt ) {
+		if ( ! p.init || Math.hypot( x - p.x, z - p.z ) > 8 ) { p.x = x; p.z = z; p.vx = p.vz = 0; p.init = true; p.h = Math.atan2( ball.x - x, ball.z - z ); return; }
+		if ( dt <= 0 ) return;
+		const vx = ( x - p.x ) / dt, vz = ( z - p.z ) / dt, kv = Math.min( 1, dt * 10 );
+		p.vx += ( vx - p.vx ) * kv; p.vz += ( vz - p.vz ) * kv;
+		p.x = x; p.z = z;
+		const prev = p.speed;
+		p.speed = Math.hypot( p.vx, p.vz );
+		p.accF = p.accF * 0.85 + ( ( p.speed - prev ) / dt ) * 0.15;
+		const a = p.act, locked = a && [ 'slide', 'dive', 'fall', 'tackle' ].includes( a.type );
+		if ( ! locked ) {
+			let want = p.speed > 1.2 ? Math.atan2( p.vx, p.vz ) : Math.atan2( ball.x - p.x, ball.z - p.z );
+			if ( p.speed > 1.2 && p.speed < 4 && Math.hypot( ball.x - p.x, ball.z - p.z ) < 18 ) want = Math.atan2( ball.x - p.x, ball.z - p.z ); // de cara a la jugada
+			if ( a && [ 'pass', 'long', 'shot', 'header' ].includes( a.type ) ) want = Math.atan2( ball.x - p.x, ball.z - p.z );
+			const rate = ( 9 - 6 * clamp( p.speed / 8 ) ) * dt, dh = clamp( wrapA( want - p.h ), - rate, rate );
+			p.h += dh; p.yawRate = p.yawRate * 0.8 + ( dh / dt ) * 0.2;
+		} else p.yawRate *= 0.8;
+		p.lf = p.vx * Math.sin( p.h ) + p.vz * Math.cos( p.h );
+		p.ls = p.vx * Math.cos( p.h ) - p.vz * Math.sin( p.h );
+		p.ph += p.speed / ( 0.9 + 0.42 * p.speed ) * Math.PI * 2 * dt;
+		const near = Math.hypot( ball.x - p.x, ball.z - p.z );
+		p.jockey += ( ( near < 6 && p.speed < 3 ? 0.6 : 0 ) - p.jockey ) * Math.min( 1, dt * 5 );
+		if ( a ) { a.t += dt; if ( a.t >= a.dur ) p.act = null; }
+	}
+	function pose( p, t ) {
+		if ( ! p.mesh.visible ) return;
+		const P = p.P;
+		loco( P, p, t );
+		const a = p.act;
+		if ( a ) {
+			const A = p.A; neutral( A ); a.f( Math.min( 1, a.t / a.dur ), A, a, t );
+			const quick = [ 'slide', 'fall', 'dive' ].includes( a.type ) ? 0.06 : 0.1;
+			const w = clamp( Math.min( a.t / quick, ( a.dur - a.t ) / 0.15 ) );
+			if ( a.upper ) { for ( const b of UPPER ) for ( let k = 0; k < 3; k ++ ) P[ b * 3 + k ] += ( A[ b * 3 + k ] - P[ b * 3 + k ] ) * w; }
+			else for ( let i = 0; i < PLEN; i ++ ) P[ i ] += ( A[ i ] - P[ i ] ) * w;
+		}
+		const bdx = ball.x - p.x, bdz = ball.z - p.z, bd = Math.hypot( bdx, bdz );
+		const yaw = clamp( wrapA( Math.atan2( bdx, bdz ) - p.h ), - 1.1, 1.1 ), pitchA = clamp( Math.atan2( 1.55 - ball.y, bd ) * 0.6, - 0.5, 0.6 );
+		P[ NK * 3 + 1 ] += yaw * 0.4; P[ HD * 3 + 1 ] += yaw * 0.6; P[ HD * 3 ] += pitchA * 0.6;
+		const m = p.mesh, bones = p.rig;
+		m.position.set( p.x, 0, p.z ); m.rotation.set( 0, p.h, 0 ); m.scale.set( p.sc * p.wd, p.sc, p.sc * p.wd );
+		for ( let b = 0; b < NB; b ++ ) bones[ b ].rotation.set( P[ b * 3 ], P[ b * 3 + 1 ], P[ b * 3 + 2 ] );
+		bones[ HIPS ].position.set( P[ ROOT ], HIPS_Y + P[ ROOT + 1 ], P[ ROOT + 2 ] );
+		m.updateMatrixWorld( true );
+		if ( P[ GW ] > 0.001 ) {
+			let minY = 1e9;
+			for ( const f of [ FTR, FTL ] ) for ( const [ x, y, z ] of [ [ 0, - 0.085, - 0.06 ], [ 0, - 0.075, 0.16 ] ] ) {
+				pt.set( x, y, z ).applyMatrix4( bones[ f ].matrixWorld ); m.worldToLocal( pt ); minY = Math.min( minY, pt.y );
+			}
+			bones[ HIPS ].position.y -= minY * P[ GW ];
+			bones[ HIPS ].updateMatrixWorld( true );
+		}
+	}
+
+	// ---------- controles
+	let camMode = 'tv', speed = 1, replay = null, renderT = 0, autoDone = 0;
+	const btn = { tv: $( 'tv' ), cl: $( 'cl' ), fr: $( 'fr' ) };
+	const setCam = mode => { camMode = mode; controls.enabled = mode === 'fr'; for ( const k in btn ) btn[ k ].classList.toggle( 'on', k === mode ); if ( mode === 'fr' ) controls.target.set( ball.x, 0.5, ball.z ); };
+	btn.tv.onclick = () => setCam( 'tv' ); btn.cl.onclick = () => setCam( 'cl' ); btn.fr.onclick = () => setCam( 'fr' );
+	$( 'ps' ).onclick = e => { const v = ! LAB.paused; LAB.setPaused( v ); e.target.textContent = v ? 'Seguir' : 'Pausa'; e.target.classList.toggle( 'on', v ); };
+	$( 'sp' ).onclick = e => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; LAB.setSpeed( speed ); e.target.textContent = 'Velocidad ×' + speed; };
+	$( 'mn' ).onclick = e => { $( 'mini' ).classList.toggle( 'off' ); e.target.classList.toggle( 'on' ); };
+	// Repetición: el partido se congela y el 3D vuelve atrás y lo enseña a cámara lenta, con cámara cercana
+	function startReplay( from, to ) {
+		const F = LAB.frames;
+		if ( ! F.length ) return;
+		from = Math.max( from, F[ 0 ].t ); to = Math.min( to, F[ F.length - 1 ].t );
+		if ( to - from < 1 ) return;
+		replay = { to, wasPaused: LAB.paused, cam: camMode };
+		LAB.setPaused( true );
+		renderT = from; resetEvents( from );
+		for ( const p of people.values() ) p.init = false;
+		$( 'replay' ).style.display = 'block'; setCam( 'cl' );
+	}
+	function endReplay() {
+		$( 'replay' ).style.display = 'none';
+		LAB.setPaused( replay.wasPaused ); setCam( replay.cam );
+		replay = null;
+		renderT = LAB.t() - DELAY; resetEvents( renderT );
+		for ( const p of people.values() ) p.init = false;
+	}
+	$( 'rp' ).onclick = () => { if ( replay ) endReplay(); else { const now = LAB.t() - DELAY; startReplay( now - 9, now ); } };
+	addEventListener( 'resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize( innerWidth, innerHeight ); } );
+
+	// ---------- bucle
+	const look = new Vector3( 0, 0.5, 0 );
+	let last = performance.now(), fpsN = 0, fpsT = 0, feedN = - 1;
+	renderer.setAnimationLoop( () => {
+		const now = performance.now(), real = Math.min( 0.05, ( now - last ) / 1000 ); last = now;
+		fpsN ++; fpsT += real;
+		if ( fpsT > 0.5 ) { $( 'fps' ).textContent = `${Math.round( fpsN / fpsT )} FPS · ${[ ...people.values() ].filter( p => p.mesh.visible ).length} personas`; fpsN = 0; fpsT = 0; }
+		// Qué instante del partido se dibuja
+		let dt;
+		if ( replay ) { dt = real * 0.6; renderT += dt; if ( renderT >= replay.to ) endReplay(); }
+		else {
+			const target = LAB.t() - DELAY;
+			dt = Math.max( 0, target - renderT ); renderT = target;
+			// Repetición automática de cada gol, cuando el 2D termina de celebrarlo
+			const g = LAB.goals.find( x => x.t > autoDone && LAB.t() > x.t + 9 );
+			if ( g ) { autoDone = g.t; startReplay( g.t - 4, g.t + 6 ); }
+		}
+		const fr = frameAt( renderT );
+		if ( fr ) {
+			fireEvents( renderT );
+			place( fr, dt );
+			for ( const p of people.values() ) pose( p, renderT );
+		}
+		ballMesh.position.set( ball.x, ball.y, ball.z );
+		// Marcador y narración del juego
+		const m = LAB.m;
+		$( 'sc' ).textContent = `${m.score[ 0 ]} – ${m.score[ 1 ]}`; $( 'clk' ).textContent = m.done ? 'Final' : m.min + "'";
+		if ( LAB.log.length !== feedN ) { feedN = LAB.log.length; $( 'feed' ).innerHTML = LAB.log.slice( - 3 ).reverse().map( e => `<div>${e.min}' · ${e.text}</div>` ).join( '' ); }
+		// Cámara
+		if ( camMode !== 'fr' ) {
+			const k = replay ? 0.08 : 0.05;
+			const tp = camMode === 'tv' ? V( ball.x * 0.85, 26, 50 ) : V( ball.x - 7, 5.5, ball.z + 12 );
+			camera.position.lerp( tp, k );
+			look.lerp( V( camMode === 'tv' ? ball.x * 0.85 : ball.x, 0.6, camMode === 'tv' ? ball.z * 0.3 : ball.z ), k );
+			camera.lookAt( look );
+		} else controls.update();
+		renderer.render( scene, camera );
+	} );
+	return renderer;
+}
+
+// ================= ARRANQUE =================
+for ( const b of document.querySelectorAll( '#start button' ) ) b.onclick = async () => {
+	$( 'err' ).textContent = 'Cargando la base de datos y simulando el partido…';
+	try {
+		await LAB.start( b.dataset.g, $( 'p2d' ) );
+		const [ h, a ] = LAB.names;
+		$( 'hN' ).textContent = h.code || h.name; $( 'aN' ).textContent = a.code || a.name;
+		await boot();
+		$( 'start' ).remove();
+	} catch ( err ) {
+		console.error( err );
+		$( 'err' ).textContent = 'No se pudo arrancar: ' + err.message;
+	}
+};
+</script>
+</body>
+</html>
