@@ -400,15 +400,58 @@
       const half = (L / 2) * dir;                       // en su campo no hay fuera de juego
       return Math.max(second, this.ball.x * dir, half) / dir;
     }
+    /**
+     * Lo que decide hacer una jugadora sin balón cuando su equipo ataca. Elige una idea cada 2–5 s
+     * (según su puesto y dónde está la jugada) y la mantiene: así cada una se mueve por su cuenta.
+     */
+    _initiative(a, car, att) {
+      const slot = this.slotOf(a), line = F.LINE[slot];
+      if (line === 0) return;
+      const cd = this.depth(att, car.x), cl = this.lat(att, car.y);
+      let I = a.intent;
+      if (!I || I.until < this.t || I.car !== car.pid) {
+        const wide = /^(R|L)(B|WB|M|W)$/.test(slot);
+        const fb = /^(R|L)(B|WB)$/.test(slot);
+        const myLat = this.lat(att, a.ty), mySide = myLat > Wd / 2 ? 1 : -1, ballSide = cl > Wd / 2 ? 1 : -1;
+        const opts = [['hold', 3]];
+        if (line === 3) opts.push(['drop', 2], ['drift', 1.4], ['post', cd > 70 && (cl < 16 || cl > Wd - 16) ? 3 : 0.3]);
+        if (wide && !fb) opts.push(['touch', 2.2], ['inside', 1.6]);
+        if (line === 2 && !wide) opts.push(['between', 2], ['arrive', cd > 58 ? 2.6 : 0.4]);
+        if (fb) opts.push(['overlap', mySide === ballSide && cd > 40 ? 2.6 : 0.3]);
+        if (slot === 'CB') opts.push(['step', cd < 55 ? 0.8 : 0.1]);
+        a.intent = I = { k: U.weighted(opts, o => o[1])[0], car: car.pid, until: this.t + U.rand(2, 5), r: Math.random(), side: mySide };
+      }
+      const hd = this.depth(att, a.tx), hl = this.lat(att, a.ty);
+      let d = hd, l = hl, run = a.run;
+      switch (I.k) {
+        case 'drop': d = clamp(cd + 7 + I.r * 5, 30, 90); l = lerp(hl, cl, 0.5); run = 0.7; break;           // baja a recibir
+        case 'drift': l = clamp(hl + (I.r < 0.5 ? -1 : 1) * 12, 5, Wd - 5); run = 0.5; break;                // cae a banda
+        case 'post': d = 92; l = Wd / 2 + (cl > Wd / 2 ? 1 : -1) * 3; run = 0.95; break;                      // ataca el primer palo
+        case 'touch': l = I.side > 0 ? Wd - 2.5 : 2.5; d = hd + 3; run = 0.5; break;                          // abre el campo, pegada a la cal
+        case 'inside': l = lerp(hl, Wd / 2, 0.55); d = hd + 4; run = 0.65; break;                              // se mete por dentro
+        case 'between': d = clamp(cd + 11, 30, 85); l = lerp(hl, Wd / 2, 0.35); run = 0.6; break;             // entre líneas
+        case 'arrive': d = clamp(80 + I.r * 8, 0, 90); l = lerp(hl, Wd / 2, 0.6); run = 0.85; break;          // llega desde segunda línea
+        case 'overlap': d = clamp(cd + 10, 0, 92); l = I.side > 0 ? Wd - 3 : 3; run = 0.9; break;             // dobla por fuera
+        case 'step': d = hd + 9; run = 0.45; break;                                                              // la central sale con el balón
+        default: return;
+      }
+      [a.tx, a.ty] = this.world(att, d, l); a.run = run; a.role = 'idea';
+    }
     _targets() {
       const b = this.ball;
       // Quién ataca: el equipo de quien lleva el balón (si nadie lo lleva, el último que lo tuvo)
       const car = b.owner != null ? this.A[b.owner] : null;
       const att = car ? car.team : this.poss, def = 1 - att;
+      const dtT = clamp(this.t - (this._tt == null ? this.t : this._tt), 0, 0.2); this._tt = this.t;
       for (const id in this.A) {
         const a = this.A[id];
         const h = this._home(a);
-        a.tx = h[0]; a.ty = h[1]; a.run = 0.33;
+        // Cada una reacciona al movimiento del bloque a su ritmo: unas van ya, otras se descuelgan un poco
+        if (a.shift == null) a.shift = 0.7 + ((a.pid * 0.618) % 1) * 1.8;
+        if (a.hx == null || Math.hypot(h[0] - a.hx, h[1] - a.hy) > 30) { a.hx = h[0]; a.hy = h[1]; }
+        const k = Math.min(1, dtT * a.shift);
+        a.hx += (h[0] - a.hx) * k; a.hy += (h[1] - a.hy) * k;
+        a.tx = a.hx; a.ty = a.hy; a.run = 0.33;
         a.role = null;
       }
       if (!this.ov || !this.ov.all) {
@@ -479,6 +522,8 @@
           const farSide = car.y < Wd / 2 ? Wd - 5 : 5;
           const winger = mates.filter(a => !a.role && [1, 2, 3].includes(F.LINE[this.slotOf(a)])).sort((p, q) => Math.abs(p.y - farSide) - Math.abs(q.y - farSide))[0];
           if (winger) { winger.ty = lerp(winger.ty, farSide, 0.7); winger.role = 'width'; }
+          // Iniciativa propia: cada una, a su ritmo, decide qué hacer según su puesto y la jugada
+          for (const m of mates) if (!m.role) this._initiative(m, car, att);
           // Fuera de juego: nadie se queda por delante de la línea (salvo quien tira la ruptura)
           const line = this._offsideLine(att);
           const run = this.runner && this.runner.until > this.t ? this.runner : null;
