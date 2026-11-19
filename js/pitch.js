@@ -412,7 +412,7 @@
       for (const id in this.A) {
         const a = this.A[id];
         const h = this._home(a);
-        a.tx = h[0]; a.ty = h[1]; a.run = 0.34;
+        a.tx = h[0]; a.ty = h[1]; a.run = 0.33;
         a.role = null;
       }
       if (!this.ov || !this.ov.all) {
