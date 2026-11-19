@@ -360,7 +360,10 @@ async function boot() {
 		const mixer = new THREE.AnimationMixer( obj );
 		const act = {};
 		for ( const k in clips ) { act[ k ] = mixer.clipAction( clips[ k ] ); act[ k ].play(); act[ k ].setEffectiveWeight( k === 'idle' ? 1 : 0 ); act[ k ].time = rnd( seed, 7 ) * clips[ k ].duration; }
-		p = { id, obj, mixer, act, x: 0, z: 0, vx: 0, vz: 0, h: 0, speed: 0, init: false, a: null, gait: 0.92 + rnd( seed, 8 ) * 0.16,
+		// Su forma de moverse: arrancada, frenada, giro, zancada, postura y cuánto se inclina
+		const sty = { acc: 4.5 + rnd( seed, 9 ) * 4, dec: 6 + rnd( seed, 10 ) * 5, turn: 4.5 + rnd( seed, 11 ) * 4, lean: 0.6 + rnd( seed, 12 ) * 0.8,
+			posture: - 0.04 + rnd( seed, 13 ) * 0.16, top: 7.2 + rnd( seed, 14 ) * 1.6, runAt: 1.6 + rnd( seed, 15 ) * 0.8 };
+		p = { id, obj, mixer, act, sty, x: 0, z: 0, vx: 0, vz: 0, h: 0, speed: 0, accF: 0, yawRate: 0, init: false, a: null, gait: 0.9 + rnd( seed, 8 ) * 0.2,
 			b: { hips: bone( 'Hips' ), spine: bone( 'Spine' ), spine2: bone( 'Spine2' ), head: bone( 'Head' ), neck: bone( 'Neck' ), rUp: bone( 'RightUpLeg' ), rLeg: bone( 'RightLeg' ), lUp: bone( 'LeftUpLeg' ), lLeg: bone( 'LeftLeg' ), rFoot: bone( 'RightFoot' ), lFoot: bone( 'LeftFoot' ), rToe: bone( 'RightToeBase' ), lToe: bone( 'LeftToeBase' ), rArm: bone( 'RightArm' ), lArm: bone( 'LeftArm' ), rFore: bone( 'RightForeArm' ), lFore: bone( 'LeftForeArm' ), rHand: bone( 'RightHand' ), lHand: bone( 'LeftHand' ) } };
 		scene.add( obj );
 		people.set( id, p );
@@ -427,24 +430,35 @@ async function boot() {
 		for ( const p of people.values() ) p.obj.visible = live.has( p.id ) && clipOn;
 	}
 	function move( p, x, z, dt ) {
+		const S = p.sty;
 		if ( ! p.init || Math.hypot( x - p.x, z - p.z ) > 14 ) { p.x = x; p.z = z; p.vx = p.vz = 0; p.speed = 0; p.init = true; p.h = Math.atan2( ball.x - x, ball.z - z ); return; }
 		if ( dt <= 0 ) return;
-		// sigue al dato sin superar MAX_V: los saltos del 2D se convierten en carreras
-		let dx = x - p.x, dz = z - p.z;
-		const d = Math.hypot( dx, dz ), maxStep = MAX_V * dt;
-		if ( d > maxStep ) { dx *= maxStep / d; dz *= maxStep / d; }
-		const vx = dx / dt, vz = dz / dt, kv = Math.min( 1, dt * 6 );
-		p.vx += ( vx - p.vx ) * kv; p.vz += ( vz - p.vz ) * kv;
-		p.x += dx; p.z += dz;
+		// Velocidad que pide el dato (hacia donde tiene que estar), con su punta de velocidad
+		let ex = x - p.x, ez = z - p.z;
+		const err = Math.hypot( ex, ez );
+		const want = Math.min( S.top, err / Math.max( dt, 0.12 ) );
+		const wx = err > 1e-4 ? ex / err * want : 0, wz = err > 1e-4 ? ez / err * want : 0;
+		// Inercia: arranca y frena según su físico
+		let dvx = wx - p.vx, dvz = wz - p.vz;
+		const dv = Math.hypot( dvx, dvz ), braking = want < p.speed;
+		const lim = ( braking ? S.dec : S.acc ) * dt * ( err > 4 ? 1.8 : 1 );
+		if ( dv > lim ) { dvx *= lim / dv; dvz *= lim / dv; }
+		p.vx += dvx; p.vz += dvz;
+		p.x += p.vx * dt; p.z += p.vz * dt;
+		// Si se queda muy atrás del dato, se la acerca poco a poco (sin saltos)
+		const ex2 = x - p.x, ez2 = z - p.z, e2 = Math.hypot( ex2, ez2 );
+		if ( e2 > 1.2 ) { const k = Math.min( 1, dt * 0.8 ) * ( e2 - 1.2 ) / e2; p.x += ex2 * k; p.z += ez2 * k; }
+		const prev = p.speed;
 		p.speed = Math.hypot( p.vx, p.vz );
+		p.accF = p.accF * 0.85 + ( ( p.speed - prev ) / dt ) * 0.15;
 		const locked = p.a && [ 'dive', 'slide', 'fall' ].includes( p.a.type );
 		if ( ! locked ) {
 			const toBall = Math.atan2( ball.x - p.x, ball.z - p.z );
-			let want = p.speed > 2.2 ? Math.atan2( p.vx, p.vz ) : toBall;
-			if ( p.a && [ 'pass', 'long', 'shot', 'header' ].includes( p.a.type ) ) want = toBall;
-			const rate = ( 7 - 4 * clamp( p.speed / 7 ) ) * dt;
-			p.h += clamp( wrapA( want - p.h ), - rate, rate );
-		}
+			let wantH = p.speed > 2.2 ? Math.atan2( p.vx, p.vz ) : toBall;
+			if ( p.a && [ 'pass', 'long', 'shot', 'lob', 'chip', 'header', 'throw' ].includes( p.a.type ) ) wantH = toBall;
+			const rate = ( S.turn - 2.5 * clamp( p.speed / 7 ) ) * dt, dh = clamp( wrapA( wantH - p.h ), - rate, rate );
+			p.h += dh; p.yawRate = p.yawRate * 0.8 + ( dh / dt ) * 0.2;
+		} else p.yawRate *= 0.8;
 		if ( p.a ) { p.a.t += dt; if ( p.a.t >= p.a.dur ) p.a = null; }
 	}
 
@@ -456,13 +470,19 @@ async function boot() {
 		if ( ! p.obj.visible ) return;
 		const v = p.speed, a = p.a;
 		const dance = a && a.type === 'celebrate';
-		const wIdle = dance ? 0 : 1 - smooth( 0.15, 1.3, v ), wRun = dance ? 0 : smooth( 1.9, 4.2, v ), wWalk = dance ? 0 : Math.max( 0, 1 - wIdle - wRun );
+		const wIdle = dance ? 0 : 1 - smooth( 0.15, 1.3, v ), wRun = dance ? 0 : smooth( p.sty.runAt, p.sty.runAt + 2.3, v ), wWalk = dance ? 0 : Math.max( 0, 1 - wIdle - wRun );
 		p.act.idle.setEffectiveWeight( wIdle ); p.act.walk.setEffectiveWeight( wWalk ); p.act.run.setEffectiveWeight( wRun ); p.act.dance.setEffectiveWeight( dance ? 1 : 0 );
 		p.act.walk.setEffectiveTimeScale( clamp( v / 1.35, 0.6, 1.5 ) );
 		p.act.run.setEffectiveTimeScale( clamp( v / 5.0, 0.75, 1.45 ) * p.gait );
 		p.mixer.update( dt );
 		const B = p.b;
 		let roll = 0, pitch = 0, lift = 0;
+		// Inercia en el cuerpo: se echa hacia delante al arrancar, hacia atrás al frenar y hacia dentro en las curvas
+		if ( ! dance ) {
+			const S = p.sty;
+			addRot( B.spine, S.posture + clamp( p.accF * 0.035 * S.lean, - 0.22, 0.28 ), 0, 0 );
+			addRot( B.hips, 0, 0, clamp( - p.yawRate * v * 0.03 * S.lean, - 0.3, 0.3 ) );
+		}
 		if ( a && ! dance ) {
 			const u = clamp( a.t / a.dur ), side = a.dir || 1;
 			if ( [ 'pass', 'long', 'shot', 'lob', 'chip' ].includes( a.type ) ) {
