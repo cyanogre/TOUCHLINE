@@ -385,10 +385,6 @@
       const sh = kickoff ? { line: 12, span: 30, width: 0.9, shift: 0, gk: 3 } : this._shape(i);
       let depth = slot === 'GK' ? sh.gk : sh.line + (sy - 18) / 66 * sh.span;
       let lat = Wd / 2 + (sx - 50) / 50 * (Wd / 2 - 4) * sh.width + sh.shift;
-      if (!kickoff) {
-        depth += Math.sin(this.t * 0.55 + a.pid) * 0.9;
-        lat += Math.cos(this.t * 0.47 + a.pid * 1.3) * 0.9;
-      }
       if (kickoff) depth = Math.min(depth, L / 2 - 1.5);
       return this.world(i, clamp(depth, 0.8, L - 1), clamp(lat, 1.5, Wd - 1.5));
     }
@@ -428,7 +424,16 @@
           // Presión: sale la defensora que antes llega; la segunda cubre por dentro, entre el balón y la portería
           const defs = field(def).sort((p, q) => this._reach(p, bp) - this._reach(q, bp));
           const press = 0.75 + 0.3 * morale(def) + (this.m.teams[def].mentality - 1) * 0.08;
-          const presser = defs[0], cover = defs[1];
+          // Roles estables (como en agent2d): se mantiene a quien ya presiona salvo que otra llegue claramente antes
+          const keep = (pid, best, margin) => { const a = pid != null && this.A[pid]; return a && a.team === def && !this.isGK(a) && this._reach(a, bp) < this._reach(best, bp) + margin ? a : best; };
+          let presser = defs[0] ? keep(this.mem && this.mem.press, defs[0], 0.6) : null;
+          const rest = defs.filter(d => d !== presser);
+          let cover = rest[0] ? keep(this.mem && this.mem.cover, rest[0], 0.8) : null;
+          if (cover === presser) cover = rest[0];
+          this.mem = this.mem || { marks: {} };
+          if (this.mem.def !== def) { this.mem = { marks: {}, def }; }
+          this.mem.press = presser ? presser.pid : null; this.mem.cover = cover ? cover.pid : null;
+          defs.splice(0, defs.length, ...[presser, cover].filter(Boolean), ...defs.filter(d => d !== presser && d !== cover));
           if (presser) { presser.tx = bp.x + Math.sign(og - bp.x) * 0.9; presser.ty = bp.y; presser.run = clamp(press, 0.6, 1); presser.role = 'press'; }
           if (cover) {
             const k = 7 / Math.max(1, Math.hypot(og - bp.x, Wd / 2 - bp.y));
@@ -437,15 +442,22 @@
           // Marcas sin repetir: cada atacante peligrosa (las más cercanas a la portería) se la queda una defensora distinta
           const free = defs.slice(2).filter(d => F.LINE[this.slotOf(d)] <= 2);
           const threats = field(att).filter(a => a !== car).sort((p, q) => Math.abs(og - p.x) - Math.abs(og - q.x));
+          const marks = {};
           for (const t of threats) {
             let best = null, bd = 16 * 16;
-            for (const d of free) { const dd = d2({ x: d.tx, y: d.ty }, t); if (dd < bd) { bd = dd; best = d; } }
+            // si ya la marcaba alguien libre y sigue cerca de su zona, sigue marcándola
+            const prevPid = Object.keys(this.mem.marks).find(k => this.mem.marks[k] === t.pid);
+            const prev = prevPid != null ? free.find(d => d.pid === +prevPid) : null;
+            if (prev && d2({ x: prev.tx, y: prev.ty }, t) < 20 * 20) best = prev;
+            else for (const d of free) { const dd = d2({ x: d.tx, y: d.ty }, t); if (dd < bd) { bd = dd; best = d; } }
             if (!best) continue;
+            marks[best.pid] = t.pid;
             free.splice(free.indexOf(best), 1);
             const gx = og - t.x, gy = Wd / 2 - t.y, gl = Math.max(1, Math.hypot(gx, gy));
             const w = F.LINE[this.slotOf(best)] === 1 ? 0.75 : 0.5;
             best.tx = lerp(best.tx, t.x + gx / gl * 1.7, w); best.ty = lerp(best.ty, t.y + gy / gl * 1.7, w); best.run = 0.55; best.role = 'mark';
           }
+          this.mem.marks = marks;
         }
         // Ataque: apoyos, amplitud, ruptura a la espalda y nadie en fuera de juego
         if (car && !this.isGK(car)) {
@@ -459,7 +471,8 @@
           }
           const mates = field(att).filter(a => a !== car);
           // Dos apoyos cerca (uno por cada lado y por detrás de la línea del balón)
-          mates.slice().sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2).forEach((m, k) => {
+          this.sup = this.sup && this.sup.car === car.pid && this.sup.until > this.t ? this.sup : { car: car.pid, until: this.t + 1.6, ids: mates.slice().sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2).map(a => a.pid) };
+          this.sup.ids.map(id => this.A[id]).filter(Boolean).forEach((m, k) => {
             m.tx = lerp(m.tx, car.x + dx * (k ? -3 : 4), 0.4); m.ty = lerp(m.ty, car.y + (k ? -10 : 10), 0.4); m.run = 0.55; m.role = 'support';
           });
           // Amplitud: la de banda del lado contrario se abre
@@ -599,9 +612,9 @@
       if (!a) { this.fetch = null; return; }
       a.tx = b.x - this.dir[a.team] * 0.5; a.ty = b.y; a.run = 1;
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      const late = this.t - f.t0 > 3.5;
+      const late = this.t - f.t0 > 6;
       if (d < 1.1 || late) {
-        if (d >= 1.1) { a.x = b.x - this.dir[a.team] * 0.6; a.y = b.y; } // no ha llegado a tiempo: se coloca (muy raro)
+        if (d >= 1.1) { this.fetch = null; this._kick(a.x, a.y, { free: true, h: 0.2, to: a.pid, sfx: false, done: f.then ? () => { this._receive(a.pid, true); f.then(); } : null }); return; }
         this.fetch = null;
         a.held = f.held;
         b.owner = a.pid; b.z = 0; this.poss = a.team;
@@ -687,7 +700,7 @@
     // ------------------------------------------------------------ Juego abierto
     _openPlay(dt) {
       const b = this.ball;
-      if (this.hold || this.over || this.beat || this.script.length || b.path || this.fetch) return;
+      if (this.hold || this.over || this.beat || this.script.length || b.path || this.fetch || this.place) return;
       if (b.owner == null) {
         // Balón suelto: va a por él el más cercano de cada equipo; el primero que llega se lo queda
         for (const i of [0, 1]) {
@@ -789,12 +802,75 @@
     }
 
     /** Disputa de un balón dividido o aéreo: se lo queda el más cercano. */
-    /** Lleva el balón a un punto (balón parado) sin teletransportes: viaja hasta allí como un pase suave. */
-    _placeBall(x, y, maxT, to) {
-      const b = this.ball, d = Math.hypot(x - b.x, y - b.y);
+    /**
+     * Balón parado, como en un partido de verdad: si el balón está volando, primero cae; después una jugadora
+     * del equipo que saca va a por él y lo lleva al punto (o, si está lejos, se lo pasa a la que va a sacar,
+     * que lo coloca). La jugada no sigue hasta que el balón está en su sitio.
+     */
+    _placeBall(x, y, maxT, to, team) {
+      const b = this.ball;
+      if (this.instant || Math.hypot(x - b.x, y - b.y) < 1) {
+        b.path = null; b.roll = null; b.x = x; b.y = y; b.z = 0; b.owner = to != null && this.A[to] ? to : null;
+        return;
+      }
+      const tk = to != null && this.A[to] ? this.A[to] : null;
+      if (team == null) team = tk ? tk.team : this.poss;
+      this.place = { x, y, to: tk ? tk.pid : null, team, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: null };
       b.owner = null; b.roll = null;
-      if (this.instant || d < 1) { b.path = null; b.x = x; b.y = y; b.z = 0; return; }
-      b.path = { fx: b.x, fy: b.y, fz: b.z, tx: x, ty: y, tz: 0, h: Math.min(1.4, d * 0.05), T: clamp(d / 16, 0.25, maxT || 0.9), t: 0, to: to != null ? to : null, curve: 0, nx: 0, ny: 0, ease: 'out', done: to != null ? null : () => { b.z = 0; } };
+    }
+    _placeStep() {
+      const P = this.place, b = this.ball;
+      const done = () => {
+        b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0;
+        b.owner = P.to != null && this.A[P.to] ? P.to : null;
+        this.place = null;
+      };
+      if (this.instant || this.t - P.t0 > 12) { done(); return; }   // saltos de tiempo, o seguro para no atascarse
+      if (P.phase === 'land') { if (!b.path) P.phase = 'fetch'; else return; }
+      if (P.phase === 'fetch') {
+        if (P.rid == null || !this.A[P.rid]) {
+          // va a por él la más cercana del equipo que saca (la que saca, si está cerca)
+          const tk = P.to != null ? this.A[P.to] : null;
+          const cands = this.team(P.team).filter(a => !this.isGK(a) || a.pid === P.to);
+          const near = cands.sort((p, q) => d2(p, b) - d2(q, b))[0];
+          P.rid = tk && Math.sqrt(d2(tk, b)) < 15 ? tk.pid : near ? near.pid : null;
+          if (P.rid == null) { done(); return; }
+        }
+        const r = this.A[P.rid];
+        r.tx = b.x; r.ty = b.y; r.run = 0.85;
+        if (Math.hypot(r.x - b.x, r.y - b.y) < 1.1) {
+          b.owner = r.pid; b.z = 0;
+          const far = Math.hypot(P.x - b.x, P.y - b.y) > 14;
+          const recv = P.to != null && P.to !== r.pid && this.A[P.to] ? P.to : null;
+          P.phase = far && recv != null ? 'pass' : 'carry';
+        }
+        return;
+      }
+      if (P.phase === 'pass') {
+        const recv = this.A[P.to];
+        if (!recv) { P.phase = 'carry'; return; }
+        recv.tx = P.x; recv.ty = P.y; recv.run = 0.7;
+        if (Math.hypot(recv.x - P.x, recv.y - P.y) < 4) {
+          b.owner = null;
+          const d = Math.hypot(recv.x - b.x, recv.y - b.y);
+          b.path = { fx: b.x, fy: b.y, fz: 0, tx: recv.x, ty: recv.y, tz: 0, h: Math.min(2.5, d * 0.06), T: clamp(d / 15, 0.4, 1.6), t: 0, to: recv.pid, curve: 0, nx: 0, ny: 0 };
+          if (TL.SFX && !this.instant) TL.SFX.kick();
+          P.phase = 'passing'; P.rid = recv.pid;
+        }
+        return;
+      }
+      if (P.phase === 'passing') { if (!b.path) { b.owner = P.rid; P.phase = 'carry'; } return; }
+      if (P.phase === 'carry') {
+        const r = this.A[P.rid];
+        if (!r) { done(); return; }
+        b.owner = r.pid;
+        r.tx = P.x - this.dir[r.team] * 0.4; r.ty = P.y; r.run = 0.55;
+        if (Math.hypot(r.x - P.x, r.y - P.y) < 1.2) {
+          // la deja en el punto; si no es ella quien saca, se aparta
+          if (P.to != null && P.to !== r.pid && this.A[P.to]) { r.tx = r.x - this.dir[r.team] * 4; }
+          done();
+        }
+      }
     }
     _contest() {
       const b = this.ball;
@@ -824,7 +900,7 @@
       if (!gk) return [];
       const [x, y] = this.world(i, 5.5, Wd / 2 + (Math.random() < 0.5 ? -6 : 6));
       return [
-        { d: 1.3, start: () => { this._placeBall(x, y, 1.1); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this._cut(0.6); } },
+        { d: 1.3, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this._cut(0.6); } },
         { d: 0.3, start: () => { this.ov = null; const [tx, ty] = this.world(i, U.rand(48, 66), U.rand(10, Wd - 10)); this._kick(tx, ty, { h: 11, T: 1.8, by: gk.pid, done: () => this._contest() }); } }
       ];
     }
@@ -889,6 +965,7 @@
       const bt = this.beat;
       if (bt.waitHold && this.hold) return true;
       if (this.fetch) return true; // esperamos a que el jugador llegue al balón
+      if (this.place) return true; // y a que el balón esté en su sitio para el balón parado
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
       const waitBall = bt.ball && this.ball.path;
@@ -1251,7 +1328,7 @@
         const top = Math.random() < 0.5;
         const cy = top ? 0.4 : Wd - 0.4;
         const b = this.ball;
-        this._placeBall(gx - dir * 0.4, cy, 1.4);
+        this._placeBall(gx - dir * 0.4, cy, 1.4, null, i);
         this.poss = i;
         const atts = this.team(i).filter(a => !this.isGK(a));
         const defs = this.team(1 - i).filter(a => !this.isGK(a));
@@ -1298,7 +1375,7 @@
       const beats = [{ d: 2.6, start: () => {
         this._banner('Falta peligrosa', '#ffffff', 1.2);
         if (!this.instant && TL.SFX) TL.SFX.whistle(false);
-        this._placeBall(bx, by, 1.4);
+        this._placeBall(bx, by, 1.4, null, i);
         this.poss = i;
         const p = {};
         if (this.A[taker]) p[taker] = { x: bx - dir * 2.4, y: by + 1.2, run: 0.6 };
@@ -1363,7 +1440,7 @@
       } });
       beats.push(this._protestBeat(1 - i, 1.3));
       beats.push({ d: 2.4, start: () => {
-        this._placeBall(spx, spy, 1.2);
+        this._placeBall(spx, spy, 1.2, null, i);
         const taker = (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] * 1.5 + this.P(c.pid).st[2] * 0.3) - (this.P(a.pid).st[1] * 1.5 + this.P(a.pid).st[2] * 0.3))[0] || {}).pid;
         this.penTaker = taker;
         const p = {};
@@ -1632,6 +1709,7 @@
       this._runScript(dt);
       this._targets();
       if (this.fetch) this._fetchStep();
+      if (this.place) this._placeStep();
       this._officials();
       for (const id in this.A) this._move(this.A[id], dt);
       this._separate();
