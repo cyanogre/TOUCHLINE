@@ -107,7 +107,7 @@
   }
 
   // ------------------------------------------------------------ Partido narrado: solo se ve la jugada clave
-  const narrOn = () => settings().narr !== false;
+  const narrOn = () => settings().narr === true;
   function setNarr(on) {
     const root = el('match');
     if (!root) return;

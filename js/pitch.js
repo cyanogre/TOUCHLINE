@@ -394,58 +394,94 @@
     }
 
     /** Objetivos de cada jugador en juego abierto: bloque, presión, marcas y desmarques. */
+    /** Segundos que tarda en llegar a un punto (con su velocidad y el retraso con que reacciona). */
+    _reach(a, p) { return Math.hypot(a.x - p.x, a.y - p.y) / (6.2 * (a.pace || 1)) + (a.react || 0.25); }
+    /** Línea del fuera de juego para quien ataca hacia `dir`: la penúltima del rival (o el balón), nunca en su propio campo. */
+    _offsideLine(att) {
+      const dir = this.dir[att], def = 1 - att;
+      const xs = this.team(def).map(a => a.x * dir).sort((p, q) => q - p);
+      const second = xs.length > 1 ? xs[1] : xs[0] || L / 2 * dir;
+      const half = (L / 2) * dir;                       // en su campo no hay fuera de juego
+      return Math.max(second, this.ball.x * dir, half) / dir;
+    }
     _targets() {
       const b = this.ball;
-      const att = this.poss, def = 1 - att;
+      // Quién ataca: el equipo de quien lleva el balón (si nadie lo lleva, el último que lo tuvo)
+      const car = b.owner != null ? this.A[b.owner] : null;
+      const att = car ? car.team : this.poss, def = 1 - att;
       for (const id in this.A) {
         const a = this.A[id];
         const h = this._home(a);
-        a.tx = h[0]; a.ty = h[1]; a.run = 0.42;
+        a.tx = h[0]; a.ty = h[1]; a.run = 0.34;
+        a.role = null;
       }
       if (!this.ov || !this.ov.all) {
         const morale = k => { const ps = this.team(k); return ps.length ? U.sum(ps, a => this.P(a.pid).mor == null ? 70 : this.P(a.pid).mor) / ps.length / 100 : 0.7; };
-        // Presión y cobertura del equipo que defiende
-        const defs = this.team(def).filter(a => !this.isGK(a)).sort((p, q) => d2(p, b) - d2(q, b));
-        const press = 0.75 + 0.3 * morale(def) + (this.m.teams[def].mentality - 1) * 0.08;
+        const field = k => this.team(k).filter(a => !this.isGK(a));
         const og = this.ownX(def);
-        if (defs[0]) { defs[0].tx = b.x + Math.sign(og - b.x) * 0.8; defs[0].ty = b.y; defs[0].run = clamp(press, 0.6, 1); }
-        if (defs[1]) {
-          const k = 7 / Math.max(1, Math.hypot(og - b.x, Wd / 2 - b.y));
-          defs[1].tx = b.x + (og - b.x) * k; defs[1].ty = b.y + (Wd / 2 - b.y) * k; defs[1].run = 0.75;
+        // Hacia dónde va el balón: el conductor un poco por delante, el destino del pase o el balón suelto
+        const bp = car ? { x: car.x + car.vx * 0.4, y: car.y + car.vy * 0.4 } : b.path ? { x: b.path.tx, y: b.path.ty } : { x: b.x, y: b.y };
+        if (!car && !b.path) {
+          // Balón suelto: de cada equipo va solo quien llega antes
+          for (const k of [0, 1]) { const best = field(k).sort((p, q) => this._reach(p, b) - this._reach(q, b))[0]; if (best) { best.tx = b.x; best.ty = b.y; best.run = 1; best.role = 'ball'; } }
+        } else {
+          // Presión: sale la defensora que antes llega; la segunda cubre por dentro, entre el balón y la portería
+          const defs = field(def).sort((p, q) => this._reach(p, bp) - this._reach(q, bp));
+          const press = 0.75 + 0.3 * morale(def) + (this.m.teams[def].mentality - 1) * 0.08;
+          const presser = defs[0], cover = defs[1];
+          if (presser) { presser.tx = bp.x + Math.sign(og - bp.x) * 0.9; presser.ty = bp.y; presser.run = clamp(press, 0.6, 1); presser.role = 'press'; }
+          if (cover) {
+            const k = 7 / Math.max(1, Math.hypot(og - bp.x, Wd / 2 - bp.y));
+            cover.tx = bp.x + (og - bp.x) * k; cover.ty = bp.y + (Wd / 2 - bp.y) * k; cover.run = 0.7; cover.role = 'cover';
+          }
+          // Marcas sin repetir: cada atacante peligrosa (las más cercanas a la portería) se la queda una defensora distinta
+          const free = defs.slice(2).filter(d => F.LINE[this.slotOf(d)] <= 2);
+          const threats = field(att).filter(a => a !== car).sort((p, q) => Math.abs(og - p.x) - Math.abs(og - q.x));
+          for (const t of threats) {
+            let best = null, bd = 16 * 16;
+            for (const d of free) { const dd = d2({ x: d.tx, y: d.ty }, t); if (dd < bd) { bd = dd; best = d; } }
+            if (!best) continue;
+            free.splice(free.indexOf(best), 1);
+            const gx = og - t.x, gy = Wd / 2 - t.y, gl = Math.max(1, Math.hypot(gx, gy));
+            const w = F.LINE[this.slotOf(best)] === 1 ? 0.75 : 0.5;
+            best.tx = lerp(best.tx, t.x + gx / gl * 1.7, w); best.ty = lerp(best.ty, t.y + gy / gl * 1.7, w); best.run = 0.55; best.role = 'mark';
+          }
         }
-        // Marcas: los defensas y medios se pegan al atacante de su zona, por el lado de su portería
-        const atts = this.team(att).filter(a => !this.isGK(a));
-        for (const d of defs.slice(2)) {
-          const line = F.LINE[this.slotOf(d)];
-          if (line > 2) continue;
-          const near = this.nearest(atts, { x: d.tx, y: d.ty });
-          if (!near || d2(near, { x: d.tx, y: d.ty }) > 15 * 15) continue;
-          const gx = og - near.x, gy = Wd / 2 - near.y, gl = Math.max(1, Math.hypot(gx, gy));
-          const mx = near.x + gx / gl * 1.7, my = near.y + gy / gl * 1.7;
-          const w = line === 1 ? 0.7 : 0.45;
-          d.tx = lerp(d.tx, mx, w); d.ty = lerp(d.ty, my, w); d.run = 0.6;
-        }
-        // Conductor, apoyos y desmarques del que ataca
-        const car = b.owner != null ? this.A[b.owner] : null;
-        if (car && this.hold) { car.tx = car.x; car.ty = car.y; car.run = 0.2; }
-        else if (car && car.team === att && !this.isGK(car)) {
+        // Ataque: apoyos, amplitud, ruptura a la espalda y nadie en fuera de juego
+        if (car && !this.isGK(car)) {
           const dx = this.dir[att];
-          // Conduce hacia delante, pero sin pasarse del borde del área rival
-          const [mx] = this.world(att, 90, 0);
-          car.tx = dx > 0 ? Math.min(car.x + dx * 5, mx) : Math.max(car.x + dx * 5, mx);
-          car.ty = clamp(car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2, 3, Wd - 3);
-          car.run = 0.55;
-          // Dos compañeros se ofrecen cerca
-          const mates = atts.filter(a => a !== car).sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2);
-          mates.forEach((m, k) => { m.tx = lerp(m.tx, car.x + dx * (4 + k * 3), 0.35); m.ty = lerp(m.ty, car.y + (k ? -9 : 9), 0.35); m.run = 0.6; });
+          if (this.hold) { car.tx = car.x; car.ty = car.y; car.run = 0.2; }
+          else {
+            const [mx] = this.world(att, 90, 0);
+            car.tx = dx > 0 ? Math.min(car.x + dx * 5, mx) : Math.max(car.x + dx * 5, mx);
+            car.ty = clamp(car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2, 3, Wd - 3);
+            car.run = 0.55;
+          }
+          const mates = field(att).filter(a => a !== car);
+          // Dos apoyos cerca (uno por cada lado y por detrás de la línea del balón)
+          mates.slice().sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2).forEach((m, k) => {
+            m.tx = lerp(m.tx, car.x + dx * (k ? -3 : 4), 0.4); m.ty = lerp(m.ty, car.y + (k ? -10 : 10), 0.4); m.run = 0.55; m.role = 'support';
+          });
+          // Amplitud: la de banda del lado contrario se abre
+          const farSide = car.y < Wd / 2 ? Wd - 5 : 5;
+          const winger = mates.filter(a => !a.role && [1, 2, 3].includes(F.LINE[this.slotOf(a)])).sort((p, q) => Math.abs(p.y - farSide) - Math.abs(q.y - farSide))[0];
+          if (winger) { winger.ty = lerp(winger.ty, farSide, 0.7); winger.role = 'width'; }
+          // Fuera de juego: nadie se queda por delante de la línea (salvo quien tira la ruptura)
+          const line = this._offsideLine(att);
+          const run = this.runner && this.runner.until > this.t ? this.runner : null;
+          for (const m of mates) {
+            if (run && m.pid === run.pid) continue;
+            if ((m.tx - line) * dx > -0.6) { m.tx = line - dx * (0.8 + (m.pid % 3) * 0.4); }
+          }
+          this.offLine = line;
         }
         if (this.runner && this.runner.until > this.t && this.A[this.runner.pid]) {
           const r = this.A[this.runner.pid];
-          r.tx = this.runner.tx; r.ty = this.runner.ty; r.run = 1;
+          r.tx = this.runner.tx; r.ty = this.runner.ty; r.run = 1; r.role = 'run';
         }
         if (b.path && b.path.to != null && this.A[b.path.to]) {
           const r = this.A[b.path.to];
-          r.tx = b.path.tx; r.ty = b.path.ty; r.run = 0.95;
+          r.tx = b.path.tx; r.ty = b.path.ty; r.run = 0.95; r.role = 'receive';
         }
       }
       for (const id in this.A) { const a = this.A[id]; a.tx = clamp(a.tx, 0.6, L - 0.6); a.ty = clamp(a.ty, 0.6, Wd - 0.6); }
@@ -498,20 +534,38 @@
       if (a.state === 'down' || a.state === 'sit') { a.vx *= 0.8; a.vy *= 0.8; if (a.until && a.until < this.t) a.state = null; return; }
       if (a.until && a.until < this.t && a.state !== 'walk') a.state = null;
       const e = a.kind === 'pl' ? this.energy(a) : 1;
-      const top = a.kind === 'pl' ? 7 * a.pace * (0.55 + 0.45 * e) : a.kind === 'ref' ? 6.6 : a.kind === 'ar' ? 6 : 4.5;
+      // Punta de velocidad real (fútbol femenino: unos 7 m/s las más rápidas), menos con el cansancio
+      const top = a.kind === 'pl' ? 6.2 * a.pace * (0.6 + 0.4 * e) : a.kind === 'ref' ? 6 : a.kind === 'ar' ? 5.5 : 4.5;
       const speed = a.state === 'walk' || a.state === 'sad' ? Math.min(a.leave ? 2.6 : 1.6, top) : top * (a.run || 0.5);
-      // El destino se sigue con algo de retraso: si la jugada cambia de golpe, el jugador no da un volantazo
-      if (a.sx == null || Math.hypot(a.tx - a.sx, a.ty - a.sy) > 30) { a.sx = a.tx; a.sy = a.ty; }
-      const kt = a.kind === 'pl' && a.state !== 'walk' ? Math.min(1, dt * 3.2) : 1;
-      a.sx += (a.tx - a.sx) * kt; a.sy += (a.ty - a.sy) * kt;
-      const dx = a.sx - a.x, dy = a.sy - a.y, d = Math.hypot(dx, dy);
-      const want = Math.min(speed, d * 1.3);
+      // Cada jugadora tiene su físico: reacción, arrancada, frenada y giro (datos de tracking reales, escalados)
+      if (a.react == null) {
+        const r = (a.pid || 7) * 0.618 % 1;
+        a.react = 0.18 + r * 0.22; a.acc = 3.4 + ((r * 7.3) % 1) * 2.2; a.dec = 4.2 + ((r * 3.1) % 1) * 2.6; a.reT = 0; a.jx = 0; a.jy = 0;
+      }
+      // Tiempo de reacción: el destino que «ve» se actualiza cada poco, no al instante
+      if (a.kind === 'pl' && a.state !== 'walk') {
+        a.reT -= dt;
+        if (a.sx == null || a.reT <= 0 || Math.hypot(a.tx - a.sx, a.ty - a.sy) > 25) { a.sx = a.tx; a.sy = a.ty; a.reT = a.react * (a.run > 0.8 ? 0.6 : 1) * (0.8 + Math.random() * 0.4); }
+      } else { a.sx = a.tx; a.sy = a.ty; }
+      // Pequeños ajustes cuando está casi en su sitio: nadie se queda clavado
+      let gx = a.sx, gy = a.sy;
+      if (a.kind === 'pl') {
+        if (Math.random() < dt * 0.7) { a.jx = U.rand(-0.9, 0.9); a.jy = U.rand(-0.9, 0.9); }
+        if (Math.hypot(gx - a.x, gy - a.y) < 2.5) { gx += a.jx; gy += a.jy; }
+      }
+      const dx = gx - a.x, dy = gy - a.y, d = Math.hypot(dx, dy);
+      // Llega frenando: la velocidad que quiere depende de lo que le falta y de cómo frena
+      const want = Math.min(speed, Math.sqrt(2 * (a.dec || 5) * Math.max(0, d - 0.3)));
       const ux = d > 0.01 ? dx / d : 0, uy = d > 0.01 ? dy / d : 0;
-      const k = Math.min(1, dt * 2.6);
-      a.vx += (ux * want - a.vx) * k; a.vy += (uy * want - a.vy) * k;
+      let dvx = ux * want - a.vx, dvy = uy * want - a.vy;
+      const dv = Math.hypot(dvx, dvy), cur = Math.hypot(a.vx, a.vy);
+      // Aceleración y frenada limitadas; girar a toda velocidad cuesta más
+      const turning = cur > 0.5 ? 1 - Math.max(0, (a.vx * ux + a.vy * uy) / cur) : 0;
+      const lim = (want < cur ? (a.dec || 5) : (a.acc || 4)) * (1 - 0.45 * turning * clamp(cur / 6, 0, 1)) * dt;
+      if (dv > lim) { dvx *= lim / dv; dvy *= lim / dv; }
+      a.vx += dvx; a.vy += dvy;
       a.x += a.vx * dt; a.y += a.vy * dt;
     }
-
     _separate() {
       const all = Object.values(this.A);
       for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
@@ -637,7 +691,7 @@
       if (b.owner == null) {
         // Balón suelto: va a por él el más cercano de cada equipo; el primero que llega se lo queda
         for (const i of [0, 1]) {
-          const n = this.nearest(this.team(i), b, a => this.isGK(a) && this.depth(i, b.x) > 18);
+          const n = this.team(i).filter(a => !(this.isGK(a) && this.depth(i, b.x) > 18)).sort((p, q) => this._reach(p, b) - this._reach(q, b))[0];
           if (n) { n.tx = b.x; n.ty = b.y; n.run = 1; }
         }
         const n = this.nearest(Object.values(this.A), b);
@@ -681,15 +735,18 @@
         const dist = Math.sqrt(d2(a, car));
         const marked = this.nearest(this.team(opp), a);
         const free = marked ? Math.min(1, Math.sqrt(d2(marked, a)) / 5) : 1;
-        return (gain > -6 ? 1 + Math.max(0, gain) / 10 : 0.35) * (dist < 34 ? 1 : 0.25) * (this.isGK(a) ? 0.12 : 1) * (0.3 + free);
+        const runs = this.runner && this.runner.pid === a.pid && this.runner.until > this.t ? 2.2 : 1;
+        return (gain > -6 ? 1 + Math.max(0, gain) / 10 : 0.35) * (dist < 34 ? 1 : 0.25) * (this.isGK(a) ? 0.12 : 1) * (0.3 + free) * runs;
       });
       // Desmarque al espacio para el balón en profundidad
       if (!this.runner || this.runner.until < this.t) {
-        const fw = mates.filter(a => F.LINE[this.slotOf(a)] === 3);
-        if (fw.length && Math.random() < 0.35) {
-          const f = U.pick(fw);
-          const [tx, ty] = this.world(i, clamp(this.depth(i, f.x) + 14, 0, 96), clamp(f.y + U.rand(-6, 6), 4, Wd - 4));
-          this.runner = { pid: f.pid, tx, ty, until: this.t + 1.8 };
+        // La que está en la línea del fuera de juego arranca a la espalda de la defensa cuando la conductora puede levantar la cabeza
+        const line = this._offsideLine(i);
+        const fw = mates.filter(a => F.LINE[this.slotOf(a)] >= 2 && Math.abs((a.x - line) * dir) < 6 && !this.isGK(a));
+        if (fw.length && close > 4 && depthCar > 35 && Math.random() < 0.45) {
+          const f = fw.sort((p, q) => Math.abs(p.x - line) - Math.abs(q.x - line))[0];
+          const tx = clamp(line + dir * U.rand(8, 14), 3, L - 3), ty = clamp(f.y + (Wd / 2 - f.y) * 0.25 + U.rand(-4, 4), 5, Wd - 5);
+          this.runner = { pid: f.pid, tx, ty, until: this.t + 2.2 };
         }
       }
       const dist = Math.sqrt(d2(r, car));
