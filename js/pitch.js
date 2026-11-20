@@ -760,9 +760,11 @@
       if (team == null) team = tk ? tk.team : this.poss;
       // Balón fuera del campo (o casi): el recogepelotas da uno nuevo en el sitio del saque. Así nadie va
       // andando a buscarlo detrás de la portería o a la grada mientras parece que no pasa nada.
-      const outside = b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3;
-      if (outside && !b.path) this._ballBoy(x, y);
-      this.place = { x, y, to: tk ? tk.pid : null, team, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: null };
+      // Fuera de verdad (más allá de las líneas) y lejos del sitio del saque; los córners están en la línea
+      const outside = b.x < -0.6 || b.x > L + 0.6 || b.y < -0.6 || b.y > Wd + 0.6;
+      const boy = outside && !b.path && Math.hypot(b.x - x, b.y - y) > 3;
+      if (boy) this._ballBoy(x, y);
+      this.place = { x, y, to: tk ? tk.pid : null, team, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: null, boy };
       b.owner = null; b.roll = null;
     }
     /**
@@ -817,7 +819,8 @@
       if (P.phase === 'land') {
         if (b.path) return;
         P.phase = 'fetch';
-        if (b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3) { this._ballBoy(P.x, P.y); P.phase = 'land'; return; }   // balón nuevo del recogepelotas
+        // Balón nuevo del recogepelotas (una sola vez por reposición: nunca en bucle)
+        if (!P.boy && (b.x < -0.6 || b.x > L + 0.6 || b.y < -0.6 || b.y > Wd + 0.6) && Math.hypot(b.x - P.x, b.y - P.y) > 3) { P.boy = true; this._ballBoy(P.x, P.y); P.phase = 'land'; return; }
       }
       if (P.phase === 'fetch') {
         if (P.rid == null || !this.A[P.rid]) {
