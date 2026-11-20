@@ -2293,19 +2293,21 @@
       c.fillStyle = 'rgb(28 36 50 / 0.16)'; c.fillRect(0, 0, W, H);
       const want = Math.round(W * H / 520);
       const R = this.rainP || (this.rainP = []);
-      while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3] });
+      while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3], len: 0.6 + Math.random() * 1.1, sp: 0.75 + Math.random() * 0.5, sl: (Math.random() - 0.5) * 0.18 });
       if (R.length > want) R.length = want;
       const cols = ['rgb(160 180 205 / 0.28)', 'rgb(185 205 228 / 0.42)', 'rgb(215 230 248 / 0.6)'];
+      // Viento con rachas: la inclinación general cambia despacio; cada gota además tiene la suya
+      const t = this.t, wind = 0.12 + Math.sin(t * 0.23) * 0.08 + Math.sin(t * 0.71 + 1.3) * 0.05;
       for (let layer = 0; layer < 3; layer++) {
         c.fillStyle = cols[layer];
         for (let i = layer; i < R.length; i += 3) {
-          const d = R[i];
-          d.y += 620 * d.z * k; d.x -= 70 * d.z * k;
-          if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); }
-          if (d.x < -4) d.x += W + 8;
-          const len = (layer + 2) * ps, gx = Math.round(d.x / ps) * ps, gy = Math.round(d.y / ps) * ps;
-          // Gota inclinada por el viento: dos tramos desplazados un píxel
-          c.fillRect(gx, gy, ps, len >> 1 || ps); c.fillRect(gx + ps, gy - (len - (len >> 1)), ps, len - (len >> 1) || ps);
+          const d = R[i], slope = wind * (0.7 + d.z * 0.5) + d.sl, v = 620 * d.z * d.sp;
+          d.y += v * k; d.x -= v * slope * k;
+          if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); d.len = 0.6 + Math.random() * 1.1; }
+          if (d.x < -4) d.x += W + 8; else if (d.x > W + 8) d.x -= W + 12;
+          // Gota en píxeles: tantos como mida, desplazándose en x según su inclinación (como una línea pixelada)
+          const n = Math.max(2, Math.round((layer + 2) * d.len * (0.8 + d.sp * 0.4))), gx = Math.round(d.x / ps), gy = Math.round(d.y / ps);
+          for (let j = 0; j < n; j++) c.fillRect((gx + Math.round(j * slope)) * ps, (gy - j) * ps, ps, ps);
         }
       }
       // Salpicaduras sobre el campo (en coordenadas del mundo: se mueven con la cámara)
