@@ -110,6 +110,10 @@ void main(){
     cv.width = Math.round(W.color.naturalWidth * 0.8); cv.height = Math.round(W.color.naturalHeight * 0.8);
     const gl = cv.getContext('webgl', { premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) return null;
+    // En el móvil, al cambiar de app el sistema puede quitarle la memoria gráfica al juego:
+    // mientras tanto se enseña la imagen plana y, al volver, se reconstruye todo.
+    cv.addEventListener('webglcontextlost', e => { e.preventDefault(); if (S.gl && S.gl.cv === cv) S.gl = null; S.lost = true; });
+    cv.addEventListener('webglcontextrestored', () => { S.lost = false; S.warped = null; });
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
     const pr = gl.createProgram();
     gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
@@ -141,7 +145,12 @@ void main(){
       for (const k in FILES) S.warped[k] = S.imgs[k];
       try { S.gl = setupGL(S.warped); } catch (e) { S.gl = null; }
     }
-    if (!S.gl) return S.warped.color;
+    if (S.gl && S.gl.gl.isContextLost()) { S.gl = null; S.lost = true; }
+    if (!S.gl) {
+      // Tras perder el contexto, se reintenta de vez en cuando con un lienzo nuevo
+      if (S.lost && (!S.retry || performance.now() > S.retry)) { S.retry = performance.now() + 1500; try { S.gl = setupGL(S.warped); if (S.gl) S.lost = false; } catch (e) { S.gl = null; } }
+      if (!S.gl) return S.warped.color;
+    }
     const { gl, cv, u } = S.gl;
     // El sol gira despacio a lo largo del partido; el gesto lo inclina
     const a = o.t * 0.01;

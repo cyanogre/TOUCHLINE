@@ -1842,11 +1842,16 @@
       this._seq([{ d: 0.1, start: () => { this._banner('FINAL', '#ffffff', 3, true); if (TL.SFX) TL.SFX.whistle(true); go(); } }]);
     }
 
+    /** Vuelve a pintar las cachés (césped, público, anuncios) por si el móvil liberó su memoria. */
+    _refresh() { this._grassCv = null; this._fanPts = null; this._ads = null; if (this.resize) this.resize(); }
+
     /** Lo llama la vista al terminar el partido. */
     end() { if (!this.finalDone) this._finalWhistle(false); }
 
     // ------------------------------------------------------------ Bucle
     _loop(now) {
+      // Al volver de segundo plano: se rehacen los lienzos que el sistema pudo haber vaciado
+      if (now - this._last > 1500) this._refresh();
       const real = Math.min(0.05, (now - this._last) / 1000);
       this._last = now;
       if (this.loading()) { this._drawLoading(); this.raf = requestAnimationFrame(this._loop); return; }
