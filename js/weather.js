@@ -2,7 +2,7 @@
  *
  * Depende de dónde se juega (zona climática del país del estadio local) y de cuándo (mes de la temporada,
  * de agosto a mayo). Los climas adversos son poco probables, como en la realidad.
- * Solo salen en el juego los tiempos aprobados (APPROVED); el resto se ve con el botón de prueba (?test).
+ * El botón para alternarlos a mano solo aparece en modo prueba (?test).
  */
 (function () {
   'use strict';
@@ -11,8 +11,8 @@
   const TYPES = ['despejado', 'nublado', 'lluvia', 'temporal', 'nieve', 'calor', 'niebla', 'viento'];
   const NAMES = { despejado: 'Despejado', nublado: 'Nublado', lluvia: 'Lluvia', temporal: 'Temporal', nieve: 'Nieve', calor: 'Calor', niebla: 'Niebla', viento: 'Viento' };
   const ICON = { despejado: '☀️', nublado: '☁️', lluvia: '🌧️', temporal: '⛈️', nieve: '🌨️', calor: '🥵', niebla: '🌫️', viento: '🍃' };
-  // Aprobados visualmente: los demás quedan como nublado/despejado en las partidas
-  const APPROVED = ['despejado', 'nublado', 'lluvia'];
+  // Todos aprobados: salen en las partidas según la zona y el mes (lo adverso, poco)
+  const APPROVED = TYPES.slice();
 
   const ZONE = {
     'Inglaterra': 'atlantica', 'Escocia': 'atlantica', 'Gales': 'atlantica', 'Irlanda': 'atlantica', 'Irlanda del Norte': 'atlantica', 'Países Bajos': 'atlantica', 'Bélgica': 'atlantica', 'Francia': 'atlantica', 'Dinamarca': 'atlantica',

@@ -532,8 +532,9 @@
     if (S.user != null) { TL.Coach.init(S); TL.Locker.init(S); TL.Staff.migrate(S); if (TL.Events) TL.Events.init(S); }
     if (S.user != null && !S.cups && S.fixtures && TL.Cups) TL.Cups.build(S);
     TL.Manager.init(S);
-    S.settings = Object.assign({ narr: false, speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
-    if (S.settings.narrV !== 2) { S.settings.narr = false; S.settings.narrV = 2; }   // ahora se ve el partido entero por defecto
+    S.settings = Object.assign({ narr: true, speed: 2, pause: { goal: true, red: true, inj: true, pen: true, var: true, crowd: false, ht: true } }, S.settings || {});
+    // Partidas guardadas antes: pasan una vez a la retransmisión de jugadas clave (se puede volver al partido completo)
+    if (!S.settings.narrV2) { S.settings.narr = true; S.settings.narrV2 = true; }
     S.news = S.news || [];
     S.log = S.log || { crowd: {} };
     S.fin = Object.assign(newFin(), S.fin || {});
