@@ -2294,7 +2294,7 @@
       c.fillStyle = storm ? 'rgb(14 20 32 / 0.3)' : 'rgb(28 36 50 / 0.16)'; c.fillRect(0, 0, W, H);
       const want = Math.round(W * H / (storm ? 230 : 520));
       const R = this.rainP || (this.rainP = []);
-      while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3], len: 0.5 + Math.random() * 0.9, sp: 0.75 + Math.random() * 0.5, sl: (Math.random() - 0.5) * 0.18 });
+      while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3], len: 0.6 + Math.random() * 1.1, sp: 0.75 + Math.random() * 0.5, sl: (Math.random() - 0.5) * 0.18 });
       if (R.length > want) R.length = want;
       const cols = ['rgb(160 180 205 / 0.28)', 'rgb(185 205 228 / 0.42)', 'rgb(215 230 248 / 0.6)'];
       // Viento con rachas: la inclinación general cambia despacio; cada gota además tiene la suya
@@ -2304,7 +2304,7 @@
         for (let i = layer; i < R.length; i += 3) {
           const d = R[i], slope = wind * (0.7 + d.z * 0.5) + d.sl, v = 620 * d.z * d.sp;
           d.y += v * k * (storm ? 1.25 : 1); d.x -= v * slope * k * (storm ? 1.25 : 1);
-          if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); d.len = 0.5 + Math.random() * 0.9; }
+          if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); d.len = 0.6 + Math.random() * 1.1; }
           if (d.x < -4) d.x += W + 8; else if (d.x > W + 8) d.x -= W + 12;
           // Gota en píxeles: tantos como mida, desplazándose en x según su inclinación (como una línea pixelada)
           const n = Math.max(2, Math.round((layer + 2) * d.len * (0.8 + d.sp * 0.4))), gx = Math.round(d.x / ps), gy = Math.round(d.y / ps);
@@ -2395,11 +2395,54 @@
       const c = this.cx;
       this._clouds(real, 0.28, true);
       if (!this.nextBolt) this.nextBolt = this.t + 4 + Math.random() * 10;
-      if (this.t > this.nextBolt) { this.flash = 1; this.flash2 = this.t + 0.18; this.nextBolt = this.t + 7 + Math.random() * 16; if (TL.SFX && TL.SFX.thunder) setTimeout(() => TL.SFX.thunder(), 600 + Math.random() * 1600); }
+      if (this.t > this.nextBolt) {
+        this.flash = 0.8; this.flash2 = this.t + 0.18; this.nextBolt = this.t + 5 + Math.random() * 12;
+        this.skyBolt = this._makeBolt();
+        if (TL.SFX && TL.SFX.thunder) setTimeout(() => TL.SFX.thunder(), 600 + Math.random() * 1600);
+      }
+      this._drawSkyBolt();
       if (this.flash2 && this.t > this.flash2) { this.flash = Math.max(this.flash, 0.7); this.flash2 = 0; }
       if (this.flash > 0) {
         c.fillStyle = `rgb(225 235 255 / ${(this.flash * 0.55).toFixed(3)})`; c.fillRect(0, 0, this.w, this.h);
         this.flash = Math.max(0, this.flash - real * 5);
+      }
+    }
+
+    /**
+     * Rayo de fondo: cae fuera del campo (detrás de las gradas o a lo lejos), con ramas, en píxeles.
+     * Se dibuja en coordenadas del mundo para que esté «allí», no pegado a la pantalla.
+     */
+    _makeBolt() {
+      const side = Math.floor(Math.random() * 4);
+      const tx = side === 0 ? -14 - Math.random() * 6 : side === 1 ? L + 14 + Math.random() * 6 : Math.random() * L;
+      const ty = side === 2 ? -11 - Math.random() * 5 : side === 3 ? Wd + 11 + Math.random() * 5 : Math.random() * Wd;
+      const sx = tx + (Math.random() - 0.5) * 30, sy = ty - 45 - Math.random() * 20;
+      const path = (x0, y0, x1, y1, depth) => {
+        const pts = [[x0, y0]]; let x = x0, y = y0; const n = 9 + Math.floor(Math.random() * 6);
+        for (let i = 1; i <= n; i++) { const f = i / n; x = x0 + (x1 - x0) * f + (i < n ? (Math.random() - 0.5) * 6 : 0); y = y0 + (y1 - y0) * f; pts.push([x, y]); }
+        const out = [{ pts, w: depth ? 1 : 2 }];
+        if (depth < 2) for (let i = 2; i < n - 1; i++) if (Math.random() < 0.28) { const [bx, by] = pts[i]; out.push(...path(bx, by, bx + (Math.random() - 0.5) * 22, by + 6 + Math.random() * 12, depth + 1)); }
+        return out;
+      };
+      return { segs: path(sx, sy, tx, ty, 0), t: this.t };
+    }
+    _drawSkyBolt() {
+      const B = this.skyBolt;
+      if (!B) return;
+      const age = this.t - B.t;
+      if (age > 0.55) { this.skyBolt = null; return; }
+      if (age > 0.12 && age < 0.22) return;          // parpadeo: se apaga un instante y vuelve
+      const c = this.cx, X = this.X, Y = this.Y, P = Math.max(1, Math.round(this.s / 14)), a = age < 0.12 ? 1 : 1 - (age - 0.22) / 0.33;
+      for (const seg of B.segs) {
+        for (let i = 1; i < seg.pts.length; i++) {
+          const [x0, y0] = seg.pts[i - 1], [x1, y1] = seg.pts[i];
+          const X0 = X(x0), Y0 = Y(y0), X1 = X(x1), Y1 = Y(y1), steps = Math.max(1, Math.round(Math.hypot(X1 - X0, Y1 - Y0) / P));
+          for (let j = 0; j <= steps; j++) {
+            const px = Math.round((X0 + (X1 - X0) * j / steps) / P) * P, py = Math.round((Y0 + (Y1 - Y0) * j / steps) / P) * P;
+            c.fillStyle = `rgb(150 175 255 / ${(0.35 * a).toFixed(3)})`; c.fillRect(px - P * seg.w, py, P * (seg.w * 2 + 1), P);
+            c.fillStyle = `rgb(255 255 255 / ${(0.95 * a).toFixed(3)})`; c.fillRect(px, py, P * seg.w, P);
+          }
+        }
       }
     }
 
@@ -2625,34 +2668,65 @@
     }
 
     /** Gotas que caen en la lente de la cámara: refractan la imagen (invertida, como una gota de verdad), resbalan y se secan. */
+    /**
+     * Gotas que se estampan contra la lente. Al chocar se aplastan (un destello plano) y lanzan gotitas
+     * alrededor; luego se recogen en una gota redonda que refracta la imagen dada la vuelta. Si dos se tocan,
+     * se juntan en una más grande (suma de áreas), y las grandes pesan y resbalan dejando un rastro.
+     */
     _lensDrops(real, ps, storm) {
-      const c = this.cx, W = this.w, H = this.h, dpr = this.dpr;
-      const D = this.lens || (this.lens = []);
-      if (D.length < (storm ? 24 : 14) && Math.random() < real * (storm ? 3.2 : 1.6)) {
-        const r = (4 + Math.random() * 6) * Math.max(1, ps);
-        D.push({ x: Math.random() * W, y: Math.random() * H * 0.9, r, age: 0, life: 4 + Math.random() * 6, slide: Math.random() < 0.35 ? 0 : 6 + Math.random() * 18 });
+      const c = this.cx, W = this.w, H = this.h, dpr = this.dpr, P = Math.max(1, ps);
+      const D = this.lens || (this.lens = []), SP = this.lensSpray || (this.lensSpray = []);
+      if (D.length < (storm ? 34 : 20) && Math.random() < real * (storm ? 4 : 2)) {
+        const r = (2 + Math.random() * 3) * P, x = Math.random() * W, y = Math.random() * H * 0.92;
+        D.push({ x, y, r, age: 0, life: 5 + Math.random() * 7, vy: 0 });
+        // Gotitas que salen disparadas al estamparse
+        const n = 3 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, v = (30 + Math.random() * 70) * P; SP.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: 0.12 + Math.random() * 0.12 }); }
+      }
+      // Fusión: si se tocan, la grande se queda con la otra (área conservada)
+      for (let i = 0; i < D.length; i++) for (let j = i + 1; j < D.length; j++) {
+        const a = D[i], b = D[j];
+        if (a.age < 0.12 || b.age < 0.12) continue;
+        const dx = a.x - b.x, dy = a.y - b.y;
+        if (dx * dx + dy * dy < (a.r + b.r) * (a.r + b.r) * 0.8) {
+          const big = a.r >= b.r ? a : b, sm = big === a ? b : a, A = big.r * big.r, B = sm.r * sm.r;
+          big.x = (big.x * A + sm.x * B) / (A + B); big.y = (big.y * A + sm.y * B) / (A + B);
+          big.r = Math.sqrt(A + B); big.life = Math.max(big.life, sm.life) + 1; big.wob = 1;
+          D.splice(D.indexOf(sm), 1); j = D.length;
+        }
+      }
+      // Gotitas del impacto
+      c.fillStyle = 'rgb(225 235 250 / 0.7)';
+      for (let i = SP.length - 1; i >= 0; i--) {
+        const q = SP[i]; q.age += real;
+        if (q.age > q.life) { SP.splice(i, 1); continue; }
+        const f = 1 - q.age / q.life; q.x += q.vx * real * f; q.y += q.vy * real * f;
+        c.fillRect(Math.round(q.x / P) * P, Math.round(q.y / P) * P, P, P);
       }
       for (let i = D.length - 1; i >= 0; i--) {
         const d = D[i]; d.age += real;
-        if (d.age > d.life) { D.splice(i, 1); continue; }
-        // Algunas resbalan cuando ya pesan; al final se encogen al secarse
-        if (d.slide && d.age > 1.2) d.y += d.slide * real;
-        const k = d.age < 0.15 ? d.age / 0.15 : d.age > d.life - 1 ? (d.life - d.age) : 1;
-        const r = d.r * (0.6 + 0.4 * k), x = Math.round(d.x / ps) * ps, y = Math.round(d.y / ps) * ps;
+        if (d.age > d.life || d.y - d.r > H) { D.splice(i, 1); continue; }
+        // Las grandes pesan: resbalan acelerando y dejan un rastro de agua
+        if (d.r > 5.5 * P) { d.vy = Math.min(60, d.vy + real * 25 * (d.r / (6 * P))); d.y += d.vy * real; if (Math.random() < real * 6) D.push({ x: d.x + (Math.random() - 0.5) * P, y: d.y - d.r * 1.3, r: Math.max(P, d.r * 0.25), age: 0.2, life: 1.5 + Math.random(), vy: 0 }); }
+        // Impacto: primero un manchurrón plano y ancho que se recoge en gota redonda
+        const hit = Math.min(1, d.age / 0.14), fade = d.age > d.life - 1 ? (d.life - d.age) : 1;
+        d.wob = Math.max(0, (d.wob || 0) - real * 4);
+        const sx = 1 + (1 - hit) * 0.9 + Math.sin(d.age * 40) * d.wob * 0.12, sy = (1 - (1 - hit) * 0.55) * 1.1;
+        const rx = d.r * sx * (0.7 + 0.3 * fade), ry = d.r * sy * (0.7 + 0.3 * fade);
+        const x = Math.round(d.x / P) * P, y = Math.round(d.y / P) * P;
         c.save();
-        c.globalAlpha = Math.min(1, k) * 0.9;
-        c.beginPath(); c.ellipse(x, y, r, r * 1.12, 0, 0, 6.283); c.clip();
-        // Lo que se ve a través de la gota: un trozo más amplio de la imagen, dado la vuelta y encogido
-        const src = r * 3.2;
+        c.globalAlpha = Math.min(1, fade) * 0.92;
+        c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 6.283); c.clip();
+        const src = d.r * 3.2;
         c.translate(x, y); c.scale(-1, -1);
-        try { c.drawImage(this.cv, (x - src) * dpr, (y - src) * dpr, src * 2 * dpr, src * 2 * dpr, -r, -r * 1.12, r * 2, r * 2.24); } catch (e) { /* lienzo no listo */ }
+        try { c.drawImage(this.cv, (x - src) * dpr, (y - src) * dpr, src * 2 * dpr, src * 2 * dpr, -rx, -ry, rx * 2, ry * 2); } catch (e) { /* lienzo no listo */ }
         c.restore();
-        c.save(); c.globalAlpha = Math.min(1, k);
-        // Borde oscuro abajo y brillo arriba (píxeles)
-        c.strokeStyle = 'rgb(10 20 30 / 0.35)'; c.lineWidth = Math.max(1, ps);
-        c.beginPath(); c.ellipse(x, y, r, r * 1.12, 0, 0.2, Math.PI - 0.2); c.stroke();
-        c.fillStyle = 'rgb(255 255 255 / 0.75)'; c.fillRect(x - r * 0.4, y - r * 0.55, Math.max(1, ps), Math.max(1, ps));
-        c.fillStyle = 'rgb(255 255 255 / 0.35)'; c.fillRect(x - r * 0.4 + ps, y - r * 0.55, Math.max(1, ps), Math.max(1, ps));
+        c.save(); c.globalAlpha = Math.min(1, fade);
+        if (hit < 1) { c.fillStyle = `rgb(235 242 255 / ${(0.5 * (1 - hit)).toFixed(3)})`; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 6.283); c.fill(); }
+        c.strokeStyle = 'rgb(10 20 30 / 0.35)'; c.lineWidth = P;
+        c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0.25, Math.PI - 0.25); c.stroke();
+        c.fillStyle = 'rgb(255 255 255 / 0.8)'; c.fillRect(Math.round((x - rx * 0.4) / P) * P, Math.round((y - ry * 0.5) / P) * P, P, P);
+        if (d.r > 3.5 * P) { c.fillStyle = 'rgb(255 255 255 / 0.35)'; c.fillRect(Math.round((x - rx * 0.4) / P) * P + P, Math.round((y - ry * 0.5) / P) * P, P, P); }
         c.restore();
       }
     }
