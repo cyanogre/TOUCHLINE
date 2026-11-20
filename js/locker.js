@@ -943,7 +943,7 @@
       if (onLoan(S, p.id)) want = 'Está a gusto, pero sabe que en verano vuelve a su club.';
       else if (m < 40) want = 'No es feliz aquí. Si no cambia algo, pedirá salir.';
       else if (share < 0.35 && r < 16 && S.week >= 4) want = p.age <= 22 ? 'Quiere jugar. Si no hay sitio, prefiere salir ' + gx(S, 'cedido.', 'cedida.') : 'Quiere más minutos: cree que merece jugar.';
-      else if (p.contract <= S.season + 1) want = 'Le gustaría renovar antes de que acabe su contrato.';
+      else if (p.contract <= S.season + 1 && !onLoan(S, p.id)) want = 'Le gustaría renovar antes de que acabe su contrato.';
       else if (p.age >= 32) want = 'Piensa en sus últimos años de carrera; le haría ilusión quedarse en el club después, ' + gx(S, 'como técnico.', 'como entrenadora.');
       else want = gx(S, 'Está contento con su papel y con el grupo.', 'Está contenta con su papel y con el grupo.');
       const fr = W().squad(S, S.user).filter(q => q.id !== p.id).map(q => [q, rel(S, p.id, q.id)]).sort((a, c) => c[1] - a[1])[0];

@@ -2542,7 +2542,7 @@
         if (!a) continue;
         // Blanco azulado con algo de variación (nieve pisada / nieve virgen)
         const v = 236 + ((i * 2654435761 >>> 28) & 7) * 2;
-        d[i * 4] = v - 6; d[i * 4 + 1] = v - 2; d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.round(a * 225);
+        d[i * 4] = v - 6; d[i * 4 + 1] = v - 2; d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.round(a * 165);
       }
       g.putImageData(im, 0, 0);
       this._snowAt = cover;
