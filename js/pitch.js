@@ -104,10 +104,12 @@
 
   // Estadio dibujado (prueba): ?campo=arte lo activa, ?campo=no lo quita
   const ART = { on: false, img: null };
+  // Lo que cubre el estadio dibujado (campo, gradas y público): la cámara puede ir hasta ahí
+  const ART_VIEW = { x0: -28, x1: 133, y0: -17, y1: 83 };
   try {
     const q = new URLSearchParams(location.search).get('campo');
     if (q) localStorage.setItem('touchline.campo', q === 'arte' ? '1' : '0');
-    ART.on = localStorage.getItem('touchline.campo') === '1';
+    ART.on = localStorage.getItem('touchline.campo') !== '0';
   } catch (e) { /* sin almacenamiento */ }
 
   /** Tiempo del partido según la época del año (invierno: lluvia y nieve; verano: calor). Se puede forzar con ?tiempo=lluvia|nieve|calor|nublado|despejado. */
@@ -120,6 +122,13 @@
     let acc = 0; for (const [k, v] of w) { acc += v / tot; if (r < acc) return k; }
     return 'despejado';
   }
+
+  // Anuncios de las vallas (marcas inventadas, con guasa)
+  const ADS = ['CERVEZAS EL PALO · LA QUE ENTRA SIN VAR', 'SEGUROS FUERA DE JUEGO · TE CUBRIMOS HASTA EL MINUTO 90+7', 'BOCADILLOS EL DESCANSO · 15 MINUTOS DE FELICIDAD',
+    'GAFAS PARA ÁRBITROS · ÓPTICA PITAZO', 'APP DE APUESTAS NO · MEJOR VEN AL CAMPO CON TU GENTE', 'PIPAS LA GRADA · LAS DE TODA LA VIDA',
+    'GIMNASIO REMONTADA · ABIERTO HASTA EL 90', 'PELUQUERÍA EL CRACK · CORTES DE CRACK, PRECIO DE CANTERA', 'TAXI CONTRAGOLPE · LLEGAMOS ANTES QUE EL LATERAL',
+    'AGENCIA DE VIAJES LA PRÓRROGA', 'CHURROS EL PALO LARGO', 'BANCO LA CANTERA · INVERTIMOS EN TU FUTURO', 'ROPA TÉRMICA EL BANQUILLO · PARA LOS QUE ESPERAN SU OPORTUNIDAD',
+    'ACADEMIA DE IDIOMAS · APRENDE A PROTESTAR AL ÁRBITRO EN 5 LENGUAS', 'MUDANZAS EL MERCADO DE INVIERNO', 'PIZZAS TIKI-TAKA · REPARTO AL PRIMER TOQUE'];
 
   function actor(kind, x, y, extra) {
     return Object.assign({ kind, x, y, vx: 0, vy: 0, tx: x, ty: y, run: 0.5, state: null, until: 0, bob: Math.random() * 6 }, extra || {});
@@ -171,7 +180,7 @@
       this.brain.ownTeam = 0; this.brain.lastTouch = 0;
       this.stepT = 0;
       this.handled = [];
-      if (this.st.name) this._banner(this.st.name + (this.st.night ? ' · partido nocturno' : ''), '#ffffff', 2.6);
+      if (this.st.name) this._banner(this.st.name + ' · ' + this.st.hour, '#ffffff', 2.6);
       for (const i of [0, 1]) {
         const club = this.S.clubs[match.teams[i].club];
         // Sin equipación conocida: el color dominante del escudo
@@ -185,9 +194,21 @@
       };
       this.cv.addEventListener('pointermove', gest);
       this.cv.addEventListener('pointerdown', gest);
+      // Arrastrar: la cámara se mueve libre (para ver la grada); con la rueda o pellizco, zoom
+      this.cv.addEventListener('pointerdown', e => { this._drag = { x: e.clientX, y: e.clientY, moved: false }; if (this.pan) this.pan.down = true; });
+      this.cv.addEventListener('pointermove', e => {
+        const d = this._drag; if (!d || this.cv.closest('.mini') || e.buttons === 0 && e.pointerType === 'mouse') return;
+        const dx = e.clientX - d.x, dy = e.clientY - d.y;
+        if (!d.moved && Math.hypot(dx, dy) < 6) return;
+        d.moved = true; d.x = e.clientX; d.y = e.clientY;
+        const s = this.sc * this.cam.z, P = this.pan || (this.pan = { x: 0, y: 0, at: 0 });
+        P.x = clamp(P.x - dx / s, -60, 60); P.y = clamp(P.y - dy / s, -40, 40); P.at = this.t; P.down = true;
+      });
+      const up = () => { this._drag = null; if (this.pan) { this.pan.down = false; this.pan.at = this.t; } };
+      this.cv.addEventListener('pointerup', up); this.cv.addEventListener('pointercancel', up);
       this.cv.addEventListener('pointerleave', () => { if (this.tilt) this.tilt.tx = this.tilt.ty = 0; });
       this.cv.addEventListener('pointerup', e => { if (e.pointerType === 'touch' && this.tilt) this.tilt.tx = this.tilt.ty = 0; });
-      this.cv.style.touchAction = 'pan-y';
+      this.cv.style.touchAction = 'none';
       this.cv.addEventListener('wheel', e => {
         if (this.cv.closest('.mini')) return;
         e.preventDefault();
@@ -212,7 +233,7 @@
 
     /** Zoom de la cámara (1 = campo entero; más, sigue el balón). */
     setZoom(z) {
-      this.zoom = clamp(z, 1, 3);
+      this.zoom = clamp(z, ART.on ? 0.7 : 1, 3);
       if (this.onZoom) this.onZoom(this.zoom);
     }
 
@@ -299,7 +320,8 @@
         code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
         night: (this.S.week * 7 + home.id) % 3 === 0,
         time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia',
-        weather: 'despejado'
+        weather: 'despejado',
+        hour: (this.S.week * 7 + home.id) % 3 === 0 ? ['20:00', '21:00', '21:15'][h % 3] : (this.S.week * 5 + home.id) % 3 === 0 ? ['17:30', '18:30', '19:00'][h % 3] : ['12:00', '14:00', '16:15'][h % 3]
       };
     }
 
@@ -1867,6 +1889,12 @@
         c.fy = c.fy == null ? ly : lerp(c.fy, ly, Math.min(1, real * 1.2));
         tx = c.fx; ty = c.fy; tz = Math.max(tz, zoom);
       }
+      if (c.tx == null && zoom < 0.98) tz = zoom;   // campo y gradas enteras
+      if (this.pan && c.tx == null) {
+        if (this.t - this.pan.at > 5 && !this.pan.down) { this.pan.x *= 1 - Math.min(1, real * 1.5); this.pan.y *= 1 - Math.min(1, real * 1.5); }
+        tx += this.pan.x; ty += this.pan.y;
+        if (zoom < 1.05) tz = Math.min(tz, zoom);
+      }
       const k = Math.min(1, real * 3.2);
       c.z += (tz - c.z) * k; c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
       if (c.tx != null && this.ball) { c.tx = lerp(c.tx, this.ball.x, Math.min(1, real * 1.5)); c.ty = lerp(c.ty, this.ball.y, Math.min(1, real * 1.5)); }
@@ -1882,14 +1910,19 @@
       // Mantener la cámara dentro del estadio
       const halfW = this.w / 2 / s, halfH = this.h / 2 / s;
       const fit = (v, a, b, half) => (b - a <= half * 2 ? (a + b) / 2 : clamp(v, a + half, b - half));
-      const cxw = fit(cam.x, VIEW.x0, VIEW.x1, halfW), cyw = fit(cam.y, VIEW.y0, VIEW.y1, halfH);
+      const V = ART.on && this._art !== false && TL.StadiumGL && TL.StadiumGL.ready() ? ART_VIEW : VIEW;
+      const cxw = fit(cam.x, V.x0, V.x1, halfW), cyw = fit(cam.y, V.y0, V.y1, halfH);
       const X = x => this.w / 2 + (x - cxw) * s;
       const Y = y => this.h / 2 + (y - cyw) * s;
       this.X = X; this.Y = Y; this.s = s;
       // Grada y pista
       const night = this.st.night;
       const art = this._artCv();
-      if (art) { c.fillStyle = '#20242a'; c.fillRect(0, 0, this.w, this.h); c.drawImage(art, X(VIEW.x0), Y(VIEW.y0), (VIEW.x1 - VIEW.x0) * s, (VIEW.y1 - VIEW.y0) * s); }
+      if (art) {
+        c.fillStyle = '#20242a'; c.fillRect(0, 0, this.w, this.h); c.drawImage(art, X(ART_VIEW.x0), Y(ART_VIEW.y0), (ART_VIEW.x1 - ART_VIEW.x0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s);
+        this._fans(X, Y, s);
+        this._boards(X, Y, s);
+      }
       else {
       c.fillStyle = night ? '#060b12' : '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
       // Gradas con los colores del club local y tifo con sus siglas
@@ -2084,7 +2117,9 @@
       if (!ART.on || !TL.StadiumGL) return null;
       const g = this.tilt || (this.tilt = { x: 0, y: 0, tx: 0, ty: 0 });
       g.x += (g.tx - g.x) * 0.08; g.y += (g.ty - g.y) * 0.08;
-      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, weather: this.st.weather });
+      const min = this.m.min || 0;
+      const dark = this.st.time === 'noche' ? 1 : this.st.time === 'tarde' ? clamp((min - 50) / 40, 0, 0.8) : 0;
+      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, dark, weather: this.st.weather });
     }
 
     _drawLoading() {
@@ -2094,6 +2129,73 @@
       c.fillStyle = 'rgb(255 255 255 / 0.75)'; c.font = '600 14px Barlow, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
       const dots = '.'.repeat(1 + (Math.floor(performance.now() / 400) % 3));
       c.fillText((TL.t ? TL.t('Preparando el estadio') : 'Preparando el estadio') + dots, this.w / 2, this.h / 2);
+    }
+
+    /** Público en las gradas del estadio dibujado: colores del local (y un fondo visitante); salta con los goles. */
+    _fans(X, Y, s) {
+      if (!this._fanPts) {
+        const im = TL.StadiumGL.image && TL.StadiumGL.image('mask');
+        if (!im) return;
+        const cv = document.createElement('canvas'); cv.width = 322; cv.height = 200;
+        const g = cv.getContext('2d'); g.drawImage(im, 0, 0, cv.width, cv.height);
+        const d = g.getImageData(0, 0, cv.width, cv.height).data;
+        const pts = [], fill = Math.min(1, 0.45 + (this.m.att || 0.6) * 0.5);
+        for (let k = 0; k < 20000 && pts.length < 2600; k++) {
+          const px = Math.floor(Math.random() * cv.width), py = Math.floor(Math.random() * cv.height), o = (py * cv.width + px) * 4;
+          if (d[o] < 150 || d[o + 1] > 120) continue;   // solo gradas (rojo en la máscara)
+          if (Math.random() > fill) continue;
+          const x = ART_VIEW.x0 + (px + Math.random()) / cv.width * (ART_VIEW.x1 - ART_VIEW.x0), y = ART_VIEW.y0 + (py + Math.random()) / cv.height * (ART_VIEW.y1 - ART_VIEW.y0);
+          const away = x > L * 0.86 && y > Wd / 2;
+          const r = Math.random();
+          pts.push({ x, y, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
+        }
+        this._fanPts = pts;
+      }
+      const c = this.cx, z = Math.max(1, 0.42 * s);
+      const party = this.sparkUntil && this.sparkUntil > this.t;
+      for (const f of this._fanPts) {
+        const j = party ? Math.abs(Math.sin(this.t * 9 + f.ph)) * 0.35 : Math.sin(this.t * 1.5 + f.ph) * 0.04;
+        c.fillStyle = f.c; c.fillRect(X(f.x), Y(f.y - j), z, z);
+      }
+    }
+
+    /** Vallas LED junto a las bandas: lo que pasa en el partido, la figura de la temporada y anuncios. */
+    _boards(X, Y, s) {
+      const c = this.cx;
+      const B = this._board || (this._board = { msg: null, until: 0, k: 0 });
+      if (!B.msg || this.t > B.until) {
+        const q = this.boardQ && this.boardQ.shift();
+        B.msg = q || this._adText(); B.until = this.t + (q ? 7 : 9); B.born = this.t; B.hot = !!q;
+      }
+      const txt = TL.t ? TL.t(B.msg) : B.msg;
+      for (const [y0, flip] of [[-2.4, false], [Wd + 1.1, false]]) {
+        const x0 = 4, w = L - 8, hgt = 1.3;
+        c.fillStyle = '#0a0d12'; c.fillRect(X(x0), Y(y0), w * s, hgt * s);
+        c.save(); c.beginPath(); c.rect(X(x0), Y(y0), w * s, hgt * s); c.clip();
+        c.font = `800 ${Math.max(8, 1.05 * s)}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
+        const tw = c.measureText(txt).width + 40 * s / 10;
+        const off = ((this.t - B.born) * 6 * s) % (tw);
+        c.fillStyle = B.hot ? (Math.floor(this.t * 4) % 2 ? '#ffd23f' : '#ffffff') : '#b8f53d';
+        for (let xx = X(x0) - off; xx < X(x0) + w * s; xx += tw) c.fillText(txt, xx, Y(y0 + hgt / 2));
+        c.restore();
+      }
+    }
+    _adText() {
+      const S = this.S, ids = this.m.teams.flatMap(t => t.onPitch.map(o => o.pid));
+      // La figura de la temporada (si va lanzada)
+      let star = null;
+      for (const id of ids) { const st = S.stats && S.stats[id]; if (st && st[1] >= 4 && (!star || st[1] > S.stats[star][1])) star = id; }
+      this._bk = (this._bk || 0) + 1;
+      if (star && this._bk % 3 === 0) { const p = this.P(star); return `${p.short.toUpperCase()} · ${S.stats[star][1]} GOLES ESTA TEMPORADA · ¡IMPARABLE!`; }
+      return U.pick(ADS);
+    }
+    /** Lo que pasa en el partido sale en las vallas. */
+    boardMsg(e) {
+      const q = this.boardQ || (this.boardQ = []);
+      const name = e.pid != null && this.P(e.pid) ? this.P(e.pid).short.toUpperCase() : '';
+      const club = e.team >= 0 ? (this.S.clubs[this.m.teams[e.team].club].name || '').toUpperCase() : '';
+      const t = { goal: `¡GOOOL DE ${name}!  ${this.m.score[0]}-${this.m.score[1]}`, red: `ROJA PARA ${name}`, pen: `¡PENALTI PARA ${club}!`, save: `¡PARADÓN!`, sub: 'CAMBIO', var: 'REVISIÓN VAR', ht: `DESCANSO · ${this.m.score[0]}-${this.m.score[1]}`, late: `¡ÚLTIMOS MINUTOS! · ¡VAMOS ${club}!` }[e.type];
+      if (t) { q.length = 0; q.push(t); if (this._board) this._board.until = 0; }
     }
 
     /** Lluvia, nieve o calor (ondas y destellos del sol en la lente), sobre todo lo demás. */

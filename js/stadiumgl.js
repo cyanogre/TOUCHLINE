@@ -77,14 +77,14 @@ void main(){
   for (int i=1;i<=12;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.)); }
   float lit = 1. + rel*0.9 - sh*0.38;
   vec3 c = col * lit * tint * mix(1., 0.5, night);
-  if (night > 0.5) {
+  if (night > 0.01) {
     vec2 a = vec2(uv.x, uv.y/aspect);
     float f = 0.;
     f += 0.5/(1.+18.*dot(a, a));
     f += 0.5/(1.+18.*dot(a-vec2(1.,0.), a-vec2(1.,0.)));
     f += 0.5/(1.+18.*dot(a-vec2(0.,1./aspect), a-vec2(0.,1./aspect)));
     f += 0.5/(1.+18.*dot(a-vec2(1.,1./aspect), a-vec2(1.,1./aspect)));
-    c += col * f * vec3(1.,.97,.88) * (0.6 + 0.4*n.z) * (1. - sh*0.5);
+    c += col * f * night * vec3(1.,.97,.88) * (0.6 + 0.4*n.z) * (1. - sh*0.5);
   }
   gl_FragColor = vec4(c, 1.);
 }`;
@@ -107,7 +107,7 @@ void main(){
   function setupGL(W) {
     const cv = document.createElement('canvas');
     // Se pinta a resolución moderada (es fondo) para ir fluido en móvil
-    cv.width = Math.round(W.color.naturalWidth * 0.85); cv.height = Math.round(W.color.naturalHeight * 0.85);
+    cv.width = Math.round(W.color.naturalWidth * 0.8); cv.height = Math.round(W.color.naturalHeight * 0.8);
     const gl = cv.getContext('webgl', { premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) return null;
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
@@ -153,7 +153,7 @@ void main(){
     gl.uniform2f(u.tilt, o.tilt.x, o.tilt.y);
     gl.uniform3f(u.sun, Math.cos(a) * 0.55 - o.tilt.x * 0.35, Math.sin(a) * 0.45 - o.tilt.y * 0.35, dusk ? 0.32 : 0.8);
     gl.uniform1f(u.t, o.t);
-    gl.uniform1f(u.night, night ? 1 : 0);
+    gl.uniform1f(u.night, o.dark != null ? o.dark : night ? 1 : 0);
     const w = o.weather || 'despejado';
     gl.uniform1f(u.wet, w === 'lluvia' || w === 'temporal' ? 1 : 0);
     gl.uniform1f(u.snow, w === 'nieve' ? Math.min(1, 0.06 + o.t / 1200) : 0);
@@ -169,5 +169,5 @@ void main(){
     const q = new URLSearchParams(location.search).get('campo');
     if (q === 'arte' || (!q && localStorage.getItem('touchline.campo') === '1')) setTimeout(load, 1500);
   } catch (e) { /* nada */ }
-  TL.StadiumGL = { render, load, ready: () => S.state === 'loaded' || S.state === 'error' };
+  TL.StadiumGL = { image: k => (S.state === 'loaded' ? S.imgs[{ mask: 'mask' }[k] || k] : null), render, load, ready: () => S.state === 'loaded' || S.state === 'error' };
 })();

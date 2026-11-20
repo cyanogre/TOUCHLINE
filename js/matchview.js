@@ -19,6 +19,7 @@
   const PAUSE_LABEL = { goal: 'Goles', red: 'Expulsiones', inj: 'Lesiones (tuyas)', pen: 'Penaltis', var: 'VAR y polémicas', crowd: 'Incidentes en la grada', ht: 'Descanso (charla)' };
 
   function el(id) { return document.getElementById(id); }
+  function crtOn() { try { return localStorage.getItem('touchline.crt') !== '0'; } catch (e) { return true; } }
   function settings() { return G.S.settings; }
 
   function open() {
@@ -67,7 +68,8 @@
     MV.pitch.zoom = settings().zoom || 1;
     MV.pitch.onZoom = z => { settings().zoom = z; camLabel(); };
     setTimeout(camLabel, 0);
-    root.classList.toggle('crt', !!settings().crt);
+    root.classList.toggle('crt', crtOn());
+    const hr = MV.pitch.st && MV.pitch.st.hour; if (hr) { const c = root.querySelector('.mh .comp'); if (c) c.insertAdjacentText('beforeend', ' · ' + hr); }
     clearInterval(MV.ballTimer);
     MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
@@ -179,6 +181,7 @@
   function revealEv(e) {
     if (!MV.m) return;
     addEvent(e);
+    if (MV.pitch && MV.pitch.boardMsg) MV.pitch.boardMsg(e);
     if (e.type === 'goal') { TL.FX.pop(el('mv-score')); crowdSongs([e]); }
     updateHead();
     if (MV.tab !== 'feed') renderTab();
@@ -634,7 +637,7 @@
     const nx = CAMS[k < 0 ? 0 : k];
     MV.pitch.setZoom(nx[0]); UI.toast(nx[1]);
   };
-  A['mv-crt'] = () => { if (MV.pipDragged) return; settings().crt = !settings().crt; el('match').classList.toggle('crt', settings().crt); G.save(); };
+  A['mv-crt'] = () => { if (MV.pipDragged) return; const on = !crtOn(); try { localStorage.setItem('touchline.crt', on ? '1' : '0'); } catch (e) { /* nada */ } el('match').classList.toggle('crt', on); };
   A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
   A['mv-pip-size'] = () => {
     if (MV.pipDragged) return;
