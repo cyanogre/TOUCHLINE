@@ -69,7 +69,7 @@
     MV.pitch.onZoom = z => { settings().zoom = z; camLabel(); };
     setTimeout(camLabel, 0);
     root.classList.toggle('crt', crtOn());
-    const hr = MV.pitch.st && MV.pitch.st.hour; if (hr) { const c = root.querySelector('.mh .comp'); if (c) c.insertAdjacentText('beforeend', ' · ' + hr); }
+    const hr = MV.pitch.st && MV.pitch.st.hour, wx = MV.m.weather; if (hr) { const c = root.querySelector('.mh .comp'); if (c) c.insertAdjacentText('beforeend', ' · ' + hr + (wx && TL.Weather && wx !== 'despejado' ? ' · ' + TL.Weather.ICON[wx] + ' ' + TL.Weather.NAMES[wx] : '')); }
     clearInterval(MV.ballTimer);
     MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
@@ -207,7 +207,8 @@
   }
 
   // ------------------------------------------------------------ Partido narrado: solo se ve la jugada clave
-  const narrOn = () => settings().narr === true;
+  // Por defecto, retransmisión de jugadas clave; el partido completo se elige con el botón
+  const narrOn = () => settings().narr !== false;
   function setNarr(on) {
     const root = el('match');
     if (!root) return;
