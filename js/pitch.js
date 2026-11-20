@@ -2164,6 +2164,10 @@
         const cv = document.createElement('canvas'); cv.width = 322; cv.height = 200;
         const g = cv.getContext('2d'); g.drawImage(im, 0, 0, cv.width, cv.height);
         const d = g.getImageData(0, 0, cv.width, cv.height).data;
+        // Altura de cada punto (para que el público se mueva con la profundidad igual que las gradas)
+        const hi = TL.StadiumGL.image('height');
+        let hd = null;
+        if (hi) { g.clearRect(0, 0, cv.width, cv.height); g.drawImage(hi, 0, 0, cv.width, cv.height); hd = g.getImageData(0, 0, cv.width, cv.height).data; }
         const pts = [], fill = Math.min(1, 0.45 + (this.m.att || 0.6) * 0.5);
         for (let k = 0; k < 20000 && pts.length < 2600; k++) {
           const px = Math.floor(Math.random() * cv.width), py = Math.floor(Math.random() * cv.height), o = (py * cv.width + px) * 4;
@@ -2172,15 +2176,18 @@
           const x = ART_VIEW.x0 + (px + Math.random()) / cv.width * (ART_VIEW.x1 - ART_VIEW.x0), y = ART_VIEW.y0 + (py + Math.random()) / cv.height * (ART_VIEW.y1 - ART_VIEW.y0);
           const away = x > L * 0.86 && y > Wd / 2;
           const r = Math.random();
-          pts.push({ x, y, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
+          pts.push({ x, y, h: hd ? hd[o] / 255 : 0.5, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
         }
         this._fanPts = pts;
       }
       const c = this.cx, z = Math.max(1, 0.42 * s);
       const party = this.sparkUntil && this.sparkUntil > this.t;
+      // Mismo desplazamiento que el sombreador del estadio: uv' = uv + tilt·0,022·altura
+      const g = this.tilt || { x: 0, y: 0 }, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
+      const px = g.x * 0.022 * VW, py = g.y * 0.022 * (VH / VW) * VH;
       for (const f of this._fanPts) {
         const j = party ? Math.abs(Math.sin(this.t * 9 + f.ph)) * 0.35 : Math.sin(this.t * 1.5 + f.ph) * 0.04;
-        c.fillStyle = f.c; c.fillRect(X(f.x), Y(f.y - j), z, z);
+        c.fillStyle = f.c; c.fillRect(X(f.x + px * f.h), Y(f.y + py * f.h - j), z, z);
       }
     }
 

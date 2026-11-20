@@ -325,10 +325,11 @@
     const B = TL.Balls, sel = B.selected();
     const cells = Array.from({ length: B.count }, (_, i) => {
       const ok = B.unlocked(i);
-      return `<button class="ball-cell ${i === sel ? 'on' : ''} ${ok ? '' : 'locked'}" ${ok ? `data-act="ball-pick" data-i="${i}"` : 'disabled'} title="${ok ? B.fxName(i) : 'Bloqueado'}">
+      return `<button class="ball-cell ${i === sel ? 'on' : ''} ${ok ? '' : 'locked'}" ${ok ? `data-act="ball-pick" data-i="${i}"` : 'disabled'} title="${esc(B.ach(i) ? B.ach(i).name + ' — ' + B.ach(i).how : 'De serie')}${ok ? ' · ' + B.fxName(i) : ''}">
         <span style="background-position:${(i % 8) / 7 * 100}% ${Math.floor(i / 8) / 7 * 100}%"></span>${ok ? '' : '🔒'}</button>`;
     }).join('');
-    UI.sheet(UI.sheetHead('Balón del partido') + `<p class="note">Cada partido en directo desbloquea 2 balones nuevos. Cada balón deja su estela; algunos tienen efecto propio (fuego, hielo, rayo, arcoíris, galaxia…).</p><div class="ball-grid">${cells}</div><p class="note mt">Elegido: <b>${B.fxName(sel)}</b></p>`);
+    const achList = `<div class="card mt">${Array.from({ length: B.count }, (_, i) => B.ach(i) && { i, a: B.ach(i), ok: B.unlocked(i) }).filter(Boolean).map(r => `<div class="sc-row"><span>${r.ok ? '🏆' : '🔒'}</span><b>${esc(r.a.name)}</b><span class="note">${esc(r.a.how)}</span></div>`).join('')}</div>`;
+    UI.sheet(UI.sheetHead('Balón del partido') + `<p class="note">Cada <b>logro</b> en los partidos en directo desbloquea un balón (${B.total()}/64). Pasa el dedo o el ratón por uno bloqueado para ver qué logro pide. Cada balón deja su estela; algunos tienen efecto propio (fuego, hielo, rayo, arcoíris, galaxia…).</p><div class="ball-grid">${cells}</div><p class="note mt">Elegido: <b>${B.fxName(sel)}</b>${B.ach(sel) ? ' · logro «' + esc(B.ach(sel).name) + '»' : ''}</p>${achList}`);
   };
   A['ball-pick'] = b => { TL.Balls.select(+b.dataset.i); A['opt-balls'](); };
   A['opt-crt'] = () => { try { localStorage.setItem('touchline.crt', localStorage.getItem('touchline.crt') !== '0' ? '0' : '1'); } catch (e) { /* nada */ } UI.refresh(); };
