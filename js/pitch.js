@@ -2738,7 +2738,7 @@
       // La voz «¡TOUCHLINE!» entra cuando sale el logo (si hay grabaciones en assets/sfx/cortinilla-voz).
       // No en todas: en las repeticiones y saques de centro siempre, en el resto de vez en cuando.
       const big = cap == null || /Saque de centro|Penalti/.test(cap);
-      if (TL.SFX && TL.SFX.sample && !this.instant && (big || Math.random() < 0.3)) setTimeout(() => TL.SFX.sample('cortinilla-voz', { maxWait: 400 }), 150);
+      if (TL.SFX && TL.SFX.sample && !this.instant && (big || Math.random() < 0.3)) setTimeout(() => TL.SFX.sample('cortinilla-voz', { maxWait: 250 }), 300);
     }
     _wipeFx() {
       const c = this.cx, W = this.w, H = this.h;
