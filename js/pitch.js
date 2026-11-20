@@ -102,6 +102,14 @@
     img.src = url;
   }
 
+  // Estadio dibujado (prueba): ?campo=arte lo activa, ?campo=no lo quita
+  const ART = { on: false, img: null };
+  try {
+    const q = new URLSearchParams(location.search).get('campo');
+    if (q) localStorage.setItem('touchline.campo', q === 'arte' ? '1' : '0');
+    ART.on = localStorage.getItem('touchline.campo') === '1';
+  } catch (e) { /* sin almacenamiento */ }
+
   function actor(kind, x, y, extra) {
     return Object.assign({ kind, x, y, vx: 0, vy: 0, tx: x, ty: y, run: 0.5, state: null, until: 0, bob: Math.random() * 6 }, extra || {});
   }
@@ -1817,6 +1825,9 @@
       this.X = X; this.Y = Y; this.s = s;
       // Grada y pista
       const night = this.st.night;
+      const art = this._artCv();
+      if (art) { c.fillStyle = '#20242a'; c.fillRect(0, 0, this.w, this.h); c.drawImage(art, X(VIEW.x0), Y(VIEW.y0), (VIEW.x1 - VIEW.x0) * s, (VIEW.y1 - VIEW.y0) * s); }
+      else {
       c.fillStyle = night ? '#060b12' : '#0b1f14'; c.fillRect(0, 0, this.w, this.h);
       // Gradas con los colores del club local y tifo con sus siglas
       c.globalAlpha = night ? 0.28 : 0.38;
@@ -1905,6 +1916,7 @@
       }
       c.fillStyle = '#1d2a33'; c.fillRect(X(L / 2 + 1.2), Y(Wd + 0.8), 1.6 * s, 1.1 * s);
       if (this.monitor && this.monitor > this.t) { c.fillStyle = '#5db8ff'; c.fillRect(X(L / 2 + 1.35), Y(Wd + 0.95), 1.3 * s, 0.8 * s); }
+      }
       // Sombras y personas, de arriba abajo
       const R = Math.max(4.2, 1.5 * s);
       const people = [];
@@ -1999,6 +2011,44 @@
         g.addColorStop(0, 'rgb(0 0 0 / 0)'); g.addColorStop(1, `rgb(0 0 0 / ${0.45 * (1 - this.slow)})`);
         c.fillStyle = g; c.fillRect(0, 0, this.w, this.h);
       }
+    }
+
+    /**
+     * Estadio dibujado (prueba): la imagen en perspectiva se endereza una vez a vista cenital, de modo que el
+     * rectángulo del campo encaja con los metros del 2D. Se activa con ?campo=arte (y se recuerda).
+     */
+    _artCv() {
+      if (!ART.on) return null;
+      if (this._art) return this._art;
+      if (!ART.img) { ART.img = new Image(); ART.img.src = 'assets/estadio/color.jpg'; }
+      if (!ART.img.complete || !ART.img.naturalWidth) return null;
+      const k = 12, Wv = VIEW.x1 - VIEW.x0, Hv = VIEW.y1 - VIEW.y0;
+      const cv = document.createElement('canvas'); cv.width = Wv * k; cv.height = Hv * k;
+      const g = cv.getContext('2d'), im = ART.img;
+      const sx = im.naturalWidth / 2000, sy = im.naturalHeight / 1116;
+      // Esquinas del campo en la imagen (ar-izq, ar-der, ab-izq, ab-der)
+      const C = [[362, 188], [1636, 188], [292, 951], [1709, 951]].map(([x, y]) => [x * sx, y * sy]);
+      const src = (wx, wy) => { const u = wx / L, v = wy / Wd; const top = [lerp(C[0][0], C[1][0], u), lerp(C[0][1], C[1][1], u)], bot = [lerp(C[2][0], C[3][0], u), lerp(C[2][1], C[3][1], u)]; return [lerp(top[0], bot[0], v), lerp(top[1], bot[1], v)]; };
+      const N = 48, M = 36;
+      const tri = (s0, s1, s2, d0, d1, d2) => {
+        g.save(); g.beginPath(); g.moveTo(d0[0], d0[1]); g.lineTo(d1[0], d1[1]); g.lineTo(d2[0], d2[1]); g.closePath(); g.clip();
+        const den = (s1[0] - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (s1[1] - s0[1]);
+        const a = ((d1[0] - d0[0]) * (s2[1] - s0[1]) - (d2[0] - d0[0]) * (s1[1] - s0[1])) / den;
+        const bb = ((d1[1] - d0[1]) * (s2[1] - s0[1]) - (d2[1] - d0[1]) * (s1[1] - s0[1])) / den;
+        const cc = ((d2[0] - d0[0]) * (s1[0] - s0[0]) - (d1[0] - d0[0]) * (s2[0] - s0[0])) / den;
+        const dd = ((d2[1] - d0[1]) * (s1[0] - s0[0]) - (d1[1] - d0[1]) * (s2[0] - s0[0])) / den;
+        g.setTransform(a, bb, cc, dd, d0[0] - a * s0[0] - cc * s0[1], d0[1] - bb * s0[0] - dd * s0[1]);
+        g.drawImage(im, 0, 0); g.restore();
+      };
+      for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
+        const w0 = VIEW.x0 + Wv * i / N, w1 = VIEW.x0 + Wv * (i + 1) / N, h0 = VIEW.y0 + Hv * j / M, h1 = VIEW.y0 + Hv * (j + 1) / M;
+        const D = (wx, wy) => [(wx - VIEW.x0) * k, (wy - VIEW.y0) * k];
+        // un pelín más grandes para que no se vean las juntas
+        const e = 0.02;
+        tri(src(w0, h0), src(w1, h0), src(w0, h1), D(w0 - e, h0 - e), D(w1 + e, h0 - e), D(w0 - e, h1 + e));
+        tri(src(w1, h0), src(w1, h1), src(w0, h1), D(w1 + e, h0 - e), D(w1 + e, h1 + e), D(w0 - e, h1 + e));
+      }
+      return (this._art = cv);
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
