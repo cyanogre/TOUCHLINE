@@ -1595,8 +1595,14 @@ body.shake-s { animation: shake-s .35s; }
 @keyframes crtFlicker { 0%, 100% { opacity: .95; } 48% { opacity: .88; } 50% { opacity: 1; } 52% { opacity: .9; } }
 
 /* Elegir balón */
-.ball-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
-.ball-cell { position: relative; aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); display: grid; place-items: center; font-size: 12px; }
+.ball-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+@media (max-width: 520px) { .ball-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; } }
+.ball-cell .lk { position: absolute; right: 2px; bottom: 1px; font-size: 11px; line-height: 1; }
+.ach-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; align-items: start; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ach-row:last-child { border-bottom: 0; }
+.ach-row b { display: block; line-height: 1.2; }
+.ach-row .note { display: block; margin-top: 1px; }
+.ball-cell { position: relative; min-width: 0; padding: 0; overflow: hidden; aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); display: grid; place-items: center; font-size: 12px; }
 .ball-cell span { width: 78%; aspect-ratio: 1; background-image: url(../assets/balones.png); background-size: 800% 800%; image-rendering: pixelated; }
 .ball-cell.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .ball-cell.locked span { filter: grayscale(1) brightness(.35); }
