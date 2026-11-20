@@ -702,11 +702,21 @@
       const k = this.fouls.findIndex(f => f.e.team !== c.team);
       if (k < 0 || P.isGK(c)) return false;
       if (P.depth(c.team, c.x) > L - 17.5 && Math.abs(c.y - CY) < 21) return false;   // en el área sería penalti
-      let o = null, od = 2.2;
-      for (const a of P.team(1 - c.team)) { if (P.isGK(a) || a.state === 'down') continue; const d = hyp(a.x - c.x, a.y - c.y); if (d < od) { od = d; o = a; } }
+      // La falta (y su tarjeta) es de quien dice el motor: esa jugadora va a por la poseedora y la comete ella.
+      // Solo si ya no está en el campo, la comete la rival más cercana.
+      const want = this.fouls[k].e, des = P.A[want.pid];
+      let o = null;
+      if (des && des.team !== c.team && des.state !== 'down') {
+        if (hyp(des.x - c.x, des.y - c.y) > 2.2) { des.tx = c.x - P.dir[c.team] * 0.6; des.ty = c.y; des.run = 1; des.role = 'press'; return false; }
+        o = des;
+      } else {
+        let od = 2.2;
+        for (const a of P.team(1 - c.team)) { if (P.isGK(a) || a.state === 'down') continue; const d = hyp(a.x - c.x, a.y - c.y); if (d < od) { od = d; o = a; } }
+      }
       if (!o) return false;
       const f = this.fouls.splice(k, 1)[0];
-      f.e.pid = o.pid; f.e.pid2 = c.pid; f.e.fromPlay = true;
+      if (!des) f.e.pid = o.pid;
+      f.e.pid2 = c.pid; f.e.fromPlay = true;
       P.queue.unshift(f.e);
       return true;
     }

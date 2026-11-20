@@ -877,6 +877,7 @@
       this.poss = i; this.fetch = null; this.place = null;
       this.brain.afterScript(); this.brain.ownTeam = i; this.brain.lastTouch = i;
       this._cut(0.92);
+      if (!this.instant) { this.cutAt = null; this.wipe(); }
       return true;
     }
 
@@ -1273,7 +1274,7 @@
           const tz = { header: U.rand(0.2, 1.4), chip: 1.6, long: U.rand(1.4, 2.2), power: U.rand(0.4, 1.8), volley: U.rand(0.5, 2), tapin: 0.2, placed: 0.25, fk: 2.05 }[type] || 0.8;
           if (gk) { gk.state = 'dive'; gk.dive = -side * dir; gk.until = this.t + 1.2; this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {}; this.ov.p[gk.pid] = { x: gx - dir * 1.2, y: Wd / 2 - side * 1.5, run: 1 }; }
           this._kick(gx + dir * 1.3, ty, { fz, tz, h: type === 'chip' ? 3.6 : type === 'long' ? 1.2 : type === 'fk' ? 1.5 : 0.2, T, curve: type === 'fk' ? side * 2.4 : type === 'placed' ? side * 0.6 : 0, done: () => {
-            this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 };
+            this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 }; this._goalT = this.t;
             if (e.type === 'goal') this._reveal(e);
           } });
         } else if (outcome === 'save' && (!gk || Math.hypot(gk.x - (gx - dir * 1.0), gk.y - Wd / 2) > 9)) {
@@ -1332,6 +1333,7 @@
         if (e.type === 'disallowed') beats.push(...this._celebrate(i, shooter, 1.3), ...this._disallow(e));
         else {
           beats.push(...this._celebrate(i, shooter, 3.2));
+          if (!this.instant) beats.push(this._replayBeat());
           if (e.type === 'goal' && this.queue[0] && this.queue[0].type === 'controversy') { this.queue.shift(); beats.push(this._protestBeat(1 - i, 1.6)); }
           beats.push(...this._kickoffSeq(1 - i));
         }
@@ -1886,8 +1888,11 @@
       const dt = real * this.rate();
       this.t += dt;
       this._update(dt, real);
-      this._draw(real);
+      this._record(dt);
+      if (this.replay) this._drawReplay(dt, real);
+      else this._draw(real);
       this._weather(real);
+      this._wipeFx(real);
       this._tube();
       this.raf = requestAnimationFrame(this._loop);
     }
@@ -2694,6 +2699,106 @@
       // Humo y chispas en el sitio
       const n = 10;
       for (let i = 0; i < n; i++) { const a = i / n * 6.28, r = (age * 30 + i) % 18; c.fillStyle = age < 0.8 ? '#ffe9a0' : 'rgb(80 80 80 / 0.5)'; c.fillRect(Math.round((x + Math.cos(a) * r) / ps) * ps, Math.round((y + Math.sin(a) * r * 0.6 - age * 6) / ps) * ps, ps, ps); }
+    }
+
+    // ------------------------------------------------------------ Realización: cortinilla y repetición
+    /**
+     * Cortinilla de televisión propia del juego: franjas en diagonal con los colores de los dos equipos que
+     * tapan el campo de golpe, el logo (un balón de píxeles girando y TOUCHLINE) y se abren barriendo.
+     * Tapa los cortes de realización y la entrada y salida de las repeticiones. Va en tiempo real.
+     */
+    wipe() { this.wipeAt = performance.now(); }
+    _wipeFx() {
+      if (this.wipeAt == null) return;
+      const age = (performance.now() - this.wipeAt) / 1000, DUR = 0.95;
+      if (age > DUR) { this.wipeAt = null; return; }
+      const c = this.cx, W = this.w, H = this.h;
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      // 0–0.12 entra, 0.12–0.45 tapa con el logo, 0.45–0.95 se abre barriendo hacia la derecha
+      const inK = Math.min(1, age / 0.12), outK = age < 0.45 ? 0 : Math.min(1, (age - 0.45) / 0.5);
+      const ease = k => k * k * (3 - 2 * k);
+      const cols = [(this.colors && this.colors[0].main) || '#1d6b3a', '#0b1020', (this.colors && this.colors[1].main) || '#2d4fa0', '#f2f2f2'];
+      const n = 7, bw = (W + H) / n, slant = H * 0.6;
+      for (let k = 0; k < n + 2; k++) {
+        const delay = k * 0.04, o = ease(Math.max(0, Math.min(1, (outK * 1.4 - delay))));
+        const x0 = -slant + k * bw - (1 - ease(inK)) * (W + slant) + o * (W + slant + bw);
+        c.fillStyle = cols[k % cols.length];
+        c.beginPath(); c.moveTo(x0, 0); c.lineTo(x0 + bw + 1, 0); c.lineTo(x0 + bw + 1 - slant, H); c.lineTo(x0 - slant, H); c.closePath(); c.fill();
+        c.fillStyle = 'rgb(255 255 255 / 0.12)'; c.fillRect(x0 + bw * 0.1, 0, 2, 2);
+      }
+      // Logo en el centro mientras tapa
+      const la = age < 0.12 ? age / 0.12 : age < 0.5 ? 1 : Math.max(0, 1 - (age - 0.5) / 0.15);
+      if (la > 0) {
+        c.save(); c.globalAlpha = la;
+        const cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.09;
+        c.fillStyle = 'rgb(5 8 16 / 0.85)'; c.beginPath(); c.arc(cx - r * 2.6, cy, r * 1.35, 0, 6.283); c.fill();
+        // Anillo de estrellas de píxeles girando
+        for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283 + age * 3; c.fillStyle = k % 2 ? '#ffd23f' : '#ffffff'; const px = Math.round(cx - r * 2.6 + Math.cos(a) * r * 1.15), py = Math.round(cy + Math.sin(a) * r * 1.15); c.fillRect(px - 1, py - 1, 3, 3); }
+        if (TL.Balls) TL.Balls.draw(c, TL.Balls.selected(), cx - r * 2.6, cy, r * 0.75, age * 9);
+        c.font = `900 ${Math.round(r * 1.25)}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
+        c.fillStyle = '#0b1020'; c.fillText('TOUCHLINE', cx - r * 1.05 + 2, cy + 2);
+        c.fillStyle = '#ffffff'; c.fillText('TOUCHLINE', cx - r * 1.05, cy);
+        c.restore();
+      }
+    }
+
+    /** Graba lo que pasa en el campo (20 veces por segundo, los últimos 9 s) para poder repetirlo. */
+    _record(dt) {
+      if (this.replay || !(dt > 0)) return;
+      this._recT = (this._recT || 0) + dt;
+      if (this._recT < 0.05) return;
+      this._recT = 0;
+      const R = this.rec || (this.rec = []), b = this.ball, a = {};
+      for (const id in this.A) { const p = this.A[id]; a[id] = [p.x, p.y, p.state, p.dive, p.fall, p.jump, p.held]; }
+      R.push({ t: this.t, b: [b.x, b.y, b.z, b.owner], a, r: [this.ref.x, this.ref.y] });
+      while (R.length && this.t - R[0].t > 9) R.shift();
+    }
+    /** Paso del guion: repetición a cámara lenta de la jugada (del gol), con cortinilla al entrar y al salir. */
+    _replayBeat() {
+      const SLOW = 0.6, LEN = 4;
+      return { d: LEN / SLOW + 0.5, start: () => {
+        const end = (this._goalT || this.t) + 0.9, from = end - LEN;
+        const frames = (this.rec || []).filter(f => f.t >= from && f.t <= end);
+        if (frames.length < 10) return;
+        this.wipe();
+        setTimeout(() => { this.replay = { frames, t: frames[0].t, slow: SLOW, end: frames[frames.length - 1].t }; }, 140);
+      }, end: () => { if (this.replay) { this.wipe(); setTimeout(() => { this.replay = null; }, 140); } } };
+    }
+    /** Pinta un fotograma de la repetición: coloca a todos donde estaban, dibuja y lo devuelve todo a su sitio. */
+    _drawReplay(dt, real) {
+      const R = this.replay;
+      R.t = Math.min(R.end, R.t + dt * R.slow);
+      // Por si el guion se detiene (pausa, salto): la repetición nunca se queda colgada
+      if (R.t >= R.end) { R.doneAt = R.doneAt || performance.now(); if (performance.now() - R.doneAt > 1500) { this.replay = null; this.wipe(); } }
+      const F = R.frames; let k = 0;
+      while (k < F.length - 2 && F[k + 1].t < R.t) k++;
+      const f0 = F[k], f1 = F[k + 1] || f0, u = f1.t > f0.t ? clamp((R.t - f0.t) / (f1.t - f0.t), 0, 1) : 0;
+      const b = this.ball, keepB = [b.x, b.y, b.z, b.owner, b.trail], keep = {};
+      b.x = lerp(f0.b[0], f1.b[0], u); b.y = lerp(f0.b[1], f1.b[1], u); b.z = lerp(f0.b[2], f1.b[2], u); b.owner = f0.b[3];
+      b.trail = (R.trail = (R.trail || []).concat([[b.x, b.y, b.z]]).slice(-7));
+      for (const id in this.A) {
+        const p = this.A[id], s0 = f0.a[id], s1 = f1.a[id] || s0;
+        keep[id] = [p.x, p.y, p.state, p.dive, p.fall, p.jump, p.held, p.vx, p.vy];
+        if (!s0) continue;
+        p.x = lerp(s0[0], s1[0], u); p.y = lerp(s0[1], s1[1], u); p.state = s0[2]; p.dive = s0[3]; p.fall = s0[4]; p.jump = s0[5]; p.held = s0[6];
+        p.vx = (s1[0] - s0[0]) * 20; p.vy = (s1[1] - s0[1]) * 20;
+      }
+      const rk = [this.ref.x, this.ref.y]; this.ref.x = lerp(f0.r[0], f1.r[0], u); this.ref.y = lerp(f0.r[1], f1.r[1], u);
+      this._draw(real);
+      [b.x, b.y, b.z, b.owner, b.trail] = keepB;
+      for (const id in keep) { const p = this.A[id], s = keep[id]; [p.x, p.y, p.state, p.dive, p.fall, p.jump, p.held, p.vx, p.vy] = s; }
+      [this.ref.x, this.ref.y] = rk;
+      // Rótulo de repetición, bandas de cine y un velo frío
+      const c = this.cx, W = this.w, H = this.h, bar = Math.round(H * 0.06);
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      c.fillStyle = 'rgb(20 30 60 / 0.12)'; c.fillRect(0, 0, W, H);
+      c.fillStyle = '#05070c'; c.fillRect(0, 0, W, bar); c.fillRect(0, H - bar, W, bar);
+      const fs = Math.max(11, Math.round(H * 0.045));
+      c.font = `900 ${fs}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
+      const label = 'REPETICIÓN', tw = c.measureText(label).width, x = 14, y = H - bar - fs * 0.9;
+      c.fillStyle = 'rgb(5 8 16 / 0.75)'; c.fillRect(x - 6, y - fs * 0.7, tw + fs * 1.6, fs * 1.4);
+      if (Math.floor(performance.now() / 450) % 2) { c.fillStyle = '#ff3b3b'; c.beginPath(); c.arc(x + 4, y, fs * 0.26, 0, 6.283); c.fill(); }
+      c.fillStyle = '#ffffff'; c.fillText(label, x + fs * 0.75, y);
     }
 
     /**
