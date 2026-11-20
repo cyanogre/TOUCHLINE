@@ -555,6 +555,12 @@
       } else { a.sx = a.tx; a.sy = a.ty; }
       // Pequeños ajustes cuando está casi en su sitio: nadie se queda clavado
       let gx = a.sx, gy = a.sy;
+      // El portero no abandona su zona: sin el balón en los pies, nunca más allá del borde del área (con un poco de margen)
+      if (a.kind === 'pl' && this.ball.owner !== a.pid && this.isGK(a)) {
+        const i = a.team, own = this.dir[i] > 0 ? 0 : L, dep = Math.abs(gx - own);
+        if (dep > 19) gx = own + Math.sign(gx - own || this.dir[i]) * 19;
+        gy = clamp(gy, Wd / 2 - 21, Wd / 2 + 21);
+      }
       if (a.kind === 'pl') {
         if (Math.random() < dt * 0.7) { a.jx = U.rand(-0.9, 0.9); a.jy = U.rand(-0.9, 0.9); }
         if (Math.hypot(gx - a.x, gy - a.y) < 2.5) { gx += a.jx; gy += a.jy; }
@@ -1270,6 +1276,24 @@
             this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 };
             if (e.type === 'goal') this._reveal(e);
           } });
+        } else if (outcome === 'save' && (!gk || Math.hypot(gk.x - (gx - dir * 1.0), gk.y - Wd / 2) > 9)) {
+          // El portero no llega (está lejos de su portería): el balón no puede quedarse parado delante de la red vacía.
+          // Lo saca un defensa bajo palos si hay alguno cerca; si no, el remate se marcha fuera.
+          this._gkFar = true;
+          const ty = Wd / 2 + side * U.rand(0.5, GW / 2 - 0.6);
+          const def = this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), { x: gx - dir * 1.2, y: ty });
+          if (def && Math.hypot(def.x - gx, def.y - ty) < 12) {
+            def.state = 'slide'; def.until = this.t + 0.8;
+            this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {};
+            this.ov.p[def.pid] = { x: gx - dir * 0.8, y: ty, run: 1 };
+            this._kick(gx - dir * 0.9, ty, { fz, tz: air ? 0.8 : 0.4, h: 0.3, T, done: () => {
+              this._kick(gx - dir * U.rand(4, 10), Math.random() < 0.5 ? -1 : Wd + 1, { free: true, h: 2.2, T: 0.8 });
+              this._reveal(e);
+            } });
+          } else {
+            const wy = Wd / 2 + side * U.rand(GW / 2 + 0.6, GW / 2 + 3);
+            this._kick(gx + dir * 2.5, wy, { fz, tz: U.rand(0.3, 2.8), h: 0.5, T: T * 1.1, done: () => { this._reveal(e); } });
+          }
         } else if (outcome === 'save') {
           const ty = Wd / 2 + side * U.rand(0.5, GW / 2 - 0.4);
           if (gk) {
@@ -1317,6 +1341,7 @@
           const big = e.big || type === 'header' || epic;
           if (big) this._banner('¡PARADÓN!', '#5db8ff', 1.3, true);
           if (!this.instant && TL.SFX) { TL.SFX.chance(); if (big) TL.SFX.save(); }
+          if (this._gkFar) { this._gkFar = false; return; }   // ya lo resolvió el defensa o se fue fuera
           const catchIt = Math.random() < 0.5;
           if (gk && catchIt) { this._receive(gk.pid); this.ball.z = 0.5; }
           else {
