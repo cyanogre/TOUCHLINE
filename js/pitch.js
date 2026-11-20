@@ -2172,8 +2172,8 @@
       const fast = b.trail.length > 3 && Math.hypot(b.trail[b.trail.length - 1][0] - b.trail[0][0], b.trail[b.trail.length - 1][1] - b.trail[0][1]) > 2.2;
       const BI = TL.Balls ? TL.Balls.selected() : 0, fx = TL.Balls ? TL.Balls.fx(BI) : 'estela', bc = TL.Balls ? TL.Balls.color(BI) : '#ffffff';
       const bx = X(b.x), by = Y(b.y) - b.z * s * 0.9;
-      if (fast || fx === 'fantasma' || fx === 'vacio') this._ballFx(fx, bc, br, X, Y, s, fast);
-      if (fx !== 'estela') this._ballParts(fx, X, Y, s, br);
+      this._ballFx(fx, bc, br, X, Y, s, fast);
+      if (fx !== 'estela') this._ballParts(fx, X, Y, s, br, bc);
       // El balón gira según lo que rueda
       const last = this._bl || [b.x, b.y]; this.ballRot = (this.ballRot || 0) + Math.hypot(b.x - last[0], b.y - last[1]) / 0.11 * (b.x >= last[0] ? 1 : -1) * 0.15; this._bl = [b.x, b.y];
       c.globalAlpha = fx === 'fantasma' ? 0.75 : 1;
@@ -3151,32 +3151,26 @@
       const c = this.cx, b = this.ball, T = b.trail, t = this.t;
       const P = k => [X(T[k][0]), Y(T[k][1]) - T[k][2] * s * 0.9];
       const line = (stroke, w) => { c.beginPath(); T.forEach((_, k) => { const [x, y] = P(k); k ? c.lineTo(x, y) : c.moveTo(x, y); }); c.strokeStyle = stroke; c.lineWidth = w; c.lineCap = 'round'; c.stroke(); c.lineCap = 'butt'; };
-      if (fx === 'vacio' || fx === 'fantasma') {
-        const [x, y] = [X(b.x), Y(b.y) - b.z * s * 0.9];
-        const g = c.createRadialGradient(x, y, 0, x, y, br * 3);
-        g.addColorStop(0, fx === 'vacio' ? 'rgb(120 40 200 / 0.55)' : 'rgb(230 240 255 / 0.35)'); g.addColorStop(1, 'rgb(0 0 0 / 0)');
-        c.fillStyle = g; c.beginPath(); c.arc(x, y, br * 3, 0, 6.283); c.fill();
-        if (!fast) return;
-      }
+      const [h, sat] = ballHsl(col), hs = (l, a) => `hsl(${h} ${sat < 12 ? 0 : Math.max(55, sat)}% ${l}% / ${a})`;
+      // Balón normal: estela blanca si es el clásico (blanco y negro); de su color si el balón tiene color
+      if (fx === 'estela') { if (fast) line(sat < 22 ? 'rgb(255 255 255 / 0.42)' : hs(62, 0.5), br); return; }
+      // Aura del color del balón que late, más intensa cuanto más rápido va
+      const [x, y] = [X(b.x), Y(b.y) - b.z * s * 0.9], pulse = 1 + Math.sin(t * 6) * 0.12;
+      const g = c.createRadialGradient(x, y, br * 0.6, x, y, br * 3.2 * pulse);
+      g.addColorStop(0, fx === 'vacio' ? hs(18, 0.7) : hs(66, fast ? 0.55 : 0.38)); g.addColorStop(1, hs(50, 0));
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, br * 3.2 * pulse, 0, 6.283); c.fill();
+      if (!fast) return;
       if (fx === 'arcoiris') {
         for (let k = 1; k < T.length; k++) { const [x0, y0] = P(k - 1), [x1, y1] = P(k); c.strokeStyle = `hsl(${(k * 50 + t * 300) % 360} 90% 60% / 0.8)`; c.lineWidth = br * (0.5 + k / T.length); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
-      } else if (fx === 'fuego') {
-        line('rgb(255 120 20 / 0.55)', br * 1.6); line('rgb(255 220 80 / 0.7)', br * 0.7);
-        for (let k = 0; k < 4; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = Math.random() < 0.5 ? '#ffb020' : '#ff5a1a'; c.fillRect(x + (Math.random() - 0.5) * br * 2, y - Math.random() * br * 2, 2, 2); }
-      } else if (fx === 'hielo') {
-        line('rgb(160 225 255 / 0.55)', br * 1.3);
-        for (let k = 0; k < 3; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = '#ffffff'; c.fillRect(x + (Math.random() - 0.5) * br * 2.5, y + (Math.random() - 0.5) * br * 2.5, 2, 2); }
-      } else if (fx === 'rayo') {
+      } else if (fx === 'fuego') { line(hs(50, 0.55), br * 1.6); line(hs(80, 0.7), br * 0.7); }
+      else if (fx === 'hielo') line(hs(80, 0.55), br * 1.3);
+      else if (fx === 'rayo') {
         c.beginPath(); T.forEach((_, k) => { const [x, y] = P(k); const j = k ? (Math.random() - 0.5) * br * 1.6 : 0; k ? c.lineTo(x + j, y + j) : c.moveTo(x, y); });
-        c.strokeStyle = 'rgb(255 245 120 / 0.9)'; c.lineWidth = 2; c.stroke(); line('rgb(120 180 255 / 0.3)', br * 1.2);
-      } else if (fx === 'galaxia') {
-        line('rgb(110 60 200 / 0.5)', br * 1.4);
-        for (let k = 0; k < 4; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = ['#ffffff', '#ffd6ff', '#9ad8ff'][k % 3]; c.fillRect(x + (Math.random() - 0.5) * br * 2.4, y + (Math.random() - 0.5) * br * 2.4, 1.5, 1.5); }
-      } else if (fx === 'toxico') {
-        line('rgb(120 230 60 / 0.55)', br * 1.3);
-        const [x, y] = P(0); c.fillStyle = 'rgb(140 240 70 / 0.8)'; c.beginPath(); c.arc(x, y + br, br * 0.35, 0, 6.283); c.fill();
-      } else if (fx === 'fantasma') line('rgb(235 245 255 / 0.25)', br * 2);
-      else { const [r, g, bl] = [1, 3, 5].map(k => parseInt(col.slice(k, k + 2), 16)); line(`rgb(${r} ${g} ${bl} / 0.45)`, br); }
+        c.strokeStyle = hs(85, 0.95); c.lineWidth = 2; c.stroke(); line(hs(60, 0.3), br * 1.2);
+      } else if (fx === 'galaxia') line(hs(45, 0.5), br * 1.4);
+      else if (fx === 'toxico') line(hs(55, 0.55), br * 1.3);
+      else if (fx === 'fantasma') line(hs(92, 0.25), br * 2);
+      else if (fx === 'vacio') line(hs(20, 0.5), br * 1.4);
     }
 
     /**
@@ -3184,7 +3178,8 @@
      * balón y estallan en un chut fuerte. Cada efecto tiene su física: el fuego sube y se apaga, el hielo cae
      * y brilla, el rayo chisporrotea, la galaxia deja estrellas que orbitan, el tóxico burbujea…
      */
-    _ballParts(fx, X, Y, s, br) {
+    _ballParts(fx, X, Y, s, br, bc) {
+      this._bpHsl = ballHsl(bc);
       const b = this.ball, t = this.t, dt = Math.min(0.05, Math.max(0, t - (this._bpT || t))); this._bpT = t;
       const P = this.bparts || (this.bparts = []);
       const lx = this._bpL || [b.x, b.y, b.z]; this._bpL = [b.x, b.y, b.z];
@@ -3192,7 +3187,7 @@
       // Chut fuerte: estallido
       const kick = sp > 14 && (this._bpSp || 0) < 8; this._bpSp = sp;
       const rate = (kick ? 70 : 0) + Math.min(90, sp * 4.5) + 6;   // partículas por segundo (algunas también quieto)
-      let n = rate * dt; while (n > 0 && P.length < 260) { if (Math.random() < n) P.push(this._bpNew(fx, b, vx, vy, kick)); n--; }
+      let n = rate * dt; while (n > 0 && P.length < 260) { if (Math.random() < n) P.push(this._bpNew(fx, b, vx, vy, kick, this._bpHsl)); n--; }
       const c = this.cx, S = Math.max(2, s * 0.2);
       for (let i = P.length - 1; i >= 0; i--) {
         const q = P[i]; q.a += dt;
@@ -3208,18 +3203,20 @@
       }
       c.globalAlpha = 1;
     }
-    _bpNew(fx, b, vx, vy, kick) {
+    _bpNew(fx, b, vx, vy, kick, H) {
+      // H: tono del balón. Cada efecto conserva su forma de moverse, pero con los colores de su balón
+      const [h, sat] = H || [30, 90], hs = (l, a) => `hsl(${h} ${sat < 12 ? 0 : Math.max(55, sat)}% ${l}%${a != null ? ' / ' + a : ''})`;
       const R = (a, z) => a + Math.random() * (z - a), ang = Math.random() * 6.283, burst = kick ? R(2, 6) : R(0.2, 1.2);
       const q = { x: b.x + R(-0.25, 0.25), y: b.y + R(-0.25, 0.25), z: b.z + R(0, 0.3), vx: -vx * 0.08 + Math.cos(ang) * burst, vy: -vy * 0.08 + Math.sin(ang) * burst, vz: R(0, 1), g: 0, a: 0, life: R(0.4, 0.9), sz: R(1, 2), col: '#fff' };
       switch (fx) {
-        case 'fuego': q.vz = R(1.5, 3.5); q.g = -0.5; q.life = R(0.35, 0.7); q.col = k => k > 0.6 ? '#fff2a8' : k > 0.3 ? '#ffb020' : '#ff4a12'; break;
-        case 'hielo': q.vz = R(-0.2, 0.6); q.g = 2.5; q.life = R(0.6, 1.2); q.col = Math.random() < 0.4 ? '#ffffff' : '#a8e4ff'; break;
-        case 'rayo': q.vx *= 2.5; q.vy *= 2.5; q.life = R(0.12, 0.3); q.col = Math.random() < 0.5 ? '#fff9a8' : '#8fc8ff'; q.sz = R(1, 1.6); break;
-        case 'galaxia': q.cx = b.x; q.cy = b.y; q.r = R(0.4, 1.4); q.ang = ang; q.z = b.z + R(0, 0.5); q.life = R(0.8, 1.6); q.col = ['#ffffff', '#ffd6ff', '#9ad8ff', '#c9a4ff'][Math.floor(Math.random() * 4)]; q.sz = R(0.8, 1.5); break;
+        case 'fuego': q.vz = R(1.5, 3.5); q.g = -0.5; q.life = R(0.35, 0.7); q.col = k => k > 0.6 ? hs(88) : k > 0.3 ? hs(60) : hs(42); break;
+        case 'hielo': q.vz = R(-0.2, 0.6); q.g = 2.5; q.life = R(0.6, 1.2); q.col = Math.random() < 0.4 ? '#ffffff' : hs(78); break;
+        case 'rayo': q.vx *= 2.5; q.vy *= 2.5; q.life = R(0.12, 0.3); q.col = Math.random() < 0.5 ? '#ffffff' : hs(70); q.sz = R(1, 1.6); break;
+        case 'galaxia': q.cx = b.x; q.cy = b.y; q.r = R(0.4, 1.4); q.ang = ang; q.z = b.z + R(0, 0.5); q.life = R(0.8, 1.6); q.col = ['#ffffff', hs(82), hs(70), hs(58)][Math.floor(Math.random() * 4)]; q.sz = R(0.8, 1.5); break;
         case 'arcoiris': { const h = Math.floor((this.t * 240 + Math.random() * 60) % 360); q.col = `hsl(${h} 95% 62%)`; q.life = R(0.5, 1); q.g = 1.2; q.vz = R(0.5, 2); break; }
-        case 'fantasma': q.vz = R(0.3, 1); q.g = -0.2; q.life = R(0.8, 1.4); q.col = 'rgb(235 245 255 / 0.6)'; q.sz = R(1.5, 2.5); q.vx *= 0.4; q.vy *= 0.4; break;
-        case 'toxico': q.vz = R(0.4, 1.4); q.g = -0.3; q.life = R(0.6, 1.2); q.col = Math.random() < 0.5 ? '#8cf046' : '#c8ff6a'; break;
-        case 'vacio': { const r = R(1.2, 2.2); q.x = b.x + Math.cos(ang) * r; q.y = b.y + Math.sin(ang) * r * 0.6; q.vx = (b.x - q.x) * 2.2; q.vy = (b.y - q.y) * 2.2; q.life = 0.45; q.col = Math.random() < 0.5 ? '#7a2ad0' : '#1a0830'; break; }
+        case 'fantasma': q.vz = R(0.3, 1); q.g = -0.2; q.life = R(0.8, 1.4); q.col = hs(90, 0.6); q.sz = R(1.5, 2.5); q.vx *= 0.4; q.vy *= 0.4; break;
+        case 'toxico': q.vz = R(0.4, 1.4); q.g = -0.3; q.life = R(0.6, 1.2); q.col = Math.random() < 0.5 ? hs(55) : hs(75); break;
+        case 'vacio': { const r = R(1.2, 2.2); q.x = b.x + Math.cos(ang) * r; q.y = b.y + Math.sin(ang) * r * 0.6; q.vx = (b.x - q.x) * 2.2; q.vy = (b.y - q.y) * 2.2; q.life = 0.45; q.col = Math.random() < 0.5 ? hs(45) : hs(12); break; }
         default: break;
       }
       return q;
@@ -3405,6 +3402,18 @@
         if (st) { c.fillStyle = '#f2d2b6'; c.fillRect(x - r * 1.5, y - r * 0.2, r * 0.6, r * 0.4); c.fillRect(x + r * 0.9, y - r * 0.2, r * 0.6, r * 0.4); }   // brazos estirando
       }
     }
+  }
+
+  /** Tono y saturación de un color '#rrggbb' → [h, s] (para teñir estelas, auras y partículas del balón). */
+  function ballHsl(hex) {
+    if (!hex || hex[0] !== '#') return [0, 0];
+    const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+    if (!d) return [0, 0];
+    const sat = d / (1 - Math.abs(2 * l - 1));
+    let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h = Math.round(h * 60); if (h < 0) h += 360;
+    return [h, Math.round(sat * 100)];
   }
 
   /** '#rrggbb' + transparencia → rgba(). */
