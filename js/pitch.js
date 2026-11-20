@@ -166,6 +166,17 @@
         // Sin equipación conocida: el color dominante del escudo
         if (club.logo && !this.kitSrc[i].known) crestColor(club.logo, col => { this.kitSrc[i].home = kit([col, col]); this.colors = this._colors(); });
       }
+      const gest = e => {
+        const r = this.cv.getBoundingClientRect(), g = this.tilt || (this.tilt = { x: 0, y: 0, tx: 0, ty: 0 });
+        if (this.cv.closest('.mini')) { g.tx = g.ty = 0; return; }
+        g.tx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - 0.5) * 2));
+        g.ty = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - 0.5) * 2));
+      };
+      this.cv.addEventListener('pointermove', gest);
+      this.cv.addEventListener('pointerdown', gest);
+      this.cv.addEventListener('pointerleave', () => { if (this.tilt) this.tilt.tx = this.tilt.ty = 0; });
+      this.cv.addEventListener('pointerup', e => { if (e.pointerType === 'touch' && this.tilt) this.tilt.tx = this.tilt.ty = 0; });
+      this.cv.style.touchAction = 'pan-y';
       this._resize = () => this.resize();
       window.addEventListener('resize', this._resize);
       this.resize();
@@ -249,7 +260,8 @@
         pattern: patterns[h % patterns.length], grass: grass[(h >>> 5) % grass.length],
         seat: home.c1 || '#2fbf71', seat2: home.c2 || '#ffffff', away: (this.colors && this.colors[1].main) || away.c1 || '#ffffff',
         code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
-        night: (this.S.week * 7 + home.id) % 3 === 0
+        night: (this.S.week * 7 + home.id) % 3 === 0,
+        time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia'
       };
     }
 
@@ -2018,37 +2030,10 @@
      * rectángulo del campo encaja con los metros del 2D. Se activa con ?campo=arte (y se recuerda).
      */
     _artCv() {
-      if (!ART.on) return null;
-      if (this._art) return this._art;
-      if (!ART.img) { ART.img = new Image(); ART.img.src = 'assets/estadio/color.jpg'; }
-      if (!ART.img.complete || !ART.img.naturalWidth) return null;
-      const k = 12, Wv = VIEW.x1 - VIEW.x0, Hv = VIEW.y1 - VIEW.y0;
-      const cv = document.createElement('canvas'); cv.width = Wv * k; cv.height = Hv * k;
-      const g = cv.getContext('2d'), im = ART.img;
-      const sx = im.naturalWidth / 2000, sy = im.naturalHeight / 1116;
-      // Esquinas del campo en la imagen (ar-izq, ar-der, ab-izq, ab-der)
-      const C = [[362, 188], [1636, 188], [292, 951], [1709, 951]].map(([x, y]) => [x * sx, y * sy]);
-      const src = (wx, wy) => { const u = wx / L, v = wy / Wd; const top = [lerp(C[0][0], C[1][0], u), lerp(C[0][1], C[1][1], u)], bot = [lerp(C[2][0], C[3][0], u), lerp(C[2][1], C[3][1], u)]; return [lerp(top[0], bot[0], v), lerp(top[1], bot[1], v)]; };
-      const N = 48, M = 36;
-      const tri = (s0, s1, s2, d0, d1, d2) => {
-        g.save(); g.beginPath(); g.moveTo(d0[0], d0[1]); g.lineTo(d1[0], d1[1]); g.lineTo(d2[0], d2[1]); g.closePath(); g.clip();
-        const den = (s1[0] - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (s1[1] - s0[1]);
-        const a = ((d1[0] - d0[0]) * (s2[1] - s0[1]) - (d2[0] - d0[0]) * (s1[1] - s0[1])) / den;
-        const bb = ((d1[1] - d0[1]) * (s2[1] - s0[1]) - (d2[1] - d0[1]) * (s1[1] - s0[1])) / den;
-        const cc = ((d2[0] - d0[0]) * (s1[0] - s0[0]) - (d1[0] - d0[0]) * (s2[0] - s0[0])) / den;
-        const dd = ((d2[1] - d0[1]) * (s1[0] - s0[0]) - (d1[1] - d0[1]) * (s2[0] - s0[0])) / den;
-        g.setTransform(a, bb, cc, dd, d0[0] - a * s0[0] - cc * s0[1], d0[1] - bb * s0[0] - dd * s0[1]);
-        g.drawImage(im, 0, 0); g.restore();
-      };
-      for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
-        const w0 = VIEW.x0 + Wv * i / N, w1 = VIEW.x0 + Wv * (i + 1) / N, h0 = VIEW.y0 + Hv * j / M, h1 = VIEW.y0 + Hv * (j + 1) / M;
-        const D = (wx, wy) => [(wx - VIEW.x0) * k, (wy - VIEW.y0) * k];
-        // un pelín más grandes para que no se vean las juntas
-        const e = 0.02;
-        tri(src(w0, h0), src(w1, h0), src(w0, h1), D(w0 - e, h0 - e), D(w1 + e, h0 - e), D(w0 - e, h1 + e));
-        tri(src(w1, h0), src(w1, h1), src(w0, h1), D(w1 + e, h0 - e), D(w1 + e, h1 + e), D(w0 - e, h1 + e));
-      }
-      return (this._art = cv);
+      if (!ART.on || !TL.StadiumGL) return null;
+      const g = this.tilt || (this.tilt = { x: 0, y: 0, tx: 0, ty: 0 });
+      g.x += (g.tx - g.x) * 0.08; g.y += (g.ty - g.y) * 0.08;
+      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time });
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
