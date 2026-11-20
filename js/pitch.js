@@ -2581,9 +2581,9 @@
       const c = this.cx, X = this.X, Y = this.Y, s = this.s, b = this.ball;
       const bx = X(b.x), by = Y(b.y), R = Math.max(this.w, this.h);
       const gr = c.createRadialGradient(bx, by, 22 * s * 0.4, bx, by, 45 * s);
-      gr.addColorStop(0, 'rgb(205 212 218 / 0.08)'); gr.addColorStop(1, 'rgb(205 212 218 / 0.62)');
+      gr.addColorStop(0, 'rgb(205 212 218 / 0.03)'); gr.addColorStop(1, 'rgb(205 212 218 / 0.32)');
       c.fillStyle = gr; c.fillRect(0, 0, this.w, this.h);
-      const cv = this._blobCv('_fogCv', [222, 228, 232], 0.3, 0.9, 0.55, 7);
+      const cv = this._blobCv('_fogCv', [222, 228, 232], 0.3, 0.9, 0.3, 7);
       c.save(); c.imageSmoothingEnabled = true;
       [[0.9, 0, 1], [1.7, 37, 0.7]].forEach(([sp, sh, a]) => {
         const span = 200, off = (this.t * sp + sh) % span; c.globalAlpha = a;
