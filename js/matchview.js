@@ -48,6 +48,7 @@
         <div class="live-call" id="mv-live"><span class="lc-t">Los equipos saltan al campo.</span></div>
         <i class="pip-grip" aria-hidden="true"></i>
         <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
+        <button class="crt-btn" data-act="mv-crt" aria-label="Filtro CRT" title="Filtro de tele antigua (CRT)">📺</button>
         <button class="cam-btn" data-act="mv-cam" aria-label="Cámara" title="Cámara: campo entero, TV o cerca"><span id="mv-cam-l">Cámara</span></button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
       <div class="mtabs"><div class="seg" id="mv-tabs">
@@ -66,6 +67,7 @@
     MV.pitch.zoom = settings().zoom || 1;
     MV.pitch.onZoom = z => { settings().zoom = z; camLabel(); };
     setTimeout(camLabel, 0);
+    root.classList.toggle('crt', !!settings().crt);
     clearInterval(MV.ballTimer);
     MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
@@ -632,6 +634,7 @@
     const nx = CAMS[k < 0 ? 0 : k];
     MV.pitch.setZoom(nx[0]); UI.toast(nx[1]);
   };
+  A['mv-crt'] = () => { if (MV.pipDragged) return; settings().crt = !settings().crt; el('match').classList.toggle('crt', settings().crt); G.save(); };
   A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
   A['mv-pip-size'] = () => {
     if (MV.pipDragged) return;
