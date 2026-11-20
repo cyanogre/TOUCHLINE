@@ -753,7 +753,7 @@
     _placeBall(x, y, maxT, to, team) {
       const b = this.ball;
       if (this.instant || Math.hypot(x - b.x, y - b.y) < 1) {
-        b.path = null; b.roll = null; b.x = x; b.y = y; b.z = 0; b.owner = to != null && this.A[to] ? to : null;
+        b.path = null; b.roll = null; b.x = x; b.y = y; b.z = 0; b.owner = to != null && this.A[to] ? to : null; b.trail = []; this._recCut = true;
         return;
       }
       const tk = to != null && this.A[to] ? this.A[to] : null;
@@ -788,6 +788,7 @@
       if (inStands) { old.crowd = true; old.t = this.t; this.boys.push(giver); }
       else this.boys.push(giver, actor('boy', bx + (bx < 0 ? -1.5 : bx > L ? 1.5 : 3), by + (by < 0 ? -1 : by > Wd ? 1 : 0), { until: this.t + 7, fetch: old }));
       b.owner = null; b.roll = null; b.x = bx; b.y = by; b.z = 1.2;
+      b.trail = []; this._bpL = null; this._bl = null; this._recCut = true;
       const d = Math.hypot(x - bx, y - by);
       b.path = { fx: bx, fy: by, fz: 1.2, tx: x, ty: y, tz: 0, h: Math.min(2.2, 0.6 + d * 0.06), T: clamp(d / 14, 0.45, 1.1), t: 0, to: null, curve: 0, nx: 0, ny: 0 };
     }
@@ -808,7 +809,7 @@
     _placeStep() {
       const P = this.place, b = this.ball;
       const done = () => {
-        b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0;
+        b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; b.trail = []; this._recCut = true;
         b.owner = P.to != null && this.A[P.to] ? P.to : null;
         this.place = null;
       };
@@ -937,6 +938,7 @@
       const mv = a => { a.x = lerp(a.x, a.tx, k); a.y = lerp(a.y, a.ty, k); a.vx = a.vy = 0; };
       for (const id in this.A) mv(this.A[id]);
       mv(this.ref); this.ars.forEach(mv);
+      this._recCut = true; this.ball.trail = []; this._bpL = null; this._bl = null;
       // En vez del destello: cortinilla de tele y un rótulo que explica a qué jugada vamos
       if (this.instant) this.cutAt = this.t; else { this.cutAt = null; this.wipe(cap); }
     }
@@ -2933,7 +2935,7 @@
       this._recT = 0;
       const R = this.rec || (this.rec = []), b = this.ball, a = {};
       for (const id in this.A) { const p = this.A[id]; a[id] = [p.x, p.y, p.state, p.dive, p.fall, p.jump, p.held]; }
-      R.push({ t: this.t, b: [b.x, b.y, b.z, b.owner], a, r: [this.ref.x, this.ref.y] });
+      R.push({ t: this.t, b: [b.x, b.y, b.z, b.owner], a, r: [this.ref.x, this.ref.y], cut: !!this._recCut }); this._recCut = false;
       while (R.length && this.t - R[0].t > 9) R.shift();
     }
     /** Paso del guion: repetición a cámara lenta de la jugada (del gol), con cortinilla al entrar y al salir. */
@@ -2947,11 +2949,19 @@
       const SLOW = o.slow || 0.6, BEFORE = o.before != null ? o.before : 3.1, AFTER = o.after != null ? o.after : 0.9, FRZ = o.freeze || 0;
       return { d: (BEFORE + AFTER) / SLOW + FRZ + 0.5, start: () => {
         const mark = (o.mark ? o.mark() : this._goalT) || this.t, end = mark + AFTER, from = mark - BEFORE;
-        const frames = (this.rec || []).filter(f => f.t >= from && f.t <= end);
+        let frames = (this.rec || []).filter(f => f.t >= from && f.t <= end);
+        // Sin saltos dentro de la repetición: empieza después del último corte anterior a la jugada y acaba antes del siguiente
+        const mi = frames.findIndex(f => f.t >= mark);
+        if (mi >= 0) {
+          let a = 0, z = frames.length;
+          for (let k = mi; k > 0; k--) if (frames[k].cut) { a = k; break; }
+          for (let k = mi + 1; k < frames.length; k++) if (frames[k].cut) { z = k; break; }
+          frames = frames.slice(a, z);
+        }
         if (frames.length < 10) return;
         this.wipe();
         setTimeout(() => { this.replay = { frames, t: frames[0].t, slow: SLOW, end: frames[frames.length - 1].t, mark, freeze: FRZ, an: o.an || null }; }, 140);
-      }, end: () => { if (this.replay) { this.wipe(); setTimeout(() => { this.replay = null; }, 140); } } };
+      }, end: () => { if (this.replay) { this.wipe(); setTimeout(() => { this.replay = null; this._snapAll(); }, 140); } } };
     }
     /** Análisis encima de la repetición (con los jugadores ya colocados en el fotograma). */
     _replayAnalysis(R, frozen) {
@@ -2986,6 +2996,14 @@
         if (frozen) tag(A.card === 'red' ? 'ENTRADA · ROJA' : A.card ? 'ENTRADA · AMARILLA' : 'FALTA', A.card === 'red' ? '#ff3b3b' : '#ffd23f');
       }
       c.restore();
+    }
+    /** Coloca a todos en su sitio de golpe (solo bajo una cortinilla, para que no se vea). */
+    _snapAll() {
+      this._targets(); this._officials();
+      const mv = a => { if (a.tx != null) { a.x = a.tx; a.y = a.ty; } a.vx = a.vy = 0; a.sx = a.tx; a.sy = a.ty; };
+      for (const id in this.A) mv(this.A[id]);
+      mv(this.ref); this.ars.forEach(mv);
+      this.ball.trail = []; this._bpL = null; this._bl = null; this._recCut = true;
     }
     /** Pinta un fotograma de la repetición: coloca a todos donde estaban, dibuja y lo devuelve todo a su sitio. */
     _drawReplay(dt, real) {
