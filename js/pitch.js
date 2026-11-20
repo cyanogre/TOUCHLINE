@@ -573,6 +573,12 @@
     }
     _separate() {
       const all = Object.values(this.A);
+      // Nadie atraviesa la portería: ni la red de atrás ni los laterales
+      for (const a of all) {
+        const dy = Math.abs(a.y - Wd / 2);
+        if (dy < GW / 2 + 0.6) { if (a.x < 0.3) a.x = 0.3; if (a.x > L - 0.3) a.x = L - 0.3; }
+        else if (dy < GW / 2 + 1.2 && (a.x < 0 || a.x > L)) a.y = Wd / 2 + Math.sign(a.y - Wd / 2) * (GW / 2 + 1.2);
+      }
       for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
         const a = all[i], b = all[j];
         const dx = b.x - a.x, dy = b.y - a.y, dd = dx * dx + dy * dy;
