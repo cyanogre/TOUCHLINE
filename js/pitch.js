@@ -105,7 +105,7 @@
   // Estadio dibujado (prueba): ?campo=arte lo activa, ?campo=no lo quita
   const ART = { on: false, img: null };
   // Lo que cubre el estadio dibujado (campo, gradas y público): la cámara puede ir hasta ahí
-  const ART_VIEW = { x0: -28, x1: 133, y0: -17, y1: 83 };
+  const ART_VIEW = { x0: -21, x1: 126, y0: -16.5, y1: 82.5 };
   try {
     const q = new URLSearchParams(location.search).get('campo');
     if (q) localStorage.setItem('touchline.campo', q === 'arte' ? '1' : '0');
@@ -233,7 +233,7 @@
 
     /** Zoom de la cámara (1 = campo entero; más, sigue el balón). */
     setZoom(z) {
-      this.zoom = clamp(z, ART.on ? 0.7 : 1, 3);
+      this.zoom = clamp(z, ART.on ? 0.8 : 1, 3);
       if (this.onZoom) this.onZoom(this.zoom);
     }
 
