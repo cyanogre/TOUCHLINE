@@ -2800,15 +2800,15 @@
       if (st === this._wipeSty) st = STY[(STY.indexOf(st) + 1) % STY.length];
       this._wipeSty = st;
       this.wipeAt = performance.now(); this.wipeCap = cap || null; this.wipeSeed = Math.random();
-      // Sonido: barrido + voz «¡TOUCHLINE!» pueden sonar juntos, pero nunca se apila otra cortinilla encima
-      // mientras sigue sonando la anterior (ni otro barrido ni otra voz)
-      const now = performance.now();
-      if (TL.SFX && !this.instant && !(this._wipeSndUntil > now)) {
-        const big = cap == null || /Saque de centro|Penalti/.test(cap), voice = big || Math.random() < 0.3;
-        this._wipeSndUntil = now + (voice ? 2600 : 1600);
+      // Sonido: el barrido suena en cada cortinilla y se mezcla con la voz «¡TOUCHLINE!»; lo que no se hace
+      // es pisar una voz con otra: si aún suena la anterior (≈1,6 s), esta cortinilla va sin voz
+      if (TL.SFX && !this.instant) {
         if (TL.SFX.rec) TL.SFX.rec('cortinilla', TL.SFX.swoosh);
-        // La voz entra cuando sale el logo (si hay grabaciones en assets/sfx/cortinilla-voz)
-        if (voice && TL.SFX.sample) setTimeout(() => TL.SFX.sample('cortinilla-voz', { maxWait: 400 }), 150);
+        const now = performance.now(), big = cap == null || /Saque de centro|Penalti/.test(cap);
+        if (TL.SFX.sample && (big || Math.random() < 0.3) && !(this._voiceUntil > now)) {
+          this._voiceUntil = now + 150 + 1600;
+          setTimeout(() => TL.SFX.sample('cortinilla-voz', { maxWait: 400 }), 150);
+        }
       }
     }
     _wipeFx() {
