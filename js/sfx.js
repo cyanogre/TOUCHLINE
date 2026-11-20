@@ -271,7 +271,7 @@
     gol: 1, 'gol-rival': 0.7, ocasion: 0.75, palo: 0.8, parada: 0.75, chut: 0.55, red: 0.6, pitido: 0.55, 'pitido-final': 0.6,
     tarjeta: 0.6, abucheo: 0.7, lamento: 0.7, aplausos: 0.75, silbidos: 0.6, ovacion: 0.95, canticos: 0.7, ambiente: 0.35,
     boton: 0.35, atras: 0.35, seleccion: 0.3, exito: 0.55, error: 0.45, dinero: 0.55, nivel: 0.6, fichaje: 0.65, titulo: 1,
-    'limit-break': 1, evento: 0.75, alma: 0.8
+    'limit-break': 1, evento: 0.75, alma: 0.8, cortinilla: 0.6
   };
   // Lo que puede sonar en la portada y los menús va primero
   const FIRST = ['aplausos', 'boton', 'seleccion', 'atras', 'exito', 'error', 'dinero', 'fichaje', 'nivel', 'evento', 'alma'];
@@ -450,6 +450,7 @@
       osc.connect(bp); osc2.connect(bp); bp.connect(g); g.connect(master);
       osc.start(t); osc2.start(t); osc.stop(t + dur + 0.03); osc2.stop(t + dur + 0.03);
     },
+    swoosh() { const r = burst(0.45, 'bandpass', 900, 0.14, 0.45); if (r) r.f.frequency.linearRampToValueAtTime(4200, r.t + 0.35); tone(320, 0.12, 'triangle', 0.05, 880, 0.18); },
     kick() { burst(0.07, 'lowpass', 260, 0.35, 0.7); tone(110, 0.08, 'sine', 0.2, 60); },
     net() { burst(0.25, 'bandpass', 1800, 0.12, 0.6); },
     post() { tone(1850, 0.35, 'triangle', 0.16, 1700); tone(2770, 0.25, 'sine', 0.08); burst(0.03, 'highpass', 5000, 0.2); },

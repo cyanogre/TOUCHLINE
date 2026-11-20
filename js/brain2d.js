@@ -1175,6 +1175,9 @@
     /** No ha dado tiempo: corte de realización al momento de la jugada (destello, como en la tele). */
     _agCut(ag) {
       const P = this.P, e = ag.e, i = ag.team, side = Math.random() < 0.5 ? -1 : 1;
+      // Rótulo de la cortinilla: a qué jugada saltamos
+      const club = P.clubName(i), who = P.pName(e.pid);
+      P._cap = { shot: `Ocasión del ${club}`, box: `${club} pisa el área`, fk: `Falta a favor del ${club}`, corner: `Ataque del ${club}`, off: `${club} busca la espalda`, foul: who ? `Falta de ${who}` : `Falta del ${club}` }[ag.kind] || null;
       const want = ag.want.map(pid => P.A[pid]).find(a => a && !P.isGK(a));
       switch (ag.kind) {
         case 'shot': {
