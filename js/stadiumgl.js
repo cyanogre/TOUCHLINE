@@ -54,57 +54,36 @@ uniform vec3 sun;        // dirección de la luz
 uniform float t, night, aspect;
 uniform vec3 tint;
 uniform float wet, snow, heat, cover;
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
-  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
-float fbm(vec2 p){ float v=0., a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.03; a*=.5; } return v; }
 void main(){
-  // Paralaje: lo alto se desplaza más con el gesto (sensación de volumen)
-  float h0 = texture2D(tH, uv).r;
-  vec2 par = tilt * vec2(0.012, 0.012*aspect);
-  vec2 q = uv - par * h0;
-  float h = texture2D(tH, q).r;
+  // Profundidad: lo alto (gradas, banquillos, porterías) se desplaza más que el césped con el gesto
+  vec2 par = tilt * vec2(0.022, 0.022*aspect);
+  float h = texture2D(tH, uv).r;
+  vec2 q = uv - par * h;
+  h = texture2D(tH, q).r;
   q = uv - par * h;
-  // Calor: el aire tiembla sobre el césped
-  q += heat * 0.0016 * vec2(sin(uv.y*95.+t*3.1), cos(uv.x*70.+t*2.7)) * (1.-h);
   vec3 col = texture2D(tC, q).rgb;
-  // Nieve que va cuajando (más en los bordes y donde no se pisa) y césped mojado más oscuro
-  // Se acumula desde los bordes y va ganando terreno hacia el centro durante el partido
-  float edge = min(min(uv.x, 1.-uv.x), min(uv.y, 1.-uv.y));
-  float reach = snow * 0.3 + 0.12 * (fbm(uv*9.) - .5);
-  float sn = snow > 0. ? clamp(smoothstep(reach, reach - 0.06, edge) + 0.25*snow*fbm(uv*40.) + 0.6*h, 0., 1.) : 0.;
-  col = mix(col, vec3(.92,.95,1.), sn*.85);
-  col *= 1. - wet*.2;
-  vec3 n = normalize(texture2D(tN, q).rgb*2.-1.);
   vec4 m = texture2D(tM, q);
   float grass = smoothstep(.5,.8,m.g) * (1.-smoothstep(.4,.7,m.r));
-  // Sol (de día) o luz fría ambiente (de noche)
+  // Normales: solo dan relieve a lo que tiene volumen (el césped se queda plano: sin bandas)
+  vec3 n = normalize(texture2D(tN, q).rgb*2.-1.);
+  n = normalize(mix(n, vec3(0.,0.,1.), grass));
   vec3 L = normalize(sun);
-  float dif = max(dot(n, L), 0.);
-  // Sombras proyectadas por lo alto (gradas, banquillos) sobre lo bajo
-  float sh = 1.;
-  vec2 st = -L.xy * vec2(1., aspect) * 0.006;
-  for (int i=1;i<=10;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = min(sh, 1. - clamp((hh - h - float(i)*0.025)*5., 0., 1.)*0.55); }
-  // Nubes que pasan
-  vec2 cp = uv*vec2(3.,3.*aspect) + vec2(t*0.018, t*0.007);
-  float cl = smoothstep(.45 - cover*.35, .78, fbm(cp));
-  float cloud = 1. - cl*(0.3 + cover*0.25)*(1.-night) - cover*0.12;
-  float amb = mix(0.62, 0.28, night);
-  float lit = amb + (1.-amb)*dif*sh*mix(1.,0.15,night);
-  vec3 c = col * lit * cloud * tint;
-  // Brillo del césped al sol (especular suave) que se mueve con el gesto
-  vec3 V = normalize(vec3(-tilt*0.6, 1.));
-  float spec = pow(max(dot(reflect(-L, n), V), 0.), 24.) * grass * (1.-night) * (0.18 + wet*0.5) ;
-  c += spec;
-  // Noche: cuatro focos en las esquinas
+  // Luz relativa a una superficie plana: lo plano conserva su color, el relieve se ilumina o se oscurece
+  float rel = dot(n, L) - L.z;
+  // Sombras que proyecta lo alto sobre lo bajo (mapa de altura)
+  float sh = 0.;
+  vec2 st = -L.xy * vec2(1., aspect) * 0.007;
+  for (int i=1;i<=12;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.)); }
+  float lit = 1. + rel*0.9 - sh*0.38;
+  vec3 c = col * lit * tint * mix(1., 0.5, night);
   if (night > 0.5) {
     vec2 a = vec2(uv.x, uv.y/aspect);
     float f = 0.;
-    f += 0.55/(1.+18.*dot(a-vec2(0.,0.), a-vec2(0.,0.)));
-    f += 0.55/(1.+18.*dot(a-vec2(1.,0.), a-vec2(1.,0.)));
-    f += 0.55/(1.+18.*dot(a-vec2(0.,1./aspect), a-vec2(0.,1./aspect)));
-    f += 0.55/(1.+18.*dot(a-vec2(1.,1./aspect), a-vec2(1.,1./aspect)));
-    c += col * f * vec3(1.,.97,.88) * (0.6 + 0.4*n.z);
+    f += 0.5/(1.+18.*dot(a, a));
+    f += 0.5/(1.+18.*dot(a-vec2(1.,0.), a-vec2(1.,0.)));
+    f += 0.5/(1.+18.*dot(a-vec2(0.,1./aspect), a-vec2(0.,1./aspect)));
+    f += 0.5/(1.+18.*dot(a-vec2(1.,1./aspect), a-vec2(1.,1./aspect)));
+    c += col * f * vec3(1.,.97,.88) * (0.6 + 0.4*n.z) * (1. - sh*0.5);
   }
   gl_FragColor = vec4(c, 1.);
 }`;
