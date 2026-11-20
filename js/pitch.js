@@ -2119,7 +2119,7 @@
       g.x += (g.tx - g.x) * 0.08; g.y += (g.ty - g.y) * 0.08;
       const min = this.m.min || 0;
       const dark = this.st.time === 'noche' ? 1 : this.st.time === 'tarde' ? clamp((min - 50) / 40, 0, 0.8) : 0;
-      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, dark, weather: this.st.weather });
+      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, dark, min, weather: this.st.weather });
     }
 
     _drawLoading() {

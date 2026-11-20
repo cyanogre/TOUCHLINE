@@ -75,7 +75,7 @@ void main(){
   float sh = 0.;
   vec2 st = -L.xy * vec2(1., aspect) * 0.007;
   for (int i=1;i<=12;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.)); }
-  float lit = 1. + rel*0.9 - sh*0.38;
+  float lit = 1. + rel*0.9 - sh*0.5;
   vec3 c = col * lit * tint * mix(1., 0.5, night);
   if (night > 0.01) {
     vec2 a = vec2(uv.x, uv.y/aspect);
@@ -151,7 +151,11 @@ void main(){
     gl.uniform3f(u.tint, tint[0], tint[1], tint[2]);
     gl.viewport(0, 0, cv.width, cv.height);
     gl.uniform2f(u.tilt, o.tilt.x, o.tilt.y);
-    gl.uniform3f(u.sun, Math.cos(a) * 0.55 - o.tilt.x * 0.35, Math.sin(a) * 0.45 - o.tilt.y * 0.35, dusk ? 0.32 : 0.8);
+    // Sol según la hora: a mediodía alto (sombras cortas); por la tarde cada vez más bajo (sombras largas que crecen); de noche, la luz de los focos
+    const prog = Math.min(1, (o.min || 0) / 90);
+    const el = night ? 0.6 : dusk ? 0.42 - prog * 0.24 : 0.9 - prog * 0.08;
+    const az = (night ? -2.2 : dusk ? 0.35 : -0.6 + prog * 0.5) + a * 0.15;
+    gl.uniform3f(u.sun, Math.cos(az) * (1 - el) - o.tilt.x * 0.3, Math.sin(az) * (1 - el) - o.tilt.y * 0.3, el);
     gl.uniform1f(u.t, o.t);
     gl.uniform1f(u.night, o.dark != null ? o.dark : night ? 1 : 0);
     const w = o.weather || 'despejado';
