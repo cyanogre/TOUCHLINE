@@ -1672,6 +1672,9 @@
       let [vx, vy] = this.world(i, U.rand(91, 97), Wd / 2 + U.rand(-9, 9));
       const [spx, spy] = this.world(i, L - 11, Wd / 2);
       const beats = [];
+      // Si el balón está lejos del área (p. ej. en el otro campo), primero se corta (cortinilla) a la jugada
+      // en el área rival: un penalti siempre nace de una acción cerca de la portería, no a 60 m del balón
+      if (victim != null && !this.instant && this.depth(i, this.ball.x) < 72) { this._cap = `Llega el ${this.clubName(i)} al área`; this._cutTo(i, 84, Wd / 2 + U.rand(-10, 10), victim); }
       const carrying = victim != null && this.ball.owner === victim && !this.ball.path;
       if (carrying) {
         const v = this.A[victim];
