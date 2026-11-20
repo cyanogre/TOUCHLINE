@@ -141,5 +141,6 @@ TL_I18N_ADD([
   ['Saque de puerta para {t}.', 'Goal kick to {t}.', 'Six mètres pour {t}.', 'Abstoß für {t}.', 'Rimessa dal fondo per {t}.'],
   ['Se marcha por la línea de fondo: saque de puerta.', 'It goes out over the byline: goal kick.', 'Le ballon sort en six mètres.', 'Der Ball geht ins Toraus: Abstoß.', 'Esce sul fondo: rimessa dal fondo.'],
   ['Córner para {t}.', 'Corner to {t}.', 'Corner pour {t}.', 'Ecke für {t}.', 'Calcio d’angolo per {t}.'],
-  ['La toca un defensa y se va a córner: saque de esquina para {t}.', 'Deflected off a defender and out for a corner to {t}.', 'Déviée par un défenseur : corner pour {t}.', 'Von einem Verteidiger abgefälscht: Ecke für {t}.', 'Deviata da un difensore: calcio d’angolo per {t}.']
+  ['La toca un defensa y se va a córner: saque de esquina para {t}.', 'Deflected off a defender and out for a corner to {t}.', 'Déviée par un défenseur : corner pour {t}.', 'Von einem Verteidiger abgefälscht: Ecke für {t}.', 'Deviata da un difensore: calcio d’angolo per {t}.'],
+  ['Preparando el estadio', 'Getting the stadium ready', 'Préparation du stade', 'Das Stadion wird vorbereitet', 'Preparazione dello stadio']
 ]);
