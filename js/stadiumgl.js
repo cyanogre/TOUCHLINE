@@ -13,7 +13,7 @@
   'use strict';
   const TL = window.TL;
   // Imágenes ya enderezadas a vista cenital (tools: se generan una vez desde las originales): ~200 KB en vez de 1,2 MB y sin cálculo al cargar
-  const FILES = { color: 'assets/estadio/color-top.webp', normal: 'assets/estadio/normal-top.webp', mask: 'assets/estadio/mascara-top.webp', height: 'assets/estadio/altura-top.webp', goals: 'assets/estadio/porterias-top.webp' };
+  const FILES = { color: 'assets/estadio/color-top.webp', normal: 'assets/estadio/normal-top.webp', mask: 'assets/estadio/mascara-top.webp', height: 'assets/estadio/altura-top.webp', light: 'assets/estadio/luz-noche-top.webp', goals: 'assets/estadio/porterias-top.webp' };
   // Esquinas del campo en las imágenes (2000×1116): arriba-izq, arriba-der, abajo-izq, abajo-der
   const CORNERS = [[362, 188], [1636, 188], [292, 951], [1709, 951]];
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -49,7 +49,9 @@
   const VS = `attribute vec2 p; varying vec2 uv; void main(){ uv = vec2(p.x*0.5+0.5, 0.5-p.y*0.5); gl_Position = vec4(p,0.,1.); }`;
   const FS = `precision mediump float;
 varying vec2 uv;
-uniform sampler2D tC, tN, tM, tH, tG;
+uniform sampler2D tC, tN, tM, tH, tG, tL;
+uniform vec4 ballL;     // balón con efecto: posición (uv), radio, intensidad
+uniform vec3 ballC;     // su color
 uniform float mode;      // 0 = estadio, 1 = solo las porterías (misma luz y misma profundidad)
 uniform vec2 tilt;       // gesto del ratón/dedo (-1..1)
 uniform vec3 sun;        // dirección de la luz
@@ -84,15 +86,20 @@ void main(){
   vec2 st = -L.xy * vec2(1., aspect) * 0.007;
   for (int i=1;i<=12;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.)); }
   float lit = 1. + rel*0.9 - sh*0.5;
-  vec3 c = col * lit * tint * mix(1., 0.5, night);
+  // De noche: casi todo a oscuras salvo lo que iluminan los focos (mapa de luces: el campo, banquillos y zonas
+  // técnicas); la grada en penumbra
+  float lightMap = texture2D(tL, q).r;
+  float amb = mix(1., 0.16, night);
+  vec3 c = col * lit * tint * amb;
   if (night > 0.01) {
-    vec2 a = vec2(uv.x, uv.y/aspect);
-    float f = 0.;
-    f += 0.5/(1.+18.*dot(a, a));
-    f += 0.5/(1.+18.*dot(a-vec2(1.,0.), a-vec2(1.,0.)));
-    f += 0.5/(1.+18.*dot(a-vec2(0.,1./aspect), a-vec2(0.,1./aspect)));
-    f += 0.5/(1.+18.*dot(a-vec2(1.,1./aspect), a-vec2(1.,1./aspect)));
-    c += col * f * night * vec3(1.,.97,.88) * (0.6 + 0.4*n.z) * (1. - sh*0.5);
+    float f = smoothstep(.12, .85, lightMap);
+    c += col * f * night * 1.15 * vec3(1.,.97,.9) * (0.75 + 0.25*n.z) * (1. - sh*0.45);
+  }
+  // Luz del balón con efecto: ilumina a su alrededor con su color (mucho más de noche)
+  if (ballL.w > 0.001) {
+    vec2 d = (uv - ballL.xy) * vec2(1., aspect);
+    float gl = exp(-dot(d, d) / (ballL.z * ballL.z));
+    c += (col * 0.8 + 0.12) * ballC * gl * ballL.w;
   }
   gl_FragColor = mode > 0.5 ? vec4(c, gg.a) : vec4(c, 1.);
 }`;
@@ -137,6 +144,14 @@ void main(){
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, W[k]);
       gl.uniform1i(gl.getUniformLocation(pr, ['tC', 'tN', 'tM', 'tH'][i]), i);
     });
+    // Mapa de luces nocturnas en la unidad 5
+    if (W.light) {
+      const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, W.light);
+      gl.uniform1i(gl.getUniformLocation(pr, 'tL'), 5);
+    }
     // Porterías (con transparencia) en la unidad 4
     if (W.goals) {
       const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, tx);
@@ -146,7 +161,7 @@ void main(){
       gl.uniform1i(gl.getUniformLocation(pr, 'tG'), 4);
     }
     const U = n => gl.getUniformLocation(pr, n);
-    return { cv, gl, u: { wet: U('wet'), snow: U('snow'), heat: U('heat'), cover: U('cover'), tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect'), mode: U('mode') } };
+    return { cv, gl, u: { wet: U('wet'), snow: U('snow'), heat: U('heat'), cover: U('cover'), tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect'), mode: U('mode'), ballL: U('ballL'), ballC: U('ballC') } };
   }
 
   /**
@@ -187,6 +202,8 @@ void main(){
     gl.uniform3f(u.sun, Math.cos(az) * (1 - el) - o.tilt.x * 0.3, Math.sin(az) * (1 - el) - o.tilt.y * 0.3, el);
     gl.uniform1f(u.t, o.t);
     gl.uniform1f(u.night, o.dark != null ? o.dark : night ? 1 : 0);
+    const bl = o.ballLight;
+    if (bl) { gl.uniform4f(u.ballL, bl.u, bl.v, bl.r, bl.k); gl.uniform3f(u.ballC, bl.c[0], bl.c[1], bl.c[2]); } else gl.uniform4f(u.ballL, 0, 0, 0.01, 0);
     const w = o.weather || 'despejado';
     gl.uniform1f(u.wet, w === 'lluvia' || w === 'temporal' ? 1 : 0);
     gl.uniform1f(u.snow, w === 'nieve' ? Math.min(1, 0.06 + o.t / 1200) : 0);
