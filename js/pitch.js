@@ -2417,15 +2417,16 @@
       const side = Math.floor(Math.random() * 4);
       const tx = side === 0 ? -14 - Math.random() * 6 : side === 1 ? L + 14 + Math.random() * 6 : Math.random() * L;
       const ty = side === 2 ? -11 - Math.random() * 5 : side === 3 ? Wd + 11 + Math.random() * 5 : Math.random() * Wd;
-      const sx = tx + (Math.random() - 0.5) * 30, sy = ty - 45 - Math.random() * 20;
+      // El rayo se genera en un espacio unitario (0 = borde de arriba de la pantalla, 1 = donde cae)
+      // y se estira al dibujar: siempre entra desde fuera de la pantalla, nunca aparece a medias.
       const path = (x0, y0, x1, y1, depth) => {
-        const pts = [[x0, y0]]; let x = x0, y = y0; const n = 9 + Math.floor(Math.random() * 6);
-        for (let i = 1; i <= n; i++) { const f = i / n; x = x0 + (x1 - x0) * f + (i < n ? (Math.random() - 0.5) * 6 : 0); y = y0 + (y1 - y0) * f; pts.push([x, y]); }
+        const pts = [[x0, y0]], n = 12 + Math.floor(Math.random() * 6);
+        for (let i = 1; i <= n; i++) { const f = i / n; pts.push([x0 + (x1 - x0) * f + (i < n ? (Math.random() - 0.5) * 0.09 : 0), y0 + (y1 - y0) * f]); }
         const out = [{ pts, w: depth ? 1 : 2 }];
-        if (depth < 2) for (let i = 2; i < n - 1; i++) if (Math.random() < 0.28) { const [bx, by] = pts[i]; out.push(...path(bx, by, bx + (Math.random() - 0.5) * 22, by + 6 + Math.random() * 12, depth + 1)); }
+        if (depth < 2) for (let i = 2; i < n - 1; i++) if (Math.random() < 0.25) { const [bx, by] = pts[i]; out.push(...path(bx, by, bx + (Math.random() - 0.5) * 0.35, Math.min(1, by + 0.12 + Math.random() * 0.2), depth + 1)); }
         return out;
       };
-      return { segs: path(sx, sy, tx, ty, 0), t: this.t };
+      return { segs: path((Math.random() - 0.5) * 0.4, 0, 0, 1, 0), tx, ty, t: this.t };
     }
     _drawSkyBolt() {
       const B = this.skyBolt;
@@ -2433,11 +2434,12 @@
       const age = this.t - B.t;
       if (age > 0.55) { this.skyBolt = null; return; }
       if (age > 0.12 && age < 0.22) return;          // parpadeo: se apaga un instante y vuelve
-      const c = this.cx, X = this.X, Y = this.Y, P = Math.max(1, Math.round(this.s / 14)), a = age < 0.12 ? 1 : 1 - (age - 0.22) / 0.33;
+      const c = this.cx, P = Math.max(1, Math.round(this.s / 14)), a = age < 0.12 ? 1 : 1 - (age - 0.22) / 0.33;
+      const ex = this.X(B.tx), ey = this.Y(B.ty), top = -4 * P, len = Math.max(40, ey - top);
+      const S = (u, v) => [ex + u * len, top + v * len];
       for (const seg of B.segs) {
         for (let i = 1; i < seg.pts.length; i++) {
-          const [x0, y0] = seg.pts[i - 1], [x1, y1] = seg.pts[i];
-          const X0 = X(x0), Y0 = Y(y0), X1 = X(x1), Y1 = Y(y1), steps = Math.max(1, Math.round(Math.hypot(X1 - X0, Y1 - Y0) / P));
+          const [X0, Y0] = S(...seg.pts[i - 1]), [X1, Y1] = S(...seg.pts[i]), steps = Math.max(1, Math.round(Math.hypot(X1 - X0, Y1 - Y0) / P));
           for (let j = 0; j <= steps; j++) {
             const px = Math.round((X0 + (X1 - X0) * j / steps) / P) * P, py = Math.round((Y0 + (Y1 - Y0) * j / steps) / P) * P;
             c.fillStyle = `rgb(150 175 255 / ${(0.35 * a).toFixed(3)})`; c.fillRect(px - P * seg.w, py, P * (seg.w * 2 + 1), P);
