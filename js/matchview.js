@@ -345,15 +345,14 @@
     schedule();
   }
 
-  // Con la app en segundo plano el campo no se pinta: el reloj espera a que vuelvas
   document.addEventListener('visibilitychange', () => {
     if (!MV.m || MV.m.done) return;
-    if (document.hidden) { MV.bg = true; clearTimeout(MV.timer); }
-    else if (MV.bg) { MV.bg = false; if (!MV.paused) schedule(400); }
+    // Al salir de la app el partido se queda en pausa: al volver, tú decides cuándo seguir
+    if (document.hidden) { if (!MV.paused && !MV.finished) { pause('manual', null); UI.toast('⏸ Partido en pausa mientras estabas fuera'); } }
   });
   function schedule(ms) {
     clearTimeout(MV.timer);
-    if (MV.paused || MV.bg || !MV.m || MV.m.done) return;
+    if (MV.paused || !MV.m || MV.m.done) return;
     const speed = settings().speed || 1;
     MV.timer = setTimeout(tick, ms != null ? ms : BASE_MS / speed);
   }
