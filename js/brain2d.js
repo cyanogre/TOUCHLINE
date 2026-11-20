@@ -560,7 +560,7 @@
       const offX = this.offX[i];
       const here = threat(P.depth(i, car.x), P.lat(i, car.y));
       const cands = [];
-      for (const r of [9, 13, 18]) for (let k = -6; k <= 6; k++) {
+      for (const r of [9, 13, 18, 24]) for (let k = -6; k <= 6; k++) {
         const ang = k * 0.42;
         const x = car.x + Math.cos(ang) * r * dir, y = car.y + Math.sin(ang) * r;
         if (x < 2 || x > L - 2 || y < 2 || y > Wd - 2) continue;
@@ -572,7 +572,7 @@
       }
       cands.sort((a, b) => b.sc - a.sc);
       const out = [];
-      for (const c of cands) { if (out.every(o => hyp(o.x - c.x, o.y - c.y) > 9)) out.push(c); if (out.length >= 2) break; }
+      for (const c of cands) { if (out.every(o => hyp(o.x - c.x, o.y - c.y) > 9)) out.push(c); if (out.length >= (P.depth(i, car.x) > 50 ? 3 : 2)) break; }
       return out;
     }
 
@@ -621,6 +621,11 @@
       const ag = this.ag, P = this.P;
       if (!ag) return;
       const b = P.ball, car = b.owner != null ? P.A[b.owner] : null;
+      // Quien prepara la jugada va a por el balón: la más cercana aprieta a la poseedora (y le gana el duelo)
+      if (car && car.team !== ag.team && ag.forceOn != null) {
+        const h = P.nearest(P.team(ag.team).filter(a => !P.isGK(a)), car);
+        if (h) { h.tx = car.x; h.ty = car.y; h.run = 1; h.role = 'press'; }
+      }
       // La que va a cometer la falta se va a por la poseedora
       if (ag.kind === 'foul' && car && car.team !== ag.foulTeam) {
         const f = P.A[ag.e.pid];
@@ -845,7 +850,7 @@
         if (box) opts.push({ k: 'cross', v: 0.06 + 0.035 * box - 0.012 * defs + (favored && ag.kind === 'shot' && ag.origin === 'cross' ? 0.4 : 0) });
       }
       // 5) Despejar (en su área y apretada) — o la portera en largo
-      if ((cd < 26 && pr < 2.4 && !gk) || gk) {
+      if ((cd < 24 && pr < 1.6 && !gk) || gk) {
         const v = gk ? 0.012 + (1 - T.short) * 0.05 + (pr < 5 ? 0.05 : 0) : 0.02 + 0.35 * lossAt(c.x, c.y) * (pr < 1.5 ? 1 : 0.4);
         opts.push({ k: 'clear', v });
       }
@@ -856,7 +861,7 @@
       const skill = (pas + reg) / 198;
       const tau = 0.008 + 0.02 * (1 - skill);
       let pick;
-      if (forced) pick = opts.filter(o => o.k === 'pass').sort((p, q) => q.v - p.v)[0] || opts[0];
+      if (forced) pick = opts.filter(o => o.k === 'pass' && o.pInt > 0.15).sort((p, q) => q.v - p.v)[0] || opts.filter(o => o.k === 'pass').sort((p, q) => q.pInt - p.pInt)[0] || opts[0];
       else {
         const mx = Math.max(...opts.map(o => o.v));
         pick = U.weighted(opts, o => Math.exp((o.v - mx) / tau));
@@ -975,7 +980,7 @@
         }
         if (ag) ag.forceOn = null;
       } else if (roll > o.pAcc) {
-        const err = U.rand(3, 7) * (o.lofted ? 1.4 : 1), ang = Math.random() * 6.283;
+        const err = U.rand(1.8, 4.5) * (o.lofted ? 1.3 : 1), ang = Math.random() * 6.283;
         tx += Math.cos(ang) * err; ty += Math.sin(ang) * err; to = null; what = 'bad';
         // Un mal pase de quien defiende no se va por su propia línea de fondo
         if (P.depth(i, tx) < 0.5) tx = P.world(i, 1.5, 0)[0];
@@ -1095,7 +1100,7 @@
       // Si la tiene el otro equipo, la pierde enseguida (corte o entrada)
       const b = P.ball, car = b.owner != null ? P.A[b.owner] : null;
       if (car && car.team !== ag.team && !b.path) {
-        if (ag.forceOn !== car.team) { ag.forceOn = car.team; ag.forceAt = P.t + U.rand(0.35, 0.8); }
+        if (ag.forceOn !== car.team) { ag.forceOn = car.team; ag.forceAt = P.t + U.rand(1.8, 2.6); }
       } else ag.forceOn = null;
       return true;
     }
