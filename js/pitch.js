@@ -2173,6 +2173,7 @@
       const BI = TL.Balls ? TL.Balls.selected() : 0, fx = TL.Balls ? TL.Balls.fx(BI) : 'estela', bc = TL.Balls ? TL.Balls.color(BI) : '#ffffff';
       const bx = X(b.x), by = Y(b.y) - b.z * s * 0.9;
       if (fast || fx === 'fantasma' || fx === 'vacio') this._ballFx(fx, bc, br, X, Y, s, fast);
+      if (fx !== 'estela') this._ballParts(fx, X, Y, s, br);
       // El balón gira según lo que rueda
       const last = this._bl || [b.x, b.y]; this.ballRot = (this.ballRot || 0) + Math.hypot(b.x - last[0], b.y - last[1]) / 0.11 * (b.x >= last[0] ? 1 : -1) * 0.15; this._bl = [b.x, b.y];
       c.globalAlpha = fx === 'fantasma' ? 0.75 : 1;
@@ -3176,6 +3177,52 @@
         const [x, y] = P(0); c.fillStyle = 'rgb(140 240 70 / 0.8)'; c.beginPath(); c.arc(x, y + br, br * 0.35, 0, 6.283); c.fill();
       } else if (fx === 'fantasma') line('rgb(235 245 255 / 0.25)', br * 2);
       else { const [r, g, bl] = [1, 3, 5].map(k => parseInt(col.slice(k, k + 2), 16)); line(`rgb(${r} ${g} ${bl} / 0.45)`, br); }
+    }
+
+    /**
+     * Partículas de los balones especiales (en el mundo, con vida propia): salen más cuanto más rápido va el
+     * balón y estallan en un chut fuerte. Cada efecto tiene su física: el fuego sube y se apaga, el hielo cae
+     * y brilla, el rayo chisporrotea, la galaxia deja estrellas que orbitan, el tóxico burbujea…
+     */
+    _ballParts(fx, X, Y, s, br) {
+      const b = this.ball, t = this.t, dt = Math.min(0.05, Math.max(0, t - (this._bpT || t))); this._bpT = t;
+      const P = this.bparts || (this.bparts = []);
+      const lx = this._bpL || [b.x, b.y, b.z]; this._bpL = [b.x, b.y, b.z];
+      const vx = dt ? (b.x - lx[0]) / dt : 0, vy = dt ? (b.y - lx[1]) / dt : 0, sp = Math.hypot(vx, vy);
+      // Chut fuerte: estallido
+      const kick = sp > 14 && (this._bpSp || 0) < 8; this._bpSp = sp;
+      const rate = (kick ? 70 : 0) + Math.min(90, sp * 4.5) + 6;   // partículas por segundo (algunas también quieto)
+      let n = rate * dt; while (n > 0 && P.length < 260) { if (Math.random() < n) P.push(this._bpNew(fx, b, vx, vy, kick)); n--; }
+      const c = this.cx, S = Math.max(2, s * 0.2);
+      for (let i = P.length - 1; i >= 0; i--) {
+        const q = P[i]; q.a += dt;
+        if (q.a > q.life) { P.splice(i, 1); continue; }
+        if (fx === 'galaxia') { q.ang += dt * 3; q.x = q.cx + Math.cos(q.ang) * q.r; q.y = q.cy + Math.sin(q.ang) * q.r * 0.6; }
+        else { q.x += q.vx * dt; q.y += q.vy * dt; q.z = Math.max(0, q.z + q.vz * dt); q.vz -= q.g * dt; q.vx *= 1 - dt * 1.5; q.vy *= 1 - dt * 1.5; }
+        const k = 1 - q.a / q.life, px = X(q.x), py = Y(q.y) - q.z * s * 0.9;
+        c.globalAlpha = Math.max(0, Math.min(1, k * 1.4));
+        c.fillStyle = typeof q.col === 'function' ? q.col(k) : q.col;
+        const sz = Math.max(1, Math.round(S * q.sz * (fx === 'fuego' ? k : 1)));
+        c.fillRect(Math.round(px), Math.round(py), sz, sz);
+        if (fx === 'rayo' && Math.random() < 0.25) { c.fillRect(Math.round(px) + sz, Math.round(py) - sz, sz, sz); }
+      }
+      c.globalAlpha = 1;
+    }
+    _bpNew(fx, b, vx, vy, kick) {
+      const R = (a, z) => a + Math.random() * (z - a), ang = Math.random() * 6.283, burst = kick ? R(2, 6) : R(0.2, 1.2);
+      const q = { x: b.x + R(-0.25, 0.25), y: b.y + R(-0.25, 0.25), z: b.z + R(0, 0.3), vx: -vx * 0.08 + Math.cos(ang) * burst, vy: -vy * 0.08 + Math.sin(ang) * burst, vz: R(0, 1), g: 0, a: 0, life: R(0.4, 0.9), sz: R(1, 2), col: '#fff' };
+      switch (fx) {
+        case 'fuego': q.vz = R(1.5, 3.5); q.g = -0.5; q.life = R(0.35, 0.7); q.col = k => k > 0.6 ? '#fff2a8' : k > 0.3 ? '#ffb020' : '#ff4a12'; break;
+        case 'hielo': q.vz = R(-0.2, 0.6); q.g = 2.5; q.life = R(0.6, 1.2); q.col = Math.random() < 0.4 ? '#ffffff' : '#a8e4ff'; break;
+        case 'rayo': q.vx *= 2.5; q.vy *= 2.5; q.life = R(0.12, 0.3); q.col = Math.random() < 0.5 ? '#fff9a8' : '#8fc8ff'; q.sz = R(1, 1.6); break;
+        case 'galaxia': q.cx = b.x; q.cy = b.y; q.r = R(0.4, 1.4); q.ang = ang; q.z = b.z + R(0, 0.5); q.life = R(0.8, 1.6); q.col = ['#ffffff', '#ffd6ff', '#9ad8ff', '#c9a4ff'][Math.floor(Math.random() * 4)]; q.sz = R(0.8, 1.5); break;
+        case 'arcoiris': { const h = Math.floor((this.t * 240 + Math.random() * 60) % 360); q.col = `hsl(${h} 95% 62%)`; q.life = R(0.5, 1); q.g = 1.2; q.vz = R(0.5, 2); break; }
+        case 'fantasma': q.vz = R(0.3, 1); q.g = -0.2; q.life = R(0.8, 1.4); q.col = 'rgb(235 245 255 / 0.6)'; q.sz = R(1.5, 2.5); q.vx *= 0.4; q.vy *= 0.4; break;
+        case 'toxico': q.vz = R(0.4, 1.4); q.g = -0.3; q.life = R(0.6, 1.2); q.col = Math.random() < 0.5 ? '#8cf046' : '#c8ff6a'; break;
+        case 'vacio': { const r = R(1.2, 2.2); q.x = b.x + Math.cos(ang) * r; q.y = b.y + Math.sin(ang) * r * 0.6; q.vx = (b.x - q.x) * 2.2; q.vy = (b.y - q.y) * 2.2; q.life = 0.45; q.col = Math.random() < 0.5 ? '#7a2ad0' : '#1a0830'; break; }
+        default: break;
+      }
+      return q;
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
