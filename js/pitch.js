@@ -2282,7 +2282,18 @@
       g.x += (g.tx - g.x) * 0.08; g.y += (g.ty - g.y) * 0.08;
       const min = this.m.min || 0;
       const dark = this.st.time === 'noche' ? 1 : this.st.time === 'tarde' ? clamp((min - 50) / 40, 0, 0.8) : 0;
-      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, dark, min, weather: this.st.weather });
+      // Luz del balón con efecto (su color): suave de día, muy visible de noche
+      let ballLight = null;
+      if (TL.Balls) {
+        const BI = TL.Balls.selected(), fx = TL.Balls.fx(BI);
+        if (fx !== 'estela') {
+          const hex = TL.Balls.color(BI), b = this.ball, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
+          const rgb = [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255), mx = Math.max(...rgb, 0.01);
+          const flick = 1 + Math.sin(this.t * 13) * 0.08 + Math.sin(this.t * 7.3) * 0.06;
+          ballLight = { u: (b.x - ART_VIEW.x0) / VW, v: (b.y - ART_VIEW.y0) / VH, r: 0.035 + b.z * 0.002, k: (0.12 + dark * 0.75) * flick, c: rgb.map(v => v / mx) };
+        }
+      }
+      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, dark, min, weather: this.st.weather, ballLight });
     }
 
     _drawLoading() {
@@ -2306,6 +2317,10 @@
         const hi = TL.StadiumGL.image('height');
         let hd = null;
         if (hi) { g.clearRect(0, 0, cv.width, cv.height); g.drawImage(hi, 0, 0, cv.width, cv.height); hd = g.getImageData(0, 0, cv.width, cv.height).data; }
+        // Luz de los focos en cada punto (de noche, el público fuera de las zonas iluminadas queda en penumbra)
+        const li = TL.StadiumGL.image('light');
+        let ld = null;
+        if (li) { g.clearRect(0, 0, cv.width, cv.height); g.drawImage(li, 0, 0, cv.width, cv.height); ld = g.getImageData(0, 0, cv.width, cv.height).data; }
         const pts = [], fill = Math.min(1, 0.45 + (this.m.att || 0.6) * 0.5);
         for (let k = 0; k < 20000 && pts.length < 2600; k++) {
           const px = Math.floor(Math.random() * cv.width), py = Math.floor(Math.random() * cv.height), o = (py * cv.width + px) * 4;
@@ -2314,7 +2329,7 @@
           const x = ART_VIEW.x0 + (px + Math.random()) / cv.width * (ART_VIEW.x1 - ART_VIEW.x0), y = ART_VIEW.y0 + (py + Math.random()) / cv.height * (ART_VIEW.y1 - ART_VIEW.y0);
           const away = x > L * 0.86 && y > Wd / 2;
           const r = Math.random();
-          pts.push({ x, y, aw: away, ang: Math.atan2(y - Wd / 2, x - L / 2), h: hd ? hd[o] / 255 : 0.5, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
+          pts.push({ x, y, lum: ld ? ld[o] / 255 : 1, aw: away, ang: Math.atan2(y - Wd / 2, x - L / 2), h: hd ? hd[o] / 255 : 0.5, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
         }
         this._fanPts = pts;
       }
@@ -2338,6 +2353,7 @@
       // Mismo desplazamiento que el sombreador del estadio: uv' = uv + tilt·0,022·altura
       const g = this.tilt || { x: 0, y: 0 }, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
       const px = g.x * 0.022 * VW, py = g.y * 0.022 * (VH / VW) * VH;
+      const nightK = this.st.time === 'noche' ? 1 : this.st.time === 'tarde' ? clamp(((this.m.min || 0) - 50) / 40, 0, 0.8) : 0;
       for (const f of this._fanPts) {
         let j = Math.sin(t * 1.5 + f.ph) * 0.04, arms = 0;
         const mine = ch && (ch.team === 1) === !!f.aw;
@@ -2349,9 +2365,11 @@
           if (a > 0.05) { j = Math.max(j, a * 0.75); if (a > 0.45) arms = 1; }
         }
         const x = X(f.x + px * f.h), y = Y(f.y + py * f.h - j);
+        if (nightK) c.globalAlpha = 1 - nightK * (1 - Math.max(0.18, Math.min(1, f.lum * 1.6)));
         c.fillStyle = f.c; c.fillRect(x, y, z, z);
         if (arms) { c.fillStyle = 'rgb(255 236 214 / 0.85)'; c.fillRect(x, y - z, z, z); }   // brazos arriba
       }
+      c.globalAlpha = 1;
     }
 
     /** Vallas LED junto a las bandas: lo que pasa en el partido, la figura de la temporada y anuncios. */
