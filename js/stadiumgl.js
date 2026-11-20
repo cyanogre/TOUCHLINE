@@ -53,6 +53,7 @@ uniform vec2 tilt;       // gesto del ratón/dedo (-1..1)
 uniform vec3 sun;        // dirección de la luz
 uniform float t, night, aspect;
 uniform vec3 tint;
+uniform float wet, snow, heat, cover;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
@@ -64,7 +65,16 @@ void main(){
   vec2 q = uv - par * h0;
   float h = texture2D(tH, q).r;
   q = uv - par * h;
+  // Calor: el aire tiembla sobre el césped
+  q += heat * 0.0016 * vec2(sin(uv.y*95.+t*3.1), cos(uv.x*70.+t*2.7)) * (1.-h);
   vec3 col = texture2D(tC, q).rgb;
+  // Nieve que va cuajando (más en los bordes y donde no se pisa) y césped mojado más oscuro
+  // Se acumula desde los bordes y va ganando terreno hacia el centro durante el partido
+  float edge = min(min(uv.x, 1.-uv.x), min(uv.y, 1.-uv.y));
+  float reach = snow * 0.3 + 0.12 * (fbm(uv*9.) - .5);
+  float sn = snow > 0. ? clamp(smoothstep(reach, reach - 0.06, edge) + 0.25*snow*fbm(uv*40.) + 0.6*h, 0., 1.) : 0.;
+  col = mix(col, vec3(.92,.95,1.), sn*.85);
+  col *= 1. - wet*.2;
   vec3 n = normalize(texture2D(tN, q).rgb*2.-1.);
   vec4 m = texture2D(tM, q);
   float grass = smoothstep(.5,.8,m.g) * (1.-smoothstep(.4,.7,m.r));
@@ -77,14 +87,14 @@ void main(){
   for (int i=1;i<=10;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = min(sh, 1. - clamp((hh - h - float(i)*0.025)*5., 0., 1.)*0.55); }
   // Nubes que pasan
   vec2 cp = uv*vec2(3.,3.*aspect) + vec2(t*0.018, t*0.007);
-  float cl = smoothstep(.45,.75, fbm(cp));
-  float cloud = 1. - cl*0.32*(1.-night);
+  float cl = smoothstep(.45 - cover*.35, .78, fbm(cp));
+  float cloud = 1. - cl*(0.3 + cover*0.25)*(1.-night) - cover*0.12;
   float amb = mix(0.62, 0.28, night);
   float lit = amb + (1.-amb)*dif*sh*mix(1.,0.15,night);
   vec3 c = col * lit * cloud * tint;
   // Brillo del césped al sol (especular suave) que se mueve con el gesto
   vec3 V = normalize(vec3(-tilt*0.6, 1.));
-  float spec = pow(max(dot(reflect(-L, n), V), 0.), 24.) * grass * (1.-night) * 0.18;
+  float spec = pow(max(dot(reflect(-L, n), V), 0.), 24.) * grass * (1.-night) * (0.18 + wet*0.5) ;
   c += spec;
   // Noche: cuatro focos en las esquinas
   if (night > 0.5) {
@@ -136,7 +146,7 @@ void main(){
       gl.uniform1i(gl.getUniformLocation(pr, ['tC', 'tN', 'tM', 'tH'][i]), i);
     });
     const U = n => gl.getUniformLocation(pr, n);
-    return { cv, gl, u: { tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect') } };
+    return { cv, gl, u: { wet: U('wet'), snow: U('snow'), heat: U('heat'), cover: U('cover'), tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect') } };
   }
 
   /**
@@ -164,10 +174,15 @@ void main(){
     gl.uniform3f(u.sun, Math.cos(a) * 0.55 - o.tilt.x * 0.35, Math.sin(a) * 0.45 - o.tilt.y * 0.35, dusk ? 0.32 : 0.8);
     gl.uniform1f(u.t, o.t);
     gl.uniform1f(u.night, night ? 1 : 0);
+    const w = o.weather || 'despejado';
+    gl.uniform1f(u.wet, w === 'lluvia' || w === 'temporal' ? 1 : 0);
+    gl.uniform1f(u.snow, w === 'nieve' ? Math.min(1, 0.06 + o.t / 1200) : 0);
+    gl.uniform1f(u.heat, w === 'calor' ? 1 : 0);
+    gl.uniform1f(u.cover, w === 'despejado' || w === 'calor' ? 0 : w === 'nublado' ? 0.6 : 1);
     gl.uniform1f(u.aspect, cv.height / cv.width);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     return cv;
   }
 
-  TL.StadiumGL = { render };
+  TL.StadiumGL = { render, load, ready: () => S.state === 'loaded' || S.state === 'error' };
 })();

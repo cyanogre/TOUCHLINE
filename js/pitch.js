@@ -110,6 +110,17 @@
     ART.on = localStorage.getItem('touchline.campo') === '1';
   } catch (e) { /* sin almacenamiento */ }
 
+  /** Tiempo del partido según la época del año (invierno: lluvia y nieve; verano: calor). Se puede forzar con ?tiempo=lluvia|nieve|calor|nublado|despejado. */
+  function weatherFor(S, home, h) {
+    try { const q = new URLSearchParams(location.search).get('tiempo'); if (q) return q; } catch (e) { /* nada */ }
+    const wk = S.week || 0, winter = wk >= 12 && wk <= 26, summer = wk <= 3 || wk >= 34;
+    const r = ((h * 2654435761 + wk * 97) >>> 0) % 1000 / 1000;
+    const w = [['despejado', 40], ['nublado', 25], ['lluvia', winter ? 22 : 12], ['nieve', winter ? 7 : 0], ['calor', summer ? 22 : 3]];
+    const tot = w.reduce((a, x) => a + x[1], 0);
+    let acc = 0; for (const [k, v] of w) { acc += v / tot; if (r < acc) return k; }
+    return 'despejado';
+  }
+
   function actor(kind, x, y, extra) {
     return Object.assign({ kind, x, y, vx: 0, vy: 0, tx: x, ty: y, run: 0.5, state: null, until: 0, bob: Math.random() * 6 }, extra || {});
   }
@@ -188,7 +199,13 @@
     destroy() { cancelAnimationFrame(this.raf); window.removeEventListener('resize', this._resize); }
 
     /** El reloj del partido espera mientras se escenifica una jugada. */
-    busy() { return !this.over && !!(this.beat || this.script.length || this.queue.length); }
+    busy() { return this.loading() || (!this.over && !!(this.beat || this.script.length || this.queue.length)); }
+    /** ¿Aún se está cargando el estadio dibujado? (el partido espera) */
+    loading() {
+      if (!ART.on || !TL.StadiumGL) return false;
+      TL.StadiumGL.load();
+      return !TL.StadiumGL.ready();
+    }
 
     /** El local viste la primera; el visitante, la que no se confunda (como manda el árbitro). */
     _colors() {
@@ -261,7 +278,8 @@
         seat: home.c1 || '#2fbf71', seat2: home.c2 || '#ffffff', away: (this.colors && this.colors[1].main) || away.c1 || '#ffffff',
         code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
         night: (this.S.week * 7 + home.id) % 3 === 0,
-        time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia'
+        time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia',
+        weather: this.m.weather || weatherFor(this.S, home, h)
       };
     }
 
@@ -1780,6 +1798,7 @@
     _loop(now) {
       const real = Math.min(0.05, (now - this._last) / 1000);
       this._last = now;
+      if (this.loading()) { this._drawLoading(); this.raf = requestAnimationFrame(this._loop); return; }
       this.slow += (this.slowT - this.slow) * Math.min(1, real * 6);
       const dt = real * this.rate();
       this.t += dt;
@@ -1993,6 +2012,7 @@
         c.restore();
         for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) { c.fillStyle = '#fffbe6'; c.fillRect(X(fx) - 3, Y(fy) - 2, 6, 4); }
       }
+      this._weatherFx(real);
       // Rótulo
       if (this.banner && this.banner.until > this.t) {
         const bn = this.banner;
@@ -2033,7 +2053,58 @@
       if (!ART.on || !TL.StadiumGL) return null;
       const g = this.tilt || (this.tilt = { x: 0, y: 0, tx: 0, ty: 0 });
       g.x += (g.tx - g.x) * 0.08; g.y += (g.ty - g.y) * 0.08;
-      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time });
+      return TL.StadiumGL.render({ VIEW, L, Wd, t: this.t, tilt: g, time: this.st.time, weather: this.st.weather });
+    }
+
+    _drawLoading() {
+      const c = this.cx;
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      c.fillStyle = '#0b1611'; c.fillRect(0, 0, this.w, this.h);
+      c.fillStyle = 'rgb(255 255 255 / 0.75)'; c.font = '600 14px Barlow, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      const dots = '.'.repeat(1 + (Math.floor(performance.now() / 400) % 3));
+      c.fillText((TL.t ? TL.t('Preparando el estadio') : 'Preparando el estadio') + dots, this.w / 2, this.h / 2);
+    }
+
+    /** Lluvia, nieve o calor (ondas y destellos del sol en la lente), sobre todo lo demás. */
+    _weatherFx(real) {
+      const w = this.st.weather, c = this.cx, W = this.w, H = this.h;
+      if (!w || w === 'despejado' || w === 'nublado') return;
+      const P = this.wfx || (this.wfx = []);
+      const n = w === 'lluvia' ? 170 : w === 'nieve' ? 130 : 0;
+      while (P.length < n) P.push({ x: Math.random() * W, y: Math.random() * H, z: 0.4 + Math.random() * 0.6, ph: Math.random() * 6 });
+      const k = Math.min(0.05, real) * Math.max(1, this.rate());
+      if (w === 'lluvia') {
+        c.strokeStyle = 'rgb(200 220 255 / 0.45)'; c.lineWidth = 1; c.beginPath();
+        for (const d of P) {
+          d.y += 900 * d.z * k; d.x -= 160 * d.z * k;
+          if (d.y > H) { d.y = -10; d.x = Math.random() * W * 1.2; }
+          c.moveTo(d.x, d.y); c.lineTo(d.x + 4 * d.z, d.y - 16 * d.z);
+        }
+        c.stroke();
+        c.fillStyle = 'rgb(20 30 45 / 0.12)'; c.fillRect(0, 0, W, H);
+      } else if (w === 'nieve') {
+        c.fillStyle = 'rgb(255 255 255 / 0.7)';
+        for (const d of P) {
+          d.y += 40 * d.z * k; d.x += Math.sin(this.t + d.ph) * 18 * k;
+          if (d.y > H) { d.y = -5; d.x = Math.random() * W; }
+          c.beginPath(); c.arc(d.x, d.y, 0.5 + 0.9 * d.z, 0, 6.283); c.fill();
+        }
+      } else if (w === 'calor') {
+        // Destello del sol en la lente: un brillo en la esquina y círculos que se mueven con él
+        const t = this.t, sx = W * (0.88 + Math.sin(t * 0.05) * 0.04), sy = H * 0.06;
+        const g = c.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55);
+        g.addColorStop(0, 'rgb(255 240 190 / 0.45)'); g.addColorStop(1, 'rgb(255 200 120 / 0)');
+        c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = g; c.fillRect(0, 0, W, H);
+        const cx = W / 2, cy = H / 2;
+        [[0.35, 0.05, '255 210 140'], [0.7, 0.035, '170 220 255'], [1.15, 0.06, '255 170 120'], [1.45, 0.02, '200 255 200']].forEach(([f, r, col]) => {
+          const x = sx + (cx - sx) * f * 2, y = sy + (cy - sy) * f * 2, rr = H * r * (1 + 0.15 * Math.sin(t * 1.3 + f * 5));
+          c.fillStyle = `rgb(${col} / 0.16)`; c.beginPath(); c.arc(x, y, rr, 0, 6.283); c.fill();
+        });
+        // Cáustica: bandas de luz que ondulan despacio
+        c.globalAlpha = 0.07;
+        for (let i = 0; i < 6; i++) { c.fillStyle = '#fff6d0'; const yy = (H * (i / 6) + t * 14) % H; c.fillRect(0, yy + Math.sin(t * 2 + i) * 6, W, 3); }
+        c.restore();
+      }
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
