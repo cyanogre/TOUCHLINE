@@ -371,7 +371,7 @@
   function onFinal() {
     clearTimeout(MV.timer);
     MV.finished = true;
-    if (TL.Balls) { const nw = TL.Balls.addMatch(); if (nw > 0) setTimeout(() => UI.toast(`⚽ ¡${nw} balones nuevos desbloqueados! Elígelos en el menú`), 1500); }
+    if (TL.Balls && MV.me != null) { const nw = TL.Balls.addMatch(MV.m, MV.me); if (nw.length) setTimeout(() => UI.toast(`🏆 ¡Logro: ${nw[0].name}!${nw.length > 1 ? ` (+${nw.length - 1})` : ''} El Profe te lo cuenta al salir`), 1500); }
     const fin = () => {
       if (!MV.pitch || !MV.m) return;
       if (MV.pitch.busy()) { setTimeout(fin, 250); return; }
@@ -831,6 +831,7 @@
     UI.tab = 'home';
     UI.render(false);
     UI.celebrate(G.S);
+    if (TL.Balls) setTimeout(() => TL.Balls.explain(), 1800);
   };
 
   A['play-live'] = () => (UI.advance ? UI.advance(open) : open());
