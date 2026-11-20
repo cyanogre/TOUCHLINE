@@ -732,6 +732,10 @@
       }
       const tk = to != null && this.A[to] ? this.A[to] : null;
       if (team == null) team = tk ? tk.team : this.poss;
+      // Balón fuera del campo (o casi): el recogepelotas da uno nuevo en el sitio del saque. Así nadie va
+      // andando a buscarlo detrás de la portería o a la grada mientras parece que no pasa nada.
+      const outside = b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3;
+      if (outside && !b.path) { b.roll = null; b.x = x; b.y = y; b.z = 0; }
       this.place = { x, y, to: tk ? tk.pid : null, team, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: null };
       b.owner = null; b.roll = null;
     }
@@ -743,7 +747,11 @@
         this.place = null;
       };
       if (this.instant || this.t - P.t0 > 12) { done(); return; }   // saltos de tiempo, o seguro para no atascarse
-      if (P.phase === 'land') { if (!b.path) P.phase = 'fetch'; else return; }
+      if (P.phase === 'land') {
+        if (b.path) return;
+        P.phase = 'fetch';
+        if (b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3) { b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; }   // balón nuevo
+      }
       if (P.phase === 'fetch') {
         if (P.rid == null || !this.A[P.rid]) {
           // va a por él la más cercana del equipo que saca (la que saca, si está cerca)
@@ -754,7 +762,7 @@
           if (P.rid == null) { done(); return; }
         }
         const r = this.A[P.rid];
-        r.tx = b.x; r.ty = b.y; r.run = 0.95;
+        r.tx = b.x; r.ty = b.y; r.run = 1;
         if (Math.hypot(r.x - b.x, r.y - b.y) < 1.1) {
           b.owner = r.pid; b.z = 0;
           const far = Math.hypot(P.x - b.x, P.y - b.y) > 14;
@@ -821,7 +829,7 @@
       if (!gk) return [];
       const [x, y] = this.world(i, 5.5, Wd / 2 + (Math.random() < 0.5 ? -6 : 6));
       return [
-        { d: 0.5, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this.brain.restartBy(i, 'gk'); } },
+        { d: 0.5, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 1 } } }; this.brain.restartBy(i, 'gk'); } },
         { d: 0.3, start: () => { this.ov = null; if (this.A[gk.pid]) { this.ball.owner = gk.pid; this.poss = i; } this.brain.ownTeam = i; this.brain.next = this.t + 0.5; } }
       ];
     }
