@@ -279,7 +279,7 @@
         code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
         night: (this.S.week * 7 + home.id) % 3 === 0,
         time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia',
-        weather: this.m.weather || weatherFor(this.S, home, h)
+        weather: 'despejado'
       };
     }
 
@@ -2012,7 +2012,6 @@
         c.restore();
         for (const [fx, fy] of [[-4, -9], [L + 4, -9], [-4, Wd + 3], [L + 4, Wd + 3]]) { c.fillStyle = '#fffbe6'; c.fillRect(X(fx) - 3, Y(fy) - 2, 6, 4); }
       }
-      this._weatherFx(real);
       // Rótulo
       if (this.banner && this.banner.until > this.t) {
         const bn = this.banner;
