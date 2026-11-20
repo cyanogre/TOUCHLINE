@@ -110,7 +110,7 @@
       const m = this.P.m, tot = this.possT[0] + this.possT[1];
       if (!m.min || tot < 6) return 0;
       const t0 = m.stats.possSum[0] / m.min, tgt = i === 0 ? t0 : 1 - t0;
-      return clamp((tgt - this.possT[i] / tot) * 1.8, -0.3, 0.3);
+      return clamp((tgt - this.possT[i] / tot) * 2.5, -0.35, 0.35);
     }
 
     /** Puestos, líneas y estilo de juego de un equipo (se recalcula al cambiar el once o el sistema). */
@@ -640,7 +640,8 @@
     /** Cada fotograma (desde la vista): duelos, balón suelto, saques y decisiones de la poseedora. */
     tick(dt) {
       const P = this.P, b = P.ball;
-      this.possT[this.attTeam()] += dt;
+      // La posesión que cuenta para acercarse a la del motor es la del juego libre (ni escenas ni jugadas preparadas)
+      if (!P.beat && !P.script.length) this.possT[this.attTeam()] += dt;
       if (P.hold || P.over || P.beat || P.script.length || P.fetch || P.place || b.path) return;
       if (this._outCheck()) return;
       if (b.owner == null) { this._loose(); return; }
@@ -656,8 +657,9 @@
     _loose() {
       const P = this.P, b = P.ball;
       if (b.z > 1.4) return;
+      const off = this.lastKick && P.t - this.lastKick.t < 4 && this.offAtKick ? this.offAtKick : null;
       let best = null, bd = 1.25;
-      for (const id in P.A) { const a = P.A[id]; if (a.state === 'down' || a.state === 'sit') continue; const d = hyp(a.x - b.x, a.y - b.y); if (d < bd) { bd = d; best = a; } }
+      for (const id in P.A) { const a = P.A[id]; if (a.state === 'down' || a.state === 'sit' || (off && off.has(a.pid))) continue; const d = hyp(a.x - b.x, a.y - b.y); if (d < bd) { bd = d; best = a; } }
       if (best) { this._how = 'loose'; P._receive(best.pid); }
     }
 
@@ -693,7 +695,8 @@
       if (!this.fouls || !this.fouls.length || P.beat || P.script.length || P.queue.length) return false;
       this.fouls = this.fouls.filter(f => f.until > P.t && f.e.team !== c.team || f.e.team === c.team && f.until > P.t);
       const k = this.fouls.findIndex(f => f.e.team !== c.team);
-      if (k < 0) return false;
+      if (k < 0 || P.isGK(c)) return false;
+      if (P.depth(c.team, c.x) > L - 17.5 && Math.abs(c.y - CY) < 21) return false;   // en el área sería penalti
       let o = null, od = 2.2;
       for (const a of P.team(1 - c.team)) { if (P.isGK(a) || a.state === 'down') continue; const d = hyp(a.x - c.x, a.y - c.y); if (d < od) { od = d; o = a; } }
       if (!o) return false;
@@ -980,8 +983,9 @@
         tx = lerp(c.x, tx, o.cut.s); ty = lerp(c.y, ty, o.cut.s); to = o.cut.o.pid; what = 'cut';
       } else if (Math.random() > o.pRec && o.duel) { to = o.duel.pid; what = 'duel'; }
       this.lastKick = { team: i, from: c.pid, to: o.r.pid, type: o.type, what, t: P.t, h: o.h };
-      this.kickTeam = i; this.lastTouch = i;
-      if (to != null && P.A[to] && P.A[to].team !== i) this.lastTouch = i; // la toca quien corta al recibir
+      this.kickTeam = i; this.lastTouch = i; this.restart = null;
+      if (c.held) c.held = false;
+      this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.carry = null; this.next = P.t + 99;
       P._kick(tx, ty, { h: o.h, to, T: T || undefined, done: to == null ? () => this._landed() : null });
       this.say('pass', { team: i, p: c.pid, q: o.r.pid, type: o.type, d: P.depth(i, o.tx), lat: P.lat(i, o.ty) });
@@ -1006,12 +1010,14 @@
       const kind = U.weighted(['near', 'far', 'back'], k => ({ near: 1, far: 0.9, back: 0.5 })[k]);
       const [tx, ty] = kind === 'near' ? P.world(i, 98, CY + side * 4) : kind === 'far' ? P.world(i, 96, CY - side * 7) : P.world(i, 90, CY - side * 2);
       // ¿Quién la gana? La portera si cae en su área pequeña, si no el mejor colocado (las defensas lo tienen más fácil)
-      const near = Object.values(P.A).filter(a => a.state !== 'down' && hyp(a.x - tx, a.y - ty) < 7);
+      const offNow = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
+      const near = Object.values(P.A).filter(a => a.state !== 'down' && !offNow.has(a.pid) && hyp(a.x - tx, a.y - ty) < 7);
       let win = null;
       const gk = P.gkOf(opp);
       if (gk && kind !== 'back' && hyp(gk.x - tx, gk.y - ty) < 7.5 && Math.random() < 0.35) win = gk;
       else if (near.length) win = U.weighted(near, a => (a.team === opp ? 2.2 : 1) * (0.4 + this.st(a)[5] / 100) / (0.6 + hyp(a.x - tx, a.y - ty)));
       this.lastKick = { team: i, from: c.pid, to: win ? win.pid : null, type: 'cross', what: win && win.team === opp ? 'cut' : 'ok', t: P.t, h: 4 };
+      this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.kickTeam = i; this.lastTouch = i;
       this.carry = null; this.next = P.t + 99;
       if (kind === 'back') P._kick(tx, ty, { h: 0.05, to: win ? win.pid : null, done: win ? null : () => this._landed() });
@@ -1031,7 +1037,8 @@
       const [tx, ty] = P.world(i, clamp(d, 10, 92), clamp(l, -1, Wd + 1));
       if (c.held) c.held = false;
       this.lastKick = { team: i, from: c.pid, to: null, type: gk ? 'gklong' : 'clear', what: 'ok', t: P.t, h: 6 };
-      this.kickTeam = i; this.lastTouch = i;
+      this.kickTeam = i; this.lastTouch = i; this.restart = null;
+      this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.carry = null; this.next = P.t + 99;
       const dist = hyp(tx - c.x, ty - c.y);
       P._kick(tx, ty, { h: clamp(dist * 0.18, 4, 11), done: () => this._landed(true) });
@@ -1043,7 +1050,9 @@
       const P = this.P, b = P.ball;
       b.z = 0;
       if (b.y < -0.2 || b.y > Wd + 0.2 || b.x < -0.2 || b.x > L + 0.2) return; // fuera: lo verá _outCheck
-      const near = Object.values(P.A).filter(a => a.state !== 'down' && hyp(a.x - b.x, a.y - b.y) < 3.2);
+      const off = this.offAtKick || new Set();
+      this.offAtKick = null;
+      const near = Object.values(P.A).filter(a => a.state !== 'down' && !off.has(a.pid) && hyp(a.x - b.x, a.y - b.y) < 3.2);
       if (!near.length) return;
       const w = U.weighted(near, a => (0.5 + this.st(a)[5] / 100) / (0.5 + hyp(a.x - b.x, a.y - b.y)));
       if (aerial && near.length > 1) { w.jump = P.t; this.say('aerial', { team: w.team, p: w.pid }); }

@@ -143,9 +143,6 @@
       this.cam = { x: (VIEW.x0 + VIEW.x1) / 2, y: (VIEW.y0 + VIEW.y1) / 2, z: 1, tx: null, ty: null, tz: 1 };
       this.slow = 1; this.slowT = 1;
       this.banner = null;
-      this.decide = 0.8;
-      this.nextThrow = 14 + Math.random() * 20;
-      this.runner = null;
       this.st = this._stadium();
       this.crowd = this._crowd();
       for (const i of [0, 1]) for (const o of match.teams[i].onPitch) this._spawn(i, o.pid);
@@ -1396,7 +1393,7 @@
           const top = b.y < Wd / 2;
           this.cornerTop = top;
           this.brain.lastTouch = 1 - i;
-          this._kick(gx + dir * 1.6, top ? U.rand(3, 13) : Wd - U.rand(3, 13), { h: 1.1, T: 0.55, free: true, done: () => {} });
+          this._kick(gx + dir * 1.6, top ? U.rand(1, 6) : Wd - U.rand(1, 6), { h: 1.1, T: 0.55, free: true, done: () => {} });
         } },
         { d: 0.5, start: () => { this.brain.say('out', { team: i, kind: 'corner' }); } }
       ];
@@ -1581,6 +1578,8 @@
       if (card === 'red') { this.keep.add(fouler); f.red = true; }
       const hard = card || e.hard;
       const spot = { x: clamp(victim.x, 2, L - 2), y: clamp(victim.y, 2, Wd - 2) };
+      // Si no es penalti, la falta es fuera del área de quien la comete
+      if (this.depth(1 - i, spot.x) > L - 17.5 && Math.abs(spot.y - Wd / 2) < 21) spot.x = this.world(1 - i, L - 18, 0)[0];
       const beats = [
         { d: 0.65, start: () => {
           this.poss = 1 - i;
