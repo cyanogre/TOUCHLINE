@@ -69,8 +69,15 @@ void main(){
   // quedan planas y rectas sobre el césped
   vec4 m0 = texture2D(tM, uv);
   float lineM = smoothstep(.5, .72, min(m0.r, min(m0.g, m0.b)));
-  q = mix(q, uv, lineM);
-  h = mix(h, 0., lineM);
+  // Máscara rectangular del terreno de juego (de -2,5 m a 107,5 m y de -2,5 m a 70,5 m, con borde suave): ahí todo
+  // es suelo plano y no se desplaza con el gesto (ni césped ni líneas, así no se duplican). Fuera del rectángulo
+  // (gradas, banquillos) y la capa de las porterías conservan la profundidad.
+  vec2 wpos = vec2(-21. + uv.x * 147., -16.5 + uv.y * 99.);
+  float inX = smoothstep(-4., -2.5, wpos.x) * (1. - smoothstep(107.5, 109., wpos.x));
+  float inY = smoothstep(-4., -2.5, wpos.y) * (1. - smoothstep(70.5, 72., wpos.y));
+  float pitchM = mode > 0.5 ? lineM : max(lineM, inX * inY);
+  q = mix(q, uv, pitchM);
+  h = mix(h, 0.176, lineM);   // la línea, a la altura del césped
   vec4 gg = texture2D(tG, q);
   vec3 col = mode > 0.5 ? gg.rgb : texture2D(tC, q).rgb;
   vec4 m = texture2D(tM, q);
@@ -84,7 +91,13 @@ void main(){
   // Sombras que proyecta lo alto sobre lo bajo (mapa de altura)
   float sh = 0.;
   vec2 st = -L.xy * vec2(1., aspect) * 0.007;
-  for (int i=1;i<=12;i++){ float hh = texture2D(tH, q - st*float(i)).r; sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.)); }
+  for (int i=1;i<=12;i++){
+    vec2 sq = q - st*float(i);
+    vec4 sm = texture2D(tM, sq);
+    // Las líneas del campo están algo elevadas en el mapa de altura: no proyectan sombra (era la «segunda línea»)
+    float hh = mix(texture2D(tH, sq).r, h, smoothstep(.5, .72, min(sm.r, min(sm.g, sm.b))));
+    sh = max(sh, clamp((hh - h - float(i)*0.02)*4., 0., 1.));
+  }
   float lit = 1. + rel*0.9 - sh*0.5;
   // De noche: casi todo a oscuras salvo lo que iluminan los focos (mapa de luces: el campo, banquillos y zonas
   // técnicas); la grada en penumbra
