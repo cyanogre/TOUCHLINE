@@ -2187,23 +2187,64 @@
     /** Vallas LED junto a las bandas: lo que pasa en el partido, la figura de la temporada y anuncios. */
     _boards(X, Y, s) {
       const c = this.cx;
-      const B = this._board || (this._board = { msg: null, until: 0, k: 0 });
-      if (!B.msg || this.t > B.until) {
-        const q = this.boardQ && this.boardQ.shift();
-        B.msg = q || this._adText(); B.until = this.t + (q ? 7 : 9); B.born = this.t; B.hot = !!q;
-      }
-      const txt = TL.t ? TL.t(B.msg) : B.msg;
-      for (const [y0, flip] of [[-2.4, false], [Wd + 1.1, false]]) {
-        const x0 = 4, w = L - 8, hgt = 1.3;
-        c.fillStyle = '#0a0d12'; c.fillRect(X(x0), Y(y0), w * s, hgt * s);
+      const B = this._board || (this._board = { msg: null, until: 0 });
+      // Lo que pasa en el partido ocupa toda la valla un rato; si no, anuncios por paneles
+      if (B.msg && this.t > B.until) B.msg = null;
+      if (!B.msg && this.boardQ && this.boardQ.length) { B.msg = this.boardQ.shift(); B.until = this.t + 7; B.born = this.t; }
+      if (!this._ads || this.t > this._adsAt) { this._ads = this._makeAds(); this._adsAt = this.t + 11; this._adsBorn = this.t; }
+      for (const y0 of [-2.9, Wd + 1.1]) {
+        const x0 = 4, w = L - 8, hgt = 1.8;
+        c.fillStyle = '#07090c'; c.fillRect(X(x0), Y(y0), w * s, hgt * s);
         c.save(); c.beginPath(); c.rect(X(x0), Y(y0), w * s, hgt * s); c.clip();
-        c.font = `800 ${Math.max(8, 1.05 * s)}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
-        const tw = c.measureText(txt).width + 40 * s / 10;
-        const off = ((this.t - B.born) * 6 * s) % (tw);
-        c.fillStyle = B.hot ? (Math.floor(this.t * 4) % 2 ? '#ffd23f' : '#ffffff') : '#b8f53d';
-        for (let xx = X(x0) - off; xx < X(x0) + w * s; xx += tw) c.fillText(txt, xx, Y(y0 + hgt / 2));
+        if (B.msg) {
+          const txt = TL.t ? TL.t(B.msg) : B.msg;
+          c.fillStyle = Math.floor(this.t * 4) % 2 ? '#2a1600' : '#001a2a'; c.fillRect(X(x0), Y(y0), w * s, hgt * s);
+          c.font = `900 ${Math.max(8, 1.05 * s)}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle';
+          const tw = c.measureText(txt).width + 6 * s, off = ((this.t - B.born) * 7 * s) % tw;
+          c.fillStyle = Math.floor(this.t * 4) % 2 ? '#ffd23f' : '#ffffff';
+          for (let xx = X(x0) - off; xx < X(x0) + w * s; xx += tw) c.fillText(txt, xx, Y(y0 + hgt / 2));
+        } else {
+          const n = this._ads.length, pw = w / n, slide = Math.min(1, (this.t - this._adsBorn) * 2);
+          this._ads.forEach((ad, k) => this._adPanel(ad, X(x0 + k * pw), Y(y0) + (1 - slide) * hgt * s, pw * s, hgt * s));
+        }
+        // Brillo de pantalla LED
+        c.fillStyle = 'rgb(255 255 255 / 0.05)'; c.fillRect(X(x0), Y(y0), w * s, hgt * s * 0.35);
         c.restore();
       }
+    }
+    /** Un juego de anuncios: colores, «logotipos» de píxeles que parecen algo sin ser nada, texto y efectos. */
+    _makeAds() {
+      const pal = [['#e63946', '#ffffff'], ['#1d3557', '#a8dadc'], ['#ffb703', '#023047'], ['#2a9d8f', '#e9f5db'], ['#7b2cbf', '#ffd6ff'], ['#06d6a0', '#073b4c'], ['#ef476f', '#fff3b0'], ['#111111', '#b8f53d'], ['#f77f00', '#fcbf49'], ['#0077b6', '#caf0f8']];
+      const syl = ['ZU', 'KO', 'RA', 'MI', 'TEX', 'VOL', 'NEX', 'LO', 'PA', 'GRO', 'FI', 'TA', 'XO', 'BRU', 'QI', 'NOR'];
+      const ads = [], n = 4 + Math.floor(Math.random() * 3);
+      for (let k = 0; k < n; k++) {
+        const [bg, fg] = pal[Math.floor(Math.random() * pal.length)];
+        // logotipo: patrón simétrico de 7×5 píxeles
+        const logo = []; for (let y = 0; y < 5; y++) { const row = []; for (let x = 0; x < 4; x++) row.push(Math.random() < 0.5); logo.push(row.concat(row.slice(0, 3).reverse())); }
+        const word = Array.from({ length: 2 + Math.floor(Math.random() * 2) }, () => syl[Math.floor(Math.random() * syl.length)]).join('');
+        const real = Math.random() < 0.25 ? U.pick(ADS).split('·')[0].trim() : null;
+        ads.push({ bg, fg, logo, word: real || word, fx: ['scroll', 'flash', 'grad', 'noise', 'still'][Math.floor(Math.random() * 5)], ph: Math.random() * 6 });
+      }
+      const star = this._adText(); if (/GOLES/.test(star)) { ads[0].word = star; ads[0].fx = 'scroll'; }
+      return ads;
+    }
+    _adPanel(ad, x, y, w, h) {
+      const c = this.cx, t = this.t + ad.ph;
+      c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+      if (ad.fx === 'grad') { const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, ad.bg); g.addColorStop((Math.sin(t) + 1) / 2, ad.fg); g.addColorStop(1, ad.bg); c.fillStyle = g; }
+      else c.fillStyle = ad.fx === 'flash' && Math.floor(t * 3) % 2 ? ad.fg : ad.bg;
+      c.fillRect(x, y, w, h);
+      const fg = ad.fx === 'flash' && Math.floor(t * 3) % 2 ? ad.bg : ad.fg;
+      // ruido de píxeles de colores (parece una imagen, no es nada)
+      if (ad.fx === 'noise') { const px = Math.max(2, h / 6); for (let i = 0; i < w / px; i++) for (let j = 0; j < 6; j++) if ((Math.sin(i * 12.9 + j * 78.2 + Math.floor(t * 2)) * 43758.5) % 1 > 0.55) { c.fillStyle = (i + j) % 3 ? fg : '#ffffff55'; c.fillRect(x + i * px, y + j * px, px, px); } }
+      // logotipo
+      const ps = h / 7;
+      c.fillStyle = fg;
+      ad.logo.forEach((row, j) => row.forEach((on, i) => { if (on) c.fillRect(x + ps + i * ps, y + ps + j * ps, ps, ps); }));
+      c.font = `900 ${Math.max(7, h * 0.62)}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle';
+      const tx = x + ps * 9 - (ad.fx === 'scroll' ? ((t * h * 1.5) % (w * 0.6)) : 0);
+      c.fillText(ad.word, tx, y + h / 2);
+      c.restore();
     }
     _adText() {
       const S = this.S, ids = this.m.teams.flatMap(t => t.onPitch.map(o => o.pid));
