@@ -162,6 +162,8 @@
       this.coaches = [0, 1].map(i => actor('coach', L / 2 + (i === 0 ? -11 : 11), TECH_Y, { team: i, base: L / 2 + (i === 0 ? -11 : 11) }));
       this.warm = [0, 1].map(i => [0, 1, 2].map(k => actor('warm', i === 0 ? 14 + k * 3 : L - 14 - k * 3, Wd + 3.8, { team: i, k })));
       this.medics = [];
+      this.boys = [];        // recogepelotas
+      this.spare = [];       // balones viejos que se quedan fuera hasta que alguien los recoge
       this.fx = [];
       this.sparks = [];
       this.queue = [];
@@ -669,14 +671,27 @@
         if (u >= 1) {
           b.path = null;
           const r = p.to != null ? this.A[p.to] : null;
-          if (p.done) p.done();
+          // Velocidad con la que llega (para que bote y ruede en vez de caer en seco)
+          const dl0 = Math.max(0.01, Math.hypot(p.tx - p.fx, p.ty - p.fy)), vh = p.ease === 'out' ? 0 : dl0 / p.T;
+          const vzEnd = ((p.tz - p.fz) - 4 * p.h) / p.T;
+          const settle = () => {
+            if (b.path || b.owner != null || this.instant) return;
+            if (this.netShake && this.netShake.until > this.t) return;      // dentro de la red se queda
+            const k = b.z > 0.3 || vzEnd < -2 ? 0.45 : 0.6;                 // si viene del aire pierde más al botar
+            const v = Math.min(14, vh * k);
+            // Bote según la altura desde la que cae (caída libre), no según lo rápido que se dibujó la parábola
+            const peak = Math.max(p.fz, p.tz) + p.h, vi = Math.sqrt(2 * 9.8 * Math.max(0.05, peak));
+            const vz = b.z > 0.05 ? -vi * 0.7 : (peak > 0.4 ? Math.min(4.5, vi * 0.42) : 0);
+            b.roll = { vx: (p.tx - p.fx) / dl0 * v, vy: (p.ty - p.fy) / dl0 * v, vz };
+          };
+          if (p.done) { p.done(); settle(); }
           else if (r && !this.beat && !this.script.length && Math.hypot(r.x - b.x, r.y - b.y) > 2.2) {
             // En juego abierto, si la receptora no ha llegado, el balón sigue su camino perdiendo fuerza
             const dl = Math.max(0.1, Math.hypot(p.tx - p.fx, p.ty - p.fy)), v = Math.min(7, dl / p.T * 0.4);
             b.z = 0; b.roll = { vx: (p.tx - p.fx) / dl * v, vy: (p.ty - p.fy) / dl * v };
           }
           else if (r) this._receive(p.to);
-          else if (b.z > 0.2 && !b.owner) b.z = 0;
+          else settle();
         }
       } else if (b.owner != null) {
         const a = this.A[b.owner];
@@ -692,9 +707,13 @@
         }
       } else if (b.roll) {
         b.x += b.roll.vx * dt; b.y += b.roll.vy * dt;
-        b.roll.vx *= 1 - dt * 1.6; b.roll.vy *= 1 - dt * 1.6;
-        b.z = Math.max(0, b.z - dt * 4);
-        if (Math.hypot(b.roll.vx, b.roll.vy) < 0.4) b.roll = null;
+        b.roll.vx *= 1 - dt * (b.z > 0.05 ? 0.25 : 1.6); b.roll.vy *= 1 - dt * (b.z > 0.05 ? 0.25 : 1.6);
+        // Botes: sube y baja con gravedad y en cada bote pierde fuerza
+        if (b.roll.vz != null) {
+          b.roll.vz -= 9.8 * dt; b.z += b.roll.vz * dt;
+          if (b.z <= 0) { b.z = 0; b.roll.vz = b.roll.vz < -1.2 ? -b.roll.vz * 0.48 : 0; if (b.roll.vz) { b.roll.vx *= 0.82; b.roll.vy *= 0.82; } }
+        } else b.z = Math.max(0, b.z - dt * 4);
+        if (Math.hypot(b.roll.vx, b.roll.vy) < 0.4 && !b.roll.vz && b.z <= 0.01) b.roll = null;
       }
       // Estela del balón cuando va rápido
       b.trail.push([b.x, b.y, b.z]);
@@ -742,10 +761,43 @@
       // Balón fuera del campo (o casi): el recogepelotas da uno nuevo en el sitio del saque. Así nadie va
       // andando a buscarlo detrás de la portería o a la grada mientras parece que no pasa nada.
       const outside = b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3;
-      if (outside && !b.path) { b.roll = null; b.x = x; b.y = y; b.z = 0; }
+      if (outside && !b.path) this._ballBoy(x, y);
       this.place = { x, y, to: tk ? tk.pid : null, team, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: null };
       b.owner = null; b.roll = null;
     }
+    /**
+     * Balón fuera del campo: el viejo se queda donde cayó, un recogepelotas lanza uno nuevo al sitio del saque
+     * y otro va a por el viejo y se lo lleva. Así nada «vuelve solo».
+     */
+    _ballBoy(x, y) {
+      const b = this.ball;
+      this.spare.push({ x: b.x, y: b.y, t: this.t });
+      // El que da el balón: justo fuera de la línea más cercana al sitio del saque
+      const dG = Math.min(x, L - x), dT = Math.min(y, Wd - y);
+      const bx = dG < dT ? (x < L / 2 ? -2.2 : L + 2.2) : clamp(x, 1, L - 1), by = dG < dT ? clamp(y, Wd / 2 - 14, Wd / 2 + 14) : (y < Wd / 2 ? -1.6 : Wd + 1.6);
+      const giver = actor('boy', bx, by, { until: this.t + 3.2 }); giver.tx = bx; giver.ty = by;
+      giver.state = 'throw'; giver.throwAt = this.t;
+      const old = this.spare[this.spare.length - 1];
+      const fetcher = actor('boy', bx + (bx < 0 ? -1.5 : bx > L ? 1.5 : 3), by + (by < 0 ? -1 : by > Wd ? 1 : 0), { until: this.t + 7, fetch: old });
+      this.boys.push(giver, fetcher);
+      b.owner = null; b.roll = null; b.x = bx; b.y = by; b.z = 1.2;
+      const d = Math.hypot(x - bx, y - by);
+      b.path = { fx: bx, fy: by, fz: 1.2, tx: x, ty: y, tz: 0, h: Math.min(2.2, 0.6 + d * 0.06), T: clamp(d / 14, 0.45, 1.1), t: 0, to: null, curve: 0, nx: 0, ny: 0 };
+    }
+    _boysStep(dt) {
+      if (!this.boys.length && !this.spare.length) return;
+      for (const k of this.boys) {
+        if (k.fetch) {
+          const o = k.fetch;
+          if (!o.taken) { k.tx = o.x; k.ty = o.y; k.run = 0.8; if (Math.hypot(k.x - o.x, k.y - o.y) < 0.8) o.taken = true; }
+          else { k.tx = k.x < 0 ? -6 : k.x > L ? L + 6 : k.x; k.ty = k.y < Wd / 2 ? -6 : Wd + 6; k.run = 0.5; o.x = k.x; o.y = k.y; }
+        } else { k.run = 0.4; }
+        this._move(k, dt);
+      }
+      this.boys = this.boys.filter(k => k.until > this.t);
+      this.spare = this.spare.filter(o => !(o.taken && !this.boys.some(k => k.fetch === o)) && this.t - o.t < 9);
+    }
+
     _placeStep() {
       const P = this.place, b = this.ball;
       const done = () => {
@@ -757,7 +809,7 @@
       if (P.phase === 'land') {
         if (b.path) return;
         P.phase = 'fetch';
-        if (b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3) { b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; }   // balón nuevo
+        if (b.x < 0.3 || b.x > L - 0.3 || b.y < 0.3 || b.y > Wd - 0.3) { this._ballBoy(P.x, P.y); P.phase = 'land'; return; }   // balón nuevo del recogepelotas
       }
       if (P.phase === 'fetch') {
         if (P.rid == null || !this.A[P.rid]) {
@@ -1949,6 +2001,7 @@
       this.coaches.forEach(c => this._move(c, dt));
       this.warm.forEach(ws => ws.forEach(w => { if (w.on) this._move(w, dt); }));
       this.medics.forEach(m => this._move(m, dt));
+      this._boysStep(dt);
       this._ballUpdate(dt);
       this._openPlay(dt);
       // Cámara
@@ -2093,7 +2146,9 @@
       const people = [];
       for (const id in this.A) people.push(this.A[id]);
       for (const a of this.leaving) people.push(a);
-      people.push(this.ref, this.fourth, ...this.ars, ...this.coaches, ...this.medics);
+      people.push(this.ref, this.fourth, ...this.ars, ...this.coaches, ...this.medics, ...this.boys);
+      // Balones viejos fuera del campo (hasta que se los lleva un recogepelotas)
+      for (const o of this.spare) { const br0 = Math.max(2.2, 0.36 * s); if (!(TL.Balls && TL.Balls.draw(c, TL.Balls.selected(), X(o.x), Y(o.y), br0, 0))) { c.fillStyle = '#fff'; c.beginPath(); c.arc(X(o.x), Y(o.y), br0, 0, 6.283); c.fill(); } }
       this.warm.forEach(ws => ws.forEach(w => { if (w.on) people.push(w); }));
       people.sort((a, b) => a.y - b.y);
       c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -3266,6 +3321,16 @@
         const r = R * 0.75;
         c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fillStyle = '#ffffff'; c.fill();
         c.fillStyle = '#e53935'; c.fillRect(x - r * 0.15, y - r * 0.6, r * 0.3, r * 1.2); c.fillRect(x - r * 0.6, y - r * 0.15, r * 1.2, r * 0.3);
+        return;
+      }
+      if (a.kind === 'boy') {
+        // Recogepelotas: chándal del club local, más pequeño
+        const r = R * 0.58, thr = a.state === 'throw' && this.t - a.throwAt < 0.5;
+        c.beginPath(); c.ellipse(x + 1, y + r * 0.9, r * 0.9, r * 0.33, 0, 0, 6.283); c.fillStyle = 'rgb(0 0 0 / 0.25)'; c.fill();
+        c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fillStyle = '#2a2f3a'; c.fill();
+        c.lineWidth = 1.5; c.strokeStyle = this.colors[0].main; c.stroke();
+        if (thr) { c.fillStyle = '#f2d2b6'; c.fillRect(x - r * 0.3, y - r * 1.6, r * 0.6, r * 0.7); }
+        if (a.fetch && a.fetch.taken) { c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x + r * 0.8, y - r * 0.4, r * 0.45, 0, 6.283); c.fill(); }
         return;
       }
       if (a.kind === 'warm') {
