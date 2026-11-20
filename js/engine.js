@@ -353,6 +353,10 @@
       this.pl = {}; // pid -> registro individual
       this.incidents = []; // incidentes para noticias: {type, team, pid, min}
       this.ref = refereeFor(S, homeId);
+      // El tiempo del partido (según la zona y el mes) y sus efectos, suaves
+      this.weather = TL.Weather ? TL.Weather.forMatch(S, S.clubs[homeId], homeId * 7919 + awayId * 104729) : 'despejado';
+      try { this.forceBolt = /[?&]rayo=1/.test(location.search); } catch (e) { /* nada */ }
+      this.wfx = TL.Weather ? TL.Weather.fx(this.weather) : { equal: 1, xg: 1, injury: 1, fatigue: 1 };
       this.bonus = [TL.Manager.bonus(S, homeId), TL.Manager.bonus(S, awayId)];
       this.teams = [this._team(homeId, 0, awayId), this._team(awayId, 1, homeId)];
       this._str = null;
@@ -462,8 +466,8 @@
 
     xg(i) {
       const [a, b] = [this.strengths()[i], this.strengths()[1 - i]];
-      const diff = a.attack - b.defense + (i === 0 ? HOME_ADV : 0);
-      let x = BASE_XG * Math.exp(XG_K * diff);
+      const diff = (a.attack - b.defense + (i === 0 ? HOME_ADV : 0)) * this.wfx.equal;
+      let x = BASE_XG * Math.exp(XG_K * diff) * this.wfx.xg;
       const t = this.teams[i], bo = this.bonus[i];
       const own = MENT_OWN[t.mentality];
       x *= (own > 1 ? own + bo.mentBonus : own < 1 ? own - bo.mentBonus * 0.3 : 1) * MENT_OPP[this.teams[1 - i].mentality];
@@ -564,7 +568,9 @@
           this._ev('late', i, null, null, say('late', { t: this.S.clubs[t.club].name }));
         }
         this._tire(i, possI);
-        if (Math.random() < 0.22 / 90 * this.bonus[i].injury * this._tiredRisk(i)) this._injury(i);
+        if (Math.random() < 0.22 / 90 * this.bonus[i].injury * this.wfx.injury * this._tiredRisk(i)) this._injury(i);
+        // Rayo: rarísimo, solo con temporal (?rayo=1 lo fuerza en las pruebas)
+        if (this.weather === 'temporal' && !this.bolt && (Math.random() < 1 / 4000 / 180 || (this.forceBolt && m === 20 && i === 1))) this._lightning(i);
         if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
       }
       if (m % 5 === 0) this._str = null; // el cansancio va pesando
@@ -865,6 +871,19 @@
       return 1 + Math.max(0, 72 - s / on.length) / 22;
     }
 
+    /** Un rayo alcanza a un jugador. Muere: sale del partido y del fútbol. */
+    _lightning(i) {
+      const t = this.teams[i];
+      if (!t.onPitch.length) return;
+      const o = U.pick(t.onPitch), p = this.P(o.pid), rec = this.pl[p.id];
+      if (!rec) return;
+      this.bolt = { team: i, pid: p.id, min: this.min };
+      rec.inj = 999; rec.dead = true;
+      this._ev('inj', i, p.id, null, `¡Un rayo cae sobre el campo y alcanza a ${p.short}! Las asistencias entran corriendo… El partido se detiene. Silencio absoluto en el estadio.`, { bolt: true });
+      if (t.subs < t.maxSubs && (t.autoSubs || !t.isUser)) { if (!this._bestSub(i, o)) o.hurt = true; } else o.hurt = true;
+      this._str = null;
+    }
+
     _injury(i) {
       const t = this.teams[i];
       if (!t.onPitch.length) return;
@@ -911,7 +930,7 @@
     _tire(i, possI) {
       const t = this.teams[i];
       const press = 0.92 + 0.16 * (1 - (possI == null ? 0.5 : possI));
-      const ment = [0.95, 1, 1.08][t.mentality] * (t.desperate ? 1.08 : 1) * (this.bonus[i].fatigue || 1) * press;
+      const ment = [0.95, 1, 1.08][t.mentality] * (t.desperate ? 1.08 : 1) * (this.bonus[i].fatigue || 1) * this.wfx.fatigue * press;
       for (const o of t.onPitch) {
         const r = this.pl[o.pid], p = this.P(o.pid);
         if (!r) continue;
@@ -1133,6 +1152,11 @@
         const fat = this.bonus[r.team].fatigue;
         const drop = (p.pos === 'GK' ? 4 : 10 + Math.random() * 6) * (mins / 90) * (1.15 - p.st[5] / 250) * fat;
         p.fit = U.clamp(Math.round(p.fit - drop), 30, 100);
+        if (r.dead) {
+          p.club = -2; p.listed = false; p.dead = true; p.inj = 0;
+          if (TL.News) TL.News.add(S, 'club', `Tragedia: muere ${p.name} alcanzado por un rayo`, `Un rayo cayó sobre el terreno de juego en el minuto ${this.bolt ? this.bolt.min : '?'} durante el temporal. El fútbol está de luto.`, -1, p.id, 'bad');
+          continue;
+        }
         if (r.inj) { p.inj = Math.max(p.inj, r.inj); injuries.push([+id, r.inj]); }
         if (r.r) { p.sus = Math.max(p.sus, r.r); reds.push([+id, r.r, r.rKind]); }
         // Ciclo de 5 amarillas = 1 partido de sanción
