@@ -773,7 +773,7 @@
       if (this.restart && this.restart.kind === 'gk' && this.restart.team === team && !P.isGK(a)) this.restart = null;
       // Despeje de cabeza tras un centro o un balón largo que cae en el área propia
       const pr = this.pressOn(a);
-      if (lk && lk.team !== team && (lk.type === 'cross' || lk.type === 'long') && P.depth(team, a.x) < 30 && !P.isGK(a)) { this.mustClear = a.pid; this.next = P.t + 0.05; return; }
+      if (!force && lk && lk.team !== team && (lk.type === 'cross' || lk.type === 'long') && P.t - lk.t < 3.5 && P.depth(team, a.x) < 30 && !P.isGK(a)) { this.mustClear = a.pid; this.mustHead = (lk.h || 0) > 1.5; this.next = P.t + 0.05; return; }
       // Primer control: con presión y si la técnica no acompaña, se escapa
       const sc = this.st(a);
       const bad = clamp(0.03 + (62 - sc[3]) / 420 + (pr < 1.8 ? 0.07 : 0) + (lk && lk.h > 1.5 ? 0.06 : 0), 0.01, 0.22);
@@ -803,7 +803,7 @@
       const favored = ag && ag.team === i;            // está preparando una jugada: busca la zona
       const opts = [];
       // Despeje obligado (cabezazo tras un centro)
-      if (this.mustClear === c.pid) { this.mustClear = null; this._clear(c, true); return; }
+      if (this.mustClear === c.pid) { this.mustClear = null; this._clear(c, this.mustHead !== false); this.mustHead = null; return; }
       // 1) Pases
       for (const r of mates) {
         if (this.offside(i, r) && !(this.runs[r.pid] && this.runs[r.pid].k === 'behind' && P.depth(i, r.x) <= this.offD(i) + 0.25)) continue;
@@ -951,8 +951,9 @@
 
     _pass(c, o, forced) {
       const P = this.P, i = c.team;
-      let tx = o.tx, ty = o.ty, to = o.r.pid, what = 'ok';
+      let tx = o.tx, ty = o.ty, to = o.r.pid, what = 'ok', T = null;
       const roll = Math.random();
+      if (this.ag && this.ag.team === i) { o = Object.assign({}, o, { pAcc: 1 - (1 - o.pAcc) * 0.3, pInt: o.pInt * 0.12, pRec: 1 - (1 - o.pRec) * 0.12 }); }
       if (forced) {
         // Se prepara una jugada del rival: este pase lo corta quien mejor colocada esté
         const ag = this.ag, cand = P.team(1 - i).filter(a => !P.isGK(a));
@@ -962,10 +963,12 @@
           if (m < bm) { bm = m; best = a; bs = s; }
         }
         if (best) {
-          // punto de la línea de pase más cercano a ella (lo alcanza antes de que pase el balón)
+          // punto de la línea de pase más cercano a ella; el balón llega justo cuando ella
           const vx = tx - c.x, vy = ty - c.y, vv = vx * vx + vy * vy || 1;
           const k = clamp(((best.x - c.x) * vx + (best.y - c.y) * vy) / vv, 0.2, 0.95);
           tx = c.x + vx * k; ty = c.y + vy * k; to = best.pid; what = 'cut';
+          const d = hyp(tx - c.x, ty - c.y);
+          T = Math.max(0.12 + d / 17, this.reach(best, tx, ty, 0.15) + 0.05);
         }
         if (ag) ag.forceOn = null;
       } else if (roll > o.pAcc) {
@@ -980,7 +983,7 @@
       this.kickTeam = i; this.lastTouch = i;
       if (to != null && P.A[to] && P.A[to].team !== i) this.lastTouch = i; // la toca quien corta al recibir
       this.carry = null; this.next = P.t + 99;
-      P._kick(tx, ty, { h: o.h, to, done: to == null ? () => this._landed() : null });
+      P._kick(tx, ty, { h: o.h, to, T: T || undefined, done: to == null ? () => this._landed() : null });
       this.say('pass', { team: i, p: c.pid, q: o.r.pid, type: o.type, d: P.depth(i, o.tx), lat: P.lat(i, o.ty) });
     }
 
@@ -1076,6 +1079,7 @@
       if (ready || ag.T > ag.max) {
         this.ag = null;
         e.fromPlay = ready || this._agClose(ag);
+        if (!e.fromPlay) e.fromPlay = this._agCut(ag);
         if (e.fromPlay && ag.kind === 'foul') this._agFoulVictim(ag);
         return false;
       }
@@ -1090,7 +1094,7 @@
       const P = this.P;
       const team = kind === 'foul' ? 1 - e.team : e.team;    // quién tiene que tener el balón
       if (team == null || team < 0) return null;
-      const ag = { e, kind, team, T: 0, max: { shot: 5, corner: 4.5, foul: 3.2, box: 5, fk: 4, off: 3 }[kind] || 4, want: [] };
+      const ag = { e, kind, team, T: 0, max: { shot: 6, corner: 5.5, foul: 4, box: 6, fk: 5, off: 4 }[kind] || 5, want: [] };
       if (kind === 'shot') {
         ag.origin = e.origin || 'open';
         ag.spot = P._shotSpot(team, e.shotType || 'placed');
@@ -1142,7 +1146,31 @@
       if (!car || car.team !== ag.team) return false;
       const d = P.depth(ag.team, car.x);
       if (ag.kind === 'foul') { const f = P.A[ag.e.pid]; return !!f && hyp(f.x - car.x, f.y - car.y) < 18; }
-      return d > ({ shot: 38, corner: 60, box: 60, fk: 55, off: 30 }[ag.kind] || 50);
+      return d > ({ shot: 50, corner: 60, box: 62, fk: 55, off: 30 }[ag.kind] || 50);
+    }
+    /** No ha dado tiempo: corte de realización al momento de la jugada (destello, como en la tele). */
+    _agCut(ag) {
+      const P = this.P, e = ag.e, i = ag.team, side = Math.random() < 0.5 ? -1 : 1;
+      const want = ag.want.map(pid => P.A[pid]).find(a => a && !P.isGK(a));
+      switch (ag.kind) {
+        case 'shot': {
+          const o = ag.origin;
+          const d = o === 'cross' ? 80 : o === 'long' ? 64 : o === 'counter' ? 56 : 70;
+          const l = o === 'cross' ? CY + side * 26 : CY + side * U.rand(4, 14);
+          const who = o === 'cross' ? null : want && want.pid !== e.pid ? want : null;
+          return P._cutTo(i, d, l, who ? who.pid : null);
+        }
+        case 'box': return P._cutTo(i, 80, CY + side * U.rand(4, 12), want ? want.pid : e.pid);
+        case 'fk': return P._cutTo(i, 74, CY + side * U.rand(2, 14), null);
+        case 'corner': return P._cutTo(i, 82, CY + side * 24, null);
+        case 'off': return P._cutTo(i, 52, CY + side * U.rand(4, 18), null);
+        case 'foul': {
+          const f = P.A[e.pid];
+          if (!f) return false;
+          return P._cutTo(i, clamp(P.depth(i, f.x) + 1.8, 3, L - 3), clamp(P.lat(i, f.y), 3, Wd - 3), want ? want.pid : null);
+        }
+      }
+      return false;
     }
     /** La falta se la hacen a quien lleva el balón (si el motor no nombró a nadie en el texto). */
     _agFoulVictim(ag) {

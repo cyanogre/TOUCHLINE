@@ -568,8 +568,14 @@
         b.z = Math.max(0, lerp(p.fz, p.tz, u) + 4 * p.h * u * (1 - u));
         if (u >= 1) {
           b.path = null;
+          const r = p.to != null ? this.A[p.to] : null;
           if (p.done) p.done();
-          else if (p.to != null && this.A[p.to]) this._receive(p.to);
+          else if (r && !this.beat && !this.script.length && Math.hypot(r.x - b.x, r.y - b.y) > 2.2) {
+            // En juego abierto, si la receptora no ha llegado, el balón sigue su camino perdiendo fuerza
+            const dl = Math.max(0.1, Math.hypot(p.tx - p.fx, p.ty - p.fy)), v = Math.min(7, dl / p.T * 0.4);
+            b.z = 0; b.roll = { vx: (p.tx - p.fx) / dl * v, vy: (p.ty - p.fy) / dl * v };
+          }
+          else if (r) this._receive(p.to);
           else if (b.z > 0.2 && !b.owner) b.z = 0;
         }
       } else if (b.owner != null) {
@@ -722,7 +728,7 @@
       if (!gk) return [];
       const [x, y] = this.world(i, 5.5, Wd / 2 + (Math.random() < 0.5 ? -6 : 6));
       return [
-        { d: 1.3, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this.brain.restartBy(i, 'gk'); } },
+        { d: 0.5, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this.brain.restartBy(i, 'gk'); } },
         { d: 0.3, start: () => { this.ov = null; if (this.A[gk.pid]) { this.ball.owner = gk.pid; this.poss = i; } this.brain.ownTeam = i; this.brain.next = this.t + 0.5; } }
       ];
     }
@@ -765,6 +771,20 @@
       for (const id in this.A) mv(this.A[id]);
       mv(this.ref); this.ars.forEach(mv);
       this.cutAt = this.t;
+    }
+
+    /** Corte de realización a una jugada: la poseedora aparece con el balón en la zona y el resto se recoloca (con destello). */
+    _cutTo(i, d, l, pid) {
+      const [x, y] = this.world(i, clamp(d, 2, L - 2), clamp(l, 2, Wd - 2));
+      const a = (pid != null && this.A[pid] && !this.isGK(this.A[pid])) ? this.A[pid] : this.nearest(this.team(i).filter(p => !this.isGK(p)), { x, y });
+      if (!a) return false;
+      a.x = x; a.y = y; a.vx = a.vy = 0;
+      const b = this.ball;
+      b.path = null; b.roll = null; b.owner = a.pid; b.x = x + this.dir[i] * 0.5; b.y = y; b.z = 0;
+      this.poss = i; this.fetch = null; this.place = null;
+      this.brain.afterScript(); this.brain.ownTeam = i; this.brain.lastTouch = i;
+      this._cut(0.92);
+      return true;
     }
 
     _clearStates() {
@@ -983,6 +1003,42 @@
       const say = (p, q, type2) => this.brain.say('pass', { team: i, p, q, type: type2 });
       const beats = [];
       this.ov = { p: {} };
+      const rebound = type === 'tapin' && /rechace/.test(e.text || '') && car.pid !== shooter;
+      if (rebound) {
+        const gk = this.gkOf(1 - i), gx = this.goalX(i), side = sy < Wd / 2 ? -1 : 1;
+        // Quien dispara primero lo hace desde la frontal: si quien lleva el balón está lejos, se la da a quien está cerca (o conduce hasta allí)
+        const [fx, fy] = this.world(i, U.rand(84, 89), Wd / 2 + U.rand(-8, 8));
+        const near = this.team(i).filter(a => a.pid !== shooter && !this.isGK(a)).sort((p, q) => Math.hypot(p.x - fx, p.y - fy) - Math.hypot(q.x - fx, q.y - fy))[0];
+        const first = ass != null && this.A[ass] && Math.hypot(this.A[ass].x - fx, this.A[ass].y - fy) < 22 ? ass : near ? near.pid : car.pid;
+        if (first !== car.pid) {
+          beats.push({ d: 0.05, ball: true, start: () => { say(car.pid, first, 'prog'); this.ov.p[first] = { x: fx, y: fy, run: 1 }; this.ov.p[shooter] = { x: lerp(this.A[shooter].x, sx, 0.5), y: lerp(this.A[shooter].y, sy, 0.5), run: 1 }; this._kick(fx, fy, { h: 0.05, to: first }); } });
+          beats.push({ d: 0.2, start: () => { this._receive(first, true); } });
+        } else if (this.depth(i, car.x) < 80) {
+          beats.push({ d: clamp(Math.hypot(fx - car.x, fy - car.y) / 6, 0.3, 1.6), start: () => { this.ov.p[first] = { x: fx, y: fy, run: 1 }; this.ov.p[shooter] = { x: sx, y: sy, run: 1 }; } });
+        }
+        // Disparo, la portera la saca con una mano… y la rematadora llega antes que nadie
+        beats.push({ d: 0.05, ball: true, slow: 0.7, start: () => {
+          this.ov.p[shooter] = { x: sx, y: sy, run: 1 };
+          this._focus(lerp(this.ball.x, gx, 0.6), Wd / 2, 1.45);
+          if (gk) { gk.state = 'dive'; gk.dive = side * dir; gk.until = this.t + 1.1; this.ov.p[gk.pid] = { x: gx - dir * 1.0, y: Wd / 2 + side * 2, run: 1 }; }
+          this._kick(gx - dir * 0.9, Wd / 2 + side * 2.2, { h: 0.3, T: 0.5, done: () => {} });
+        } });
+        beats.push({ d: 0.05, ball: true, slow: 0.6, start: () => {
+          if (!this.instant && TL.SFX) TL.SFX.save && TL.SFX.save();
+          // El rechace cae donde llega la rematadora (que ya venía lanzada hacia el área)
+          const S = this.A[shooter];
+          let px = sx, py = sy, T = 0.45;
+          if (S) {
+            const d = Math.hypot(sx - S.x, sy - S.y), can = 6.2 * (S.pace || 1) * 0.6;
+            if (d > can) { px = S.x + (sx - S.x) * can / d; py = S.y + (sy - S.y) * can / d; }
+            T = Math.max(0.45, Math.hypot(px - S.x, py - S.y) / (6.2 * (S.pace || 1)) + 0.15);
+            this.ov.p[shooter] = { x: px, y: py, run: 1 };
+          }
+          this._kick(px, py, { h: 0.7, T, free: true, done: () => {} });
+        } });
+        beats.push(...this._finish(e, shooter, type, outcome, epic));
+        return beats;
+      }
       if (car.pid === shooter && !air) {
         // Ella misma: se planta en la zona de remate y dispara
         const dd = Math.hypot(sx - car.x, sy - car.y);
@@ -1262,7 +1318,7 @@
     /** Córner: el área se llena, cada uno con su marca, el portero en la línea. */
     _cornerSetup(i, shooter) {
       const dir = this.dir[i], gx = this.goalX(i);
-      return [{ d: 2.6, start: () => {
+      return [{ d: 2.0, start: () => {
         const top = this.cornerTop != null ? this.cornerTop : Math.random() < 0.5;
         this.cornerTop = null;
         const cy = top ? 0.4 : Wd - 0.4;
@@ -1562,14 +1618,10 @@
       beats.push({ d: 0.8, start: () => {
         // Se saca la falta en corto
         this.refOv = null;
-        const taker = this.nearest(this.team(1 - i).filter(a => a !== victim), spot);
-        this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null);
+        const taker = this.nearest(this.team(1 - i).filter(a => a !== victim && !this.isGK(a)), spot);
+        this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null, 1 - i);
         this.ov = null;
-        if (taker) {
-          this._receive(taker.pid);
-          const mate = this.nearest(this.team(1 - i).filter(a => a !== taker && a !== victim && !this.isGK(a)), { x: spot.x + this.dir[1 - i] * 8, y: spot.y });
-          if (mate) setTimeout(() => { if (this.ball.owner === taker.pid) this._kick(mate.x, mate.y, { h: 0.05, to: mate.pid, sfx: false }); }, 250);
-        }
+        this.brain.restartBy(1 - i, 'fk');
       } });
       this._seq(beats);
     }
@@ -1662,8 +1714,8 @@
         { d: 0.6, start: () => {
           this.ov = null;
           const taker = this.nearest(this.team(1 - i), { x: tx, y: ty });
-          this._placeBall(tx, ty, 0.5, taker ? taker.pid : null);
-          if (taker) { this._receive(taker.pid); const [lx, ly] = this.world(1 - i, U.rand(45, 60), U.rand(10, Wd - 10)); setTimeout(() => { if (this.ball.owner === taker.pid) this._kick(lx, ly, { h: 7, T: 1.4, done: () => this._contest() }); }, 300); }
+          this._placeBall(tx, ty, 0.5, taker ? taker.pid : null, 1 - i);
+          this.brain.restartBy(1 - i, 'fk');
         } }
       ]);
     }

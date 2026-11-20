@@ -104,6 +104,7 @@
   // ------------------------------------------------------------ Radio: jugada a jugada (lo cuenta el propio campo)
   function onCall(c) {
     if (!MV.radio || MV.skip || !MV.m) return;
+    if (narrOn() && !MV.showing) return;   // modo narrado: el campo oculto no se cuenta
     const r = MV.radio.feed(c);
     if (!r) return;
     liveCall(r.call, r.prio, r.team);
