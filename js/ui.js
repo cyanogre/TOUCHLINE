@@ -321,6 +321,16 @@
     renderTitle();
   };
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
+  A['opt-balls'] = () => {
+    const B = TL.Balls, sel = B.selected();
+    const cells = Array.from({ length: B.count }, (_, i) => {
+      const ok = B.unlocked(i);
+      return `<button class="ball-cell ${i === sel ? 'on' : ''} ${ok ? '' : 'locked'}" ${ok ? `data-act="ball-pick" data-i="${i}"` : 'disabled'} title="${ok ? B.fxName(i) : 'Bloqueado'}">
+        <span style="background-position:${(i % 8) / 7 * 100}% ${Math.floor(i / 8) / 7 * 100}%"></span>${ok ? '' : '🔒'}</button>`;
+    }).join('');
+    UI.sheet(UI.sheetHead('Balón del partido') + `<p class="note">Cada partido en directo desbloquea 2 balones nuevos. Cada balón deja su estela; algunos tienen efecto propio (fuego, hielo, rayo, arcoíris, galaxia…).</p><div class="ball-grid">${cells}</div><p class="note mt">Elegido: <b>${B.fxName(sel)}</b></p>`);
+  };
+  A['ball-pick'] = b => { TL.Balls.select(+b.dataset.i); A['opt-balls'](); };
   A['opt-crt'] = () => { try { localStorage.setItem('touchline.crt', localStorage.getItem('touchline.crt') !== '0' ? '0' : '1'); } catch (e) { /* nada */ } UI.refresh(); };
   A['opt-campo'] = () => { try { localStorage.setItem('touchline.campo', localStorage.getItem('touchline.campo') !== '0' ? '0' : '1'); } catch (e) { /* nada */ } UI.toast('Se aplicará al recargar la página'); UI.refresh(); };
   A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); UI.refresh(); };
@@ -1679,6 +1689,7 @@
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-balls">⚽ Balón del partido</button>
           <button data-act="opt-crt">📺 Filtro CRT: <b>${localStorage.getItem('touchline.crt') !== '0' ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-campo">🏟️ Estadio dibujado: <b>${localStorage.getItem('touchline.campo') !== '0' ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-mentor">${profeIc()} Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>

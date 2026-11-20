@@ -371,6 +371,7 @@
   function onFinal() {
     clearTimeout(MV.timer);
     MV.finished = true;
+    if (TL.Balls) { const nw = TL.Balls.addMatch(); if (nw > 0) setTimeout(() => UI.toast(`⚽ ¡${nw} balones nuevos desbloqueados! Elígelos en el menú`), 1500); }
     const fin = () => {
       if (!MV.pitch || !MV.m) return;
       if (MV.pitch.busy()) { setTimeout(fin, 250); return; }

@@ -2030,14 +2030,17 @@
       c.beginPath(); c.ellipse(X(b.x) + b.z * 0.25 * s, Y(b.y) + br * 0.5, br * (1 - Math.min(0.5, b.z * 0.05)), br * 0.42, 0, 0, 6.283);
       c.fillStyle = `rgb(0 0 0 / ${0.38 - Math.min(0.25, b.z * 0.03)})`; c.fill();
       const fast = b.trail.length > 3 && Math.hypot(b.trail[b.trail.length - 1][0] - b.trail[0][0], b.trail[b.trail.length - 1][1] - b.trail[0][1]) > 2.2;
-      if (fast) {
-        c.beginPath();
-        b.trail.forEach(([x, y, z], k) => { const px = X(x), py = Y(y) - z * s * 0.9; k ? c.lineTo(px, py) : c.moveTo(px, py); });
-        c.strokeStyle = 'rgb(255 255 255 / 0.35)'; c.lineWidth = br; c.lineCap = 'round'; c.stroke(); c.lineCap = 'butt';
+      const BI = TL.Balls ? TL.Balls.selected() : 0, fx = TL.Balls ? TL.Balls.fx(BI) : 'estela', bc = TL.Balls ? TL.Balls.color(BI) : '#ffffff';
+      const bx = X(b.x), by = Y(b.y) - b.z * s * 0.9;
+      if (fast || fx === 'fantasma' || fx === 'vacio') this._ballFx(fx, bc, br, X, Y, s, fast);
+      // El balón gira según lo que rueda
+      const last = this._bl || [b.x, b.y]; this.ballRot = (this.ballRot || 0) + Math.hypot(b.x - last[0], b.y - last[1]) / 0.11 * (b.x >= last[0] ? 1 : -1) * 0.15; this._bl = [b.x, b.y];
+      c.globalAlpha = fx === 'fantasma' ? 0.75 : 1;
+      if (!TL.Balls || !TL.Balls.draw(c, BI, bx, by, br, this.ballRot)) {
+        c.beginPath(); c.arc(bx, by, br, 0, 6.283); c.fillStyle = '#ffffff'; c.fill();
+        c.lineWidth = 1; c.strokeStyle = '#1a1a1a'; c.stroke();
       }
-      c.beginPath(); c.arc(X(b.x), Y(b.y) - b.z * s * 0.9, br, 0, 6.283); c.fillStyle = '#ffffff'; c.fill();
-      c.lineWidth = 1; c.strokeStyle = '#1a1a1a'; c.stroke();
-      c.beginPath(); c.arc(X(b.x) - br * 0.25, Y(b.y) - b.z * s * 0.9 - br * 0.2, br * 0.35, 0, 6.283); c.fillStyle = '#2b2b2b'; c.fill();
+      c.globalAlpha = 1;
       // Porterías por encima (capa aparte): el balón que entra queda dentro de la red; tiemblan con el gol o el palo
       if (art) {
         const gi = TL.StadiumGL.image('goals');
@@ -2254,6 +2257,39 @@
         for (let i = 0; i < 6; i++) { c.fillStyle = '#fff6d0'; const yy = (H * (i / 6) + t * 14) % H; c.fillRect(0, yy + Math.sin(t * 2 + i) * 6, W, 3); }
         c.restore();
       }
+    }
+
+    /** Efectos del balón elegido: estela de su color, fuego, hielo, rayo, arcoíris, galaxia, fantasma, tóxico o vacío. */
+    _ballFx(fx, col, br, X, Y, s, fast) {
+      const c = this.cx, b = this.ball, T = b.trail, t = this.t;
+      const P = k => [X(T[k][0]), Y(T[k][1]) - T[k][2] * s * 0.9];
+      const line = (stroke, w) => { c.beginPath(); T.forEach((_, k) => { const [x, y] = P(k); k ? c.lineTo(x, y) : c.moveTo(x, y); }); c.strokeStyle = stroke; c.lineWidth = w; c.lineCap = 'round'; c.stroke(); c.lineCap = 'butt'; };
+      if (fx === 'vacio' || fx === 'fantasma') {
+        const [x, y] = [X(b.x), Y(b.y) - b.z * s * 0.9];
+        const g = c.createRadialGradient(x, y, 0, x, y, br * 3);
+        g.addColorStop(0, fx === 'vacio' ? 'rgb(120 40 200 / 0.55)' : 'rgb(230 240 255 / 0.35)'); g.addColorStop(1, 'rgb(0 0 0 / 0)');
+        c.fillStyle = g; c.beginPath(); c.arc(x, y, br * 3, 0, 6.283); c.fill();
+        if (!fast) return;
+      }
+      if (fx === 'arcoiris') {
+        for (let k = 1; k < T.length; k++) { const [x0, y0] = P(k - 1), [x1, y1] = P(k); c.strokeStyle = `hsl(${(k * 50 + t * 300) % 360} 90% 60% / 0.8)`; c.lineWidth = br * (0.5 + k / T.length); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+      } else if (fx === 'fuego') {
+        line('rgb(255 120 20 / 0.55)', br * 1.6); line('rgb(255 220 80 / 0.7)', br * 0.7);
+        for (let k = 0; k < 4; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = Math.random() < 0.5 ? '#ffb020' : '#ff5a1a'; c.fillRect(x + (Math.random() - 0.5) * br * 2, y - Math.random() * br * 2, 2, 2); }
+      } else if (fx === 'hielo') {
+        line('rgb(160 225 255 / 0.55)', br * 1.3);
+        for (let k = 0; k < 3; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = '#ffffff'; c.fillRect(x + (Math.random() - 0.5) * br * 2.5, y + (Math.random() - 0.5) * br * 2.5, 2, 2); }
+      } else if (fx === 'rayo') {
+        c.beginPath(); T.forEach((_, k) => { const [x, y] = P(k); const j = k ? (Math.random() - 0.5) * br * 1.6 : 0; k ? c.lineTo(x + j, y + j) : c.moveTo(x, y); });
+        c.strokeStyle = 'rgb(255 245 120 / 0.9)'; c.lineWidth = 2; c.stroke(); line('rgb(120 180 255 / 0.3)', br * 1.2);
+      } else if (fx === 'galaxia') {
+        line('rgb(110 60 200 / 0.5)', br * 1.4);
+        for (let k = 0; k < 4; k++) { const [x, y] = P(Math.floor(Math.random() * T.length)); c.fillStyle = ['#ffffff', '#ffd6ff', '#9ad8ff'][k % 3]; c.fillRect(x + (Math.random() - 0.5) * br * 2.4, y + (Math.random() - 0.5) * br * 2.4, 1.5, 1.5); }
+      } else if (fx === 'toxico') {
+        line('rgb(120 230 60 / 0.55)', br * 1.3);
+        const [x, y] = P(0); c.fillStyle = 'rgb(140 240 70 / 0.8)'; c.beginPath(); c.arc(x, y + br, br * 0.35, 0, 6.283); c.fill();
+      } else if (fx === 'fantasma') line('rgb(235 245 255 / 0.25)', br * 2);
+      else { const [r, g, bl] = [1, 3, 5].map(k => parseInt(col.slice(k, k + 2), 16)); line(`rgb(${r} ${g} ${bl} / 0.45)`, br); }
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
