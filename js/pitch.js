@@ -2186,18 +2186,43 @@
           const x = ART_VIEW.x0 + (px + Math.random()) / cv.width * (ART_VIEW.x1 - ART_VIEW.x0), y = ART_VIEW.y0 + (py + Math.random()) / cv.height * (ART_VIEW.y1 - ART_VIEW.y0);
           const away = x > L * 0.86 && y > Wd / 2;
           const r = Math.random();
-          pts.push({ x, y, h: hd ? hd[o] / 255 : 0.5, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
+          pts.push({ x, y, aw: away, ang: Math.atan2(y - Wd / 2, x - L / 2), h: hd ? hd[o] / 255 : 0.5, ph: Math.random() * 6, c: away ? (r < 0.7 ? this.colors[1].main : '#d8d8d8') : r < 0.5 ? this.st.seat : r < 0.68 ? this.st.seat2 : ['#c9d3cf', '#9aa8a2', '#e6e0d0'][k % 3] });
         }
         this._fanPts = pts;
       }
-      const c = this.cx, z = Math.max(1, 0.42 * s);
-      const party = this.sparkUntil && this.sparkUntil > this.t;
+      const c = this.cx, z = Math.max(1, 0.42 * s), t = this.t;
+      const dt = Math.min(0.1, Math.max(0, t - (this._fanT || t))); this._fanT = t;
+      const party = this.sparkUntil && this.sparkUntil > t;
+      // Goles: salta la afición del que marca; con goleada o partido loco, la grada hace la ola
+      const sc = this.m.score || [0, 0], last = this._fanSc || (this._fanSc = sc.slice());
+      for (const i of [0, 1]) if (sc[i] > last[i]) {
+        this.cheer = { team: i, until: t + 7 };
+        const tot = sc[0] + sc[1], lead = Math.abs(sc[0] - sc[1]);
+        if ((lead >= 2 || tot >= 3) && !(this.wave && this.wave.end > t)) this.wave = { start: t + 6, end: t + 20, dir: Math.random() < 0.5 ? 1 : -1 };
+      }
+      this._fanSc = sc.slice();
+      // Ánimo de la grada: más goles, ventaja local y final de partido → más gente botando y alguna ola espontánea
+      const excite = Math.min(1, (sc[0] + sc[1]) * 0.15 + Math.max(0, sc[0] - sc[1]) * 0.15 + ((this.m.min || 0) > 75 ? 0.15 : 0));
+      if (!(this.wave && this.wave.end > t) && Math.random() < dt * (0.004 + excite * 0.03)) this.wave = { start: t, end: t + 14, dir: Math.random() < 0.5 ? 1 : -1 };
+      const W8 = this.wave && t >= this.wave.start && t < this.wave.end ? this.wave : null;
+      const front = W8 ? (((t - W8.start) * 1.7 * W8.dir) % 6.283 + 6.283) % 6.283 - Math.PI : 0;
+      const ch = this.cheer && this.cheer.until > t ? this.cheer : null;
       // Mismo desplazamiento que el sombreador del estadio: uv' = uv + tilt·0,022·altura
       const g = this.tilt || { x: 0, y: 0 }, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
       const px = g.x * 0.022 * VW, py = g.y * 0.022 * (VH / VW) * VH;
       for (const f of this._fanPts) {
-        const j = party ? Math.abs(Math.sin(this.t * 9 + f.ph)) * 0.35 : Math.sin(this.t * 1.5 + f.ph) * 0.04;
-        c.fillStyle = f.c; c.fillRect(X(f.x + px * f.h), Y(f.y + py * f.h - j), z, z);
+        let j = Math.sin(t * 1.5 + f.ph) * 0.04, arms = 0;
+        const mine = ch && (ch.team === 1) === !!f.aw;
+        if (mine || party) { j = Math.abs(Math.sin(t * 9 + f.ph)) * 0.4; arms = Math.sin(t * 9 + f.ph) > 0.3 ? 1 : 0; }
+        else if (excite > 0.3 && (f.ph * 97 % 1) < excite * 0.25) j = Math.abs(Math.sin(t * 7 + f.ph)) * 0.25;   // algunos botan solos
+        if (W8) {
+          let d = f.ang - front; d = Math.atan2(Math.sin(d), Math.cos(d));
+          const a = Math.exp(-d * d / 0.05);
+          if (a > 0.05) { j = Math.max(j, a * 0.75); if (a > 0.45) arms = 1; }
+        }
+        const x = X(f.x + px * f.h), y = Y(f.y + py * f.h - j);
+        c.fillStyle = f.c; c.fillRect(x, y, z, z);
+        if (arms) { c.fillStyle = 'rgb(255 236 214 / 0.85)'; c.fillRect(x, y - z, z, z); }   // brazos arriba
       }
     }
 
