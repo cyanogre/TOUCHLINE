@@ -1587,3 +1587,11 @@ body.shake-s { animation: shake-s .35s; }
   mix-blend-mode: multiply; animation: crtFlicker 3.5s infinite steps(60); }
 .match.crt #pitch { filter: saturate(1.15) contrast(1.08) blur(.25px); }
 @keyframes crtFlicker { 0%, 100% { opacity: .95; } 48% { opacity: .88; } 50% { opacity: 1; } 52% { opacity: .9; } }
+
+/* Elegir balón */
+.ball-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
+.ball-cell { position: relative; aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); display: grid; place-items: center; font-size: 12px; }
+.ball-cell span { width: 78%; aspect-ratio: 1; background-image: url(../assets/balones.png); background-size: 800% 800%; image-rendering: pixelated; }
+.ball-cell.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.ball-cell.locked span { filter: grayscale(1) brightness(.35); }
+.ball-cell.locked { position: relative; }
