@@ -49,7 +49,7 @@
         <div class="live-call" id="mv-live"><span class="lc-t">Los equipos saltan al campo.</span></div>
         <i class="pip-grip" aria-hidden="true"></i>
         <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
-        <button class="crt-btn" data-act="mv-crt" aria-label="Filtro CRT" title="Filtro de tele antigua (CRT)">📺</button>
+        <button class="crt-btn" data-act="mv-crt" aria-label="Filtro CRT" title="Filtro de tele antigua (CRT)">📺</button>${testMode() ? `<button class="crt-btn wx-btn" data-act="mv-wx" title="Prueba: cambiar el tiempo">${TL.Weather.ICON[MV.m.weather || 'despejado']}</button>` : ''}
         <button class="cam-btn" data-act="mv-cam" aria-label="Cámara" title="Cámara: campo entero, TV o cerca"><span id="mv-cam-l">Cámara</span></button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
       <div class="mtabs"><div class="seg" id="mv-tabs">
@@ -642,6 +642,15 @@
     const z = MV.pitch.zoom || 1, k = CAMS.findIndex(c => c[0] > z + 0.05);
     const nx = CAMS[k < 0 ? 0 : k];
     MV.pitch.setZoom(nx[0]); UI.toast(nx[1]);
+  };
+  // Prueba del tiempo (?test): alterna todos los tiempos en directo para verlos
+  function testMode() { try { return /[?&](test|tiempo)\b/.test(location.search); } catch (e) { return false; } }
+  A['mv-wx'] = b => {
+    const T = TL.Weather.TYPES, cur = (MV.pitch && MV.pitch.st.weather) || 'despejado', nx = T[(T.indexOf(cur) + 1) % T.length];
+    if (MV.pitch) MV.pitch.setWeather(nx);
+    MV.m.weather = nx; MV.m.wfx = TL.Weather.fx(nx);
+    if (b) b.textContent = TL.Weather.ICON[nx];
+    UI.toast(`${TL.Weather.ICON[nx]} ${TL.Weather.NAMES[nx]}`);
   };
   A['mv-crt'] = () => { if (MV.pipDragged) return; const on = !crtOn(); try { localStorage.setItem('touchline.crt', on ? '1' : '0'); } catch (e) { /* nada */ } el('match').classList.toggle('crt', on); };
   A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };

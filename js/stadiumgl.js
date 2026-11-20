@@ -156,9 +156,11 @@ void main(){
     const a = o.t * 0.01;
     // Día, tarde (sol bajo y cálido: sombras largas) o noche (focos)
     const dusk = o.time === 'tarde', night = o.time === 'noche';
-    const wetSky = o.weather === 'lluvia';
+    // Cielo según el tiempo: cubierto (luz fría y apagada, sombras suaves), temporal (muy oscuro), calor (cálido)
+    const W8 = o.weather || 'despejado', SKY = { nublado: [0.9, 0.92, 0.96], lluvia: [0.8, 0.85, 0.92], temporal: [0.62, 0.68, 0.8], nieve: [0.92, 0.96, 1.04], niebla: [0.9, 0.92, 0.95], calor: [1.08, 1.0, 0.88], viento: [0.98, 0.98, 1] };
+    const wetSky = !!SKY[W8] && W8 !== 'calor' && W8 !== 'viento';
     let tint = night ? [0.78, 0.84, 1.0] : dusk ? [1.12, 0.9, 0.72] : [1, 1, 1];
-    if (wetSky) tint = tint.map((v, i) => v * [0.8, 0.85, 0.92][i]);   // cielo cubierto: luz más fría y apagada
+    if (SKY[W8]) tint = tint.map((v, i) => v * SKY[W8][i]);
     gl.uniform3f(u.tint, tint[0], tint[1], tint[2]);
     gl.viewport(0, 0, cv.width, cv.height);
     gl.uniform2f(u.tilt, o.tilt.x, o.tilt.y);

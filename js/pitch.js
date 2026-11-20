@@ -321,7 +321,7 @@
         night: (this.S.week * 7 + home.id) % 3 === 0,
         time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia',
         // Del tiempo, de momento solo la lluvia (pixelada); el resto queda despejado
-        weather: weatherFor(this.S, home, h) === 'lluvia' ? 'lluvia' : 'despejado',
+        weather: this.m.weather || 'despejado',
         hour: (this.S.week * 7 + home.id) % 3 === 0 ? ['20:00', '21:00', '21:15'][h % 3] : (this.S.week * 5 + home.id) % 3 === 0 ? ['17:30', '18:30', '19:00'][h % 3] : ['12:00', '14:00', '16:15'][h % 3]
       };
     }
@@ -1749,6 +1749,7 @@
     _injury(e) {
       const a = this.A[e.pid];
       if (!a) return;
+      if (e.bolt) { this.boltHit = { x: a.x, y: a.y, t: this.t, seed: Math.random() }; if (TL.SFX && TL.SFX.thunder) TL.SFX.thunder(true); }
       this.keep.add(e.pid);
       const subNext = this.queue.findIndex(x => x.type === 'sub' && x.pid2 === e.pid) >= 0;
       this._seq([
@@ -1861,7 +1862,7 @@
       this.t += dt;
       this._update(dt, real);
       this._draw(real);
-      this._rain(real);
+      this._weather(real);
       this._tube();
       this.raf = requestAnimationFrame(this._loop);
     }
@@ -2284,25 +2285,25 @@
      * Lluvia pixelada: gotas del tamaño de un píxel del dibujo del estadio (14 px por metro), pegadas a su rejilla,
      * en tres planos de profundidad; salpicaduras de píxeles sobre el césped y un velo gris de cielo cubierto.
      */
-    _rain(real) {
-      if (this.st.weather !== 'lluvia' || !this.X) return;
+    _rain(real, storm) {
+      if (!this.X) return;
       const c = this.cx, W = this.w, H = this.h, s = this.s, X = this.X, Y = this.Y;
       const ps = Math.max(1, Math.round(s / 14));              // un píxel del dibujo, en pantalla
       const k = Math.min(0.05, real);
       c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      c.fillStyle = 'rgb(28 36 50 / 0.16)'; c.fillRect(0, 0, W, H);
-      const want = Math.round(W * H / 520);
+      c.fillStyle = storm ? 'rgb(14 20 32 / 0.3)' : 'rgb(28 36 50 / 0.16)'; c.fillRect(0, 0, W, H);
+      const want = Math.round(W * H / (storm ? 230 : 520));
       const R = this.rainP || (this.rainP = []);
       while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3], len: 0.5 + Math.random() * 0.9, sp: 0.75 + Math.random() * 0.5, sl: (Math.random() - 0.5) * 0.18 });
       if (R.length > want) R.length = want;
       const cols = ['rgb(160 180 205 / 0.28)', 'rgb(185 205 228 / 0.42)', 'rgb(215 230 248 / 0.6)'];
       // Viento con rachas: la inclinación general cambia despacio; cada gota además tiene la suya
-      const t = this.t, wind = 0.12 + Math.sin(t * 0.23) * 0.08 + Math.sin(t * 0.71 + 1.3) * 0.05;
+      const t = this.t, wind = (storm ? 0.38 : 0.12) + Math.sin(t * 0.23) * (storm ? 0.14 : 0.08) + Math.sin(t * 0.71 + 1.3) * 0.05;
       for (let layer = 0; layer < 3; layer++) {
         c.fillStyle = cols[layer];
         for (let i = layer; i < R.length; i += 3) {
           const d = R[i], slope = wind * (0.7 + d.z * 0.5) + d.sl, v = 620 * d.z * d.sp;
-          d.y += v * k; d.x -= v * slope * k;
+          d.y += v * k * (storm ? 1.25 : 1); d.x -= v * slope * k * (storm ? 1.25 : 1);
           if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); d.len = 0.5 + Math.random() * 0.9; }
           if (d.x < -4) d.x += W + 8; else if (d.x > W + 8) d.x -= W + 12;
           // Gota en píxeles: tantos como mida, desplazándose en x según su inclinación (como una línea pixelada)
@@ -2312,7 +2313,7 @@
       }
       // Salpicaduras sobre el campo (en coordenadas del mundo: se mueven con la cámara)
       const S = this.splash || (this.splash = []);
-      const born = Math.min(12, Math.round((W * H / 3500) * k));
+      const born = Math.min(storm ? 30 : 12, Math.round((W * H / (storm ? 1500 : 3500)) * k));
       for (let i = 0; i < born; i++) S.push({ x: -6 + Math.random() * (L + 12), y: -4 + Math.random() * (Wd + 8), a: 0 });
       c.fillStyle = 'rgb(220 235 250 / 0.55)';
       for (let i = S.length - 1; i >= 0; i--) {
@@ -2324,7 +2325,275 @@
         else { const r = ps * (p.a < 0.15 ? 1 : 2); c.fillRect(x - r, y - ps, ps, ps); c.fillRect(x + r, y - ps, ps, ps); }
       }
       if (S.length > 400) S.splice(0, S.length - 400);
-      this._lensDrops(real, ps);
+      this._lensDrops(real, ps, storm);
+    }
+
+    /** Cambia el tiempo en directo (botón de prueba). */
+    setWeather(w) {
+      this.st.weather = w;
+      this.rainP = this.splash = this.lens = this.flakes = this.leaves = null;
+      this._snowCv = null; this._snowAt = -1; this.flash = 0; this.nextBolt = 0;
+    }
+
+    /** Efectos de cada tiempo, por encima de todo lo que se pinta en el campo. */
+    _weather(real) {
+      const w = this.st.weather;
+      if (!this.X || !w || w === 'despejado') { this._boltFx(real); return; }
+      const c = this.cx, ps = Math.max(1, Math.round(this.s / 14));
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      if (w === 'nublado') this._clouds(real, 0.2, false);
+      else if (w === 'lluvia') this._rain(real, false);
+      else if (w === 'temporal') { this._puddles(ps); this._rain(real, true); this._storm(real); }
+      else if (w === 'nieve') this._snow(real, ps);
+      else if (w === 'calor') this._heat(real, ps);
+      else if (w === 'niebla') this._fog(real);
+      else if (w === 'viento') this._wind(real, ps);
+      this._boltFx(real);
+    }
+
+    /** Ruido suave en mosaico (para nubes, niebla y nieve): valores 0..1 en una rejilla n×m que se repite. */
+    _noise(n, m, seed) {
+      const g = (x, y) => { const h = Math.sin((x % n) * 127.1 + (y % m) * 311.7 + seed * 74.7) * 43758.5453; return h - Math.floor(h); };
+      const out = new Float32Array(n * m * 16), N = n * 4, M = m * 4;
+      for (let oct = 0, amp = 0.6, f = 1; oct < 3; oct++, amp *= 0.5, f *= 2) {
+        for (let y = 0; y < M; y++) for (let x = 0; x < N; x++) {
+          const fx = x / 4 * f, fy = y / 4 * f, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+          const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+          const a = g(x0, y0), b = g(x0 + 1, y0), cc = g(x0, y0 + 1), d = g(x0 + 1, y0 + 1);
+          out[y * N + x] += amp * ((a * (1 - sx) + b * sx) * (1 - sy) + (cc * (1 - sx) + d * sx) * sy);
+        }
+      }
+      return { v: out, w: N, h: M };
+    }
+    /** Lienzo de manchas (nubes o niebla) a partir del ruido. */
+    _blobCv(key, rgb, lo, hi, maxA, seed) {
+      if (this[key]) return this[key];
+      const nz = this._noise(12, 8, seed), cv = document.createElement('canvas');
+      cv.width = nz.w; cv.height = nz.h;
+      const g = cv.getContext('2d'), im = g.createImageData(nz.w, nz.h);
+      for (let i = 0; i < nz.v.length; i++) {
+        const t = Math.min(1, Math.max(0, (nz.v[i] - lo) / (hi - lo)));
+        im.data[i * 4] = rgb[0]; im.data[i * 4 + 1] = rgb[1]; im.data[i * 4 + 2] = rgb[2]; im.data[i * 4 + 3] = Math.round(255 * maxA * t * t * (3 - 2 * t));
+      }
+      g.putImageData(im, 0, 0);
+      return (this[key] = cv);
+    }
+
+    /** Sombras de nubes que cruzan el estadio con el viento (en coordenadas del mundo). */
+    _clouds(real, strength, dark) {
+      const c = this.cx, X = this.X, Y = this.Y, s = this.s;
+      c.fillStyle = dark ? 'rgb(20 26 38 / 0.1)' : 'rgb(40 48 60 / 0.07)'; c.fillRect(0, 0, this.w, this.h);
+      const cv = this._blobCv('_cloudCv', [8, 12, 20], 0.45, 0.85, strength, 3);
+      const span = 190, off = (this.t * 1.4) % span;    // la nube recorre 190 m en bucle
+      c.save(); c.imageSmoothingEnabled = true;
+      for (let k = -1; k <= 1; k++) c.drawImage(cv, X(-40 + off + k * span), Y(-30), span * s, 130 * s);
+      c.restore();
+    }
+
+    /** Temporal: relámpagos que iluminan todo de golpe (doble destello) y el cielo muy cargado. */
+    _storm(real) {
+      const c = this.cx;
+      this._clouds(real, 0.28, true);
+      if (!this.nextBolt) this.nextBolt = this.t + 4 + Math.random() * 10;
+      if (this.t > this.nextBolt) { this.flash = 1; this.flash2 = this.t + 0.18; this.nextBolt = this.t + 7 + Math.random() * 16; if (TL.SFX && TL.SFX.thunder) setTimeout(() => TL.SFX.thunder(), 600 + Math.random() * 1600); }
+      if (this.flash2 && this.t > this.flash2) { this.flash = Math.max(this.flash, 0.7); this.flash2 = 0; }
+      if (this.flash > 0) {
+        c.fillStyle = `rgb(225 235 255 / ${(this.flash * 0.55).toFixed(3)})`; c.fillRect(0, 0, this.w, this.h);
+        this.flash = Math.max(0, this.flash - real * 5);
+      }
+    }
+
+    /** Charcos que crecen durante el temporal: reflejan el cielo y tiemblan con las gotas. */
+    _puddles(ps) {
+      const c = this.cx, X = this.X, Y = this.Y, s = this.s;
+      if (!this._pud) { const r = (i => { const h = Math.sin(i * 91.7 + 13) * 9137.1; return h - Math.floor(h); }); this._pud = Array.from({ length: 14 }, (_, i) => ({ x: 6 + r(i) * (L - 12), y: 4 + r(i + 50) * (Wd - 8), r: 0.8 + r(i + 99) * 1.8, e: 0.5 + r(i + 7) * 0.4 })); }
+      const grow = Math.min(1, 0.25 + (this.m.min || 0) / 70);
+      for (const p of this._pud) {
+        const rx = Math.max(ps, p.r * grow * s), ry = rx * p.e, cx = Math.round(X(p.x) / ps) * ps, cy = Math.round(Y(p.y) / ps) * ps;
+        // Charco en filas de píxeles (forma de elipse escalonada)
+        for (let yy = -ry; yy <= ry; yy += ps) {
+          const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (yy / ry) ** 2)) / ps) * ps;
+          if (!half) continue;
+          c.fillStyle = 'rgb(30 45 62 / 0.42)'; c.fillRect(cx - half, cy + yy, half * 2, ps);
+        }
+        c.fillStyle = 'rgb(200 215 235 / 0.35)'; c.fillRect(cx - rx * 0.4, cy - ry * 0.4, Math.max(ps, rx * 0.5), ps);
+        // Ondas de las gotas en el charco
+        if (Math.random() < 0.35) { c.fillStyle = 'rgb(230 240 255 / 0.5)'; c.fillRect(cx + (Math.random() - 0.5) * rx * 1.4, cy + (Math.random() - 0.5) * ry * 1.2, ps, ps); }
+      }
+    }
+
+    /**
+     * Nieve: copos de uno o dos píxeles en tres planos que bailan con el viento, y un manto que se acumula.
+     * Empieza en las gradas, techos y bordes del campo (lo alto y lo que no se pisa) y se va extendiendo
+     * hacia el centro; si existe assets/estadio/nieve.jpg (blanco = donde cuaja antes), manda ese mapa.
+     */
+    _snow(real, ps) {
+      const c = this.cx, W = this.w, H = this.h, X = this.X, Y = this.Y, s = this.s, k = Math.min(0.05, real);
+      c.fillStyle = 'rgb(200 212 230 / 0.07)'; c.fillRect(0, 0, W, H);
+      // Manto de nieve
+      const cover = Math.min(0.92, 0.2 + (this.m.min || 0) / 90 * 0.65 + (this._snowBoost || 0));
+      const cv = this._snowMap(cover);
+      if (cv) { c.save(); c.imageSmoothingEnabled = false; c.drawImage(cv, X(ART_VIEW.x0), Y(ART_VIEW.y0), (ART_VIEW.x1 - ART_VIEW.x0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s); c.restore(); }
+      // Copos
+      const want = Math.round(W * H / 700), F = this.flakes || (this.flakes = []);
+      while (F.length < want) F.push({ x: Math.random() * W, y: Math.random() * H, z: [0.4, 0.7, 1][F.length % 3], ph: Math.random() * 6.28, sw: 0.6 + Math.random() * 0.8 });
+      const t = this.t, gust = Math.sin(t * 0.3) * 18 + Math.sin(t * 0.83 + 2) * 8;
+      const cols = ['rgb(225 232 245 / 0.45)', 'rgb(240 245 252 / 0.7)', 'rgb(255 255 255 / 0.92)'];
+      for (let layer = 0; layer < 3; layer++) {
+        c.fillStyle = cols[layer];
+        for (let i = layer; i < F.length; i += 3) {
+          const f = F[i];
+          f.y += (26 + 40 * f.z) * k; f.x += (Math.sin(t * f.sw + f.ph) * 22 * f.z + gust * f.z) * k;
+          if (f.y > H) { f.y = -3; f.x = Math.random() * W; }
+          if (f.x < -3) f.x += W + 6; else if (f.x > W + 3) f.x -= W + 6;
+          const sz = (layer === 2 && f.ph > 3.5 ? 2 : 1) * ps;
+          c.fillRect(Math.round(f.x / ps) * ps, Math.round(f.y / ps) * ps, sz, sz);
+        }
+      }
+    }
+    /** Mapa de acumulación de nieve (resolución del dibujo / 4), recalculado cuando crece el manto. */
+    _snowMap(cover) {
+      if (this._snowCv && Math.abs(cover - this._snowAt) < 0.015) return this._snowCv;
+      if (!this._snowImg) {
+        // Mapa de nieve propio (opcional): blanco = donde cuaja antes
+        this._snowImg = new Image();
+        this._snowImg.onload = () => { this._snowT = null; this._snowAt = -1; };
+        this._snowImg.src = 'assets/estadio/nieve.jpg';
+      }
+      if (!this._snowT) {
+        const mask = TL.StadiumGL && TL.StadiumGL.image && TL.StadiumGL.image('mask'), hi = TL.StadiumGL && TL.StadiumGL.image('height');
+        if (!mask) return null;
+        const VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0, w = Math.round(VW * 3.5), h = Math.round(VH * 3.5);
+        const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+        const g = tmp.getContext('2d', { willReadFrequently: true });
+        const read = im => { g.clearRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h); return g.getImageData(0, 0, w, h).data; };
+        const md = read(mask), hd = hi ? read(hi) : null;
+        let sd = null;
+        if (this._snowImg && this._snowImg.complete && this._snowImg.naturalWidth) sd = read(this._snowImg);
+        const nz = this._noise(24, 16, 11), T = new Float32Array(w * h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const i = y * w + x, o = i * 4, n = nz.v[(y % nz.h) * nz.w + (x % nz.w)];
+          if (sd) { T[i] = 1 - sd[o] / 255 * 0.8 - n * 0.25; continue; }
+          // Sin mapa propio: cuaja antes en lo alto (gradas, techos) y en los bordes del campo, después hacia el centro
+          const wx = ART_VIEW.x0 + (x + 0.5) / w * VW, wy = ART_VIEW.y0 + (y + 0.5) / h * VH;
+          const inside = wx > 0 && wx < L && wy > 0 && wy < Wd;
+          const edge = inside ? Math.min(wx, L - wx, wy, Wd - wy) / (Wd / 2) : 0;
+          const stand = md[o] > 150 && md[o + 1] < 120 ? 1 : 0, high = hd ? hd[o] / 255 : 0;
+          T[i] = (inside ? 0.25 + edge * 0.75 : 0.35 - stand * 0.25 - high * 0.2) * 0.75 + (1 - n) * 0.45 - 0.1;
+        }
+        this._snowT = { T, w, h };
+      }
+      const { T, w, h } = this._snowT;
+      const cv = this._snowCv || (this._snowCv = document.createElement('canvas'));
+      cv.width = w; cv.height = h;
+      const g = cv.getContext('2d'), im = g.createImageData(w, h), d = im.data;
+      for (let i = 0; i < T.length; i++) {
+        const a = Math.min(1, Math.max(0, (cover - T[i]) / 0.08));
+        if (!a) continue;
+        // Blanco azulado con algo de variación (nieve pisada / nieve virgen)
+        const v = 236 + ((i * 2654435761 >>> 28) & 7) * 2;
+        d[i * 4] = v - 6; d[i * 4 + 1] = v - 2; d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.round(a * 225);
+      }
+      g.putImageData(im, 0, 0);
+      this._snowAt = cover;
+      return cv;
+    }
+
+    /**
+     * Calor: el aire tiembla sobre el césped (la imagen se ondula de verdad, por franjas finas y con el ruido
+     * cambiando poco a poco, sin líneas rectas), luz cálida y un resplandor de sol suave en la esquina.
+     */
+    _heat(real, ps) {
+      const c = this.cx, cv = this.cv, dpr = this.dpr, W = cv.width, H = cv.height, t = this.t;
+      const buf = this._heatCv || (this._heatCv = document.createElement('canvas'));
+      if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; }
+      const g = buf.getContext('2d'); g.clearRect(0, 0, W, H); g.drawImage(cv, 0, 0);
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+      const band = Math.max(2, Math.round(2 * dpr * ps));
+      for (let y = 0; y < H; y += band) {
+        // Más temblor abajo (cerca del suelo caliente) y en olas que suben
+        const depth = 0.35 + 0.65 * (y / H);
+        const off = (Math.sin(y * 0.045 / dpr - t * 3.1) * 0.6 + Math.sin(y * 0.11 / dpr + t * 1.7) * 0.4) * dpr * 1.1 * depth;
+        if (Math.abs(off) < 0.25) continue;
+        c.drawImage(buf, 0, y, W, band, off, y, W, band);
+      }
+      c.restore();
+      c.save(); c.globalCompositeOperation = 'soft-light';
+      c.fillStyle = 'rgb(255 190 110 / 0.22)'; c.fillRect(0, 0, this.w, this.h);
+      c.restore();
+      const gr = c.createRadialGradient(this.w * 0.92, -this.h * 0.08, 0, this.w * 0.92, -this.h * 0.08, this.h * 0.9);
+      gr.addColorStop(0, 'rgb(255 245 210 / 0.35)'); gr.addColorStop(0.4, 'rgb(255 220 160 / 0.1)'); gr.addColorStop(1, 'rgb(255 200 140 / 0)');
+      c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = gr; c.fillRect(0, 0, this.w, this.h); c.restore();
+    }
+
+    /** Niebla: bancos de niebla que se desplazan en dos capas; se ve bien cerca del balón y lo lejano se pierde. */
+    _fog(real) {
+      const c = this.cx, X = this.X, Y = this.Y, s = this.s, b = this.ball;
+      const bx = X(b.x), by = Y(b.y), R = Math.max(this.w, this.h);
+      const gr = c.createRadialGradient(bx, by, 22 * s * 0.4, bx, by, 45 * s);
+      gr.addColorStop(0, 'rgb(205 212 218 / 0.08)'); gr.addColorStop(1, 'rgb(205 212 218 / 0.62)');
+      c.fillStyle = gr; c.fillRect(0, 0, this.w, this.h);
+      const cv = this._blobCv('_fogCv', [222, 228, 232], 0.3, 0.9, 0.55, 7);
+      c.save(); c.imageSmoothingEnabled = true;
+      [[0.9, 0, 1], [1.7, 37, 0.7]].forEach(([sp, sh, a]) => {
+        const span = 200, off = (this.t * sp + sh) % span; c.globalAlpha = a;
+        for (let k = -1; k <= 1; k++) c.drawImage(cv, X(-45 + off + k * span), Y(-35 + sh * 0.2), span * s, 140 * s);
+      });
+      c.restore();
+      void R;
+    }
+
+    /** Viento: hojas, papeles y envoltorios volando a rachas, dando vueltas, y algún remolino. */
+    _wind(real, ps) {
+      const c = this.cx, W = this.w, H = this.h, k = Math.min(0.05, real), t = this.t;
+      const gust = 0.55 + 0.45 * Math.sin(t * 0.37) * Math.sin(t * 0.13 + 1), speed = 120 + 260 * Math.max(0, gust);
+      const P = this.leaves || (this.leaves = []);
+      const want = Math.round(W * H / 3800);
+      const COLS = ['#7a8c2e', '#a3741f', '#c98f2a', '#8a4b1d', '#b8a046', '#e8e3d0', '#f2f2f2', '#d9443a', '#3d7fc2'];
+      while (P.length < want) P.push({ x: Math.random() * W, y: Math.random() * H, z: 0.5 + Math.random() * 0.8, ph: Math.random() * 6.28, rot: Math.random() * 6.28, c: COLS[Math.floor(Math.random() * (Math.random() < 0.75 ? 5 : COLS.length))], big: Math.random() < 0.3 });
+      for (const f of P) {
+        f.rot += (3 + 6 * f.z) * k * (0.4 + gust);
+        f.x += (speed * f.z + Math.sin(t * 1.3 + f.ph) * 30) * k;
+        f.y += (Math.sin(t * 2.1 + f.ph) * 35 + Math.cos(f.rot) * 18) * f.z * k;
+        if (f.x > W + 6) { f.x = -6; f.y = Math.random() * H; }
+        if (f.y < -6) f.y += H + 12; else if (f.y > H + 6) f.y -= H + 12;
+        // Al girar, la hoja se ve de canto (1 píxel) o de frente (2-3 píxeles)
+        const face = Math.abs(Math.cos(f.rot)), ww = (f.big ? 3 : 2) * ps, hh = Math.max(ps, Math.round(face * (f.big ? 2 : 2)) * ps);
+        const x = Math.round(f.x / ps) * ps, y = Math.round(f.y / ps) * ps;
+        c.fillStyle = f.c; c.fillRect(x, y, ww, hh);
+        if (face > 0.6) { c.fillStyle = 'rgb(0 0 0 / 0.18)'; c.fillRect(x, y + hh, ww, ps); }
+      }
+      // Rachas: estelas de aire muy tenues, en píxeles, que cruzan rápido
+      c.fillStyle = 'rgb(255 255 255 / 0.12)';
+      for (let i = 0; i < 6; i++) {
+        const yy = Math.round(((i * 97.3 + t * 11) % H) / ps) * ps, xx = Math.round((((t * speed * 1.4) + i * 211) % (W + 160) - 80) / ps) * ps;
+        c.fillRect(xx, yy, 18 * ps * gust, ps); c.fillRect(xx + 6 * ps, yy - ps, 10 * ps * gust, ps);
+      }
+    }
+
+    /** Rayo que cae sobre un jugador (evento rarísimo del temporal). */
+    _boltFx(real) {
+      const B = this.boltHit;
+      if (!B || !this.X) return;
+      const age = this.t - B.t;
+      if (age > 2.5) { this.boltHit = null; return; }
+      const c = this.cx, ps = Math.max(1, Math.round(this.s / 14)), x = this.X(B.x), y = this.Y(B.y);
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      if (age < 0.35 || (age > 0.5 && age < 0.62)) {
+        c.fillStyle = 'rgb(235 240 255 / 0.65)'; c.fillRect(0, 0, this.w, this.h);
+        // Rayo en zigzag de píxeles desde arriba hasta el jugador
+        c.fillStyle = '#ffffff';
+        let cx = x + (B.seed - 0.5) * 60, cy = 0;
+        while (cy < y) {
+          const ny = Math.min(y, cy + 6 + Math.random() * 14), nx = cx + (x - cx) * ((ny - cy) / Math.max(1, y - cy)) + (Math.random() - 0.5) * 16;
+          const steps = Math.max(1, Math.round((ny - cy) / ps));
+          for (let j = 0; j < steps; j++) { const px = cx + (nx - cx) * j / steps, py = cy + (ny - cy) * j / steps; c.fillRect(Math.round(px / ps) * ps - ps, Math.round(py / ps) * ps, ps * 3, ps); }
+          cx = nx; cy = ny;
+        }
+      }
+      // Humo y chispas en el sitio
+      const n = 10;
+      for (let i = 0; i < n; i++) { const a = i / n * 6.28, r = (age * 30 + i) % 18; c.fillStyle = age < 0.8 ? '#ffe9a0' : 'rgb(80 80 80 / 0.5)'; c.fillRect(Math.round((x + Math.cos(a) * r) / ps) * ps, Math.round((y + Math.sin(a) * r * 0.6 - age * 6) / ps) * ps, ps, ps); }
     }
 
     /**
@@ -2356,10 +2625,10 @@
     }
 
     /** Gotas que caen en la lente de la cámara: refractan la imagen (invertida, como una gota de verdad), resbalan y se secan. */
-    _lensDrops(real, ps) {
+    _lensDrops(real, ps, storm) {
       const c = this.cx, W = this.w, H = this.h, dpr = this.dpr;
       const D = this.lens || (this.lens = []);
-      if (D.length < 14 && Math.random() < real * 1.6) {
+      if (D.length < (storm ? 24 : 14) && Math.random() < real * (storm ? 3.2 : 1.6)) {
         const r = (4 + Math.random() * 6) * Math.max(1, ps);
         D.push({ x: Math.random() * W, y: Math.random() * H * 0.9, r, age: 0, life: 4 + Math.random() * 6, slide: Math.random() < 0.35 ? 0 : 6 + Math.random() * 18 });
       }
