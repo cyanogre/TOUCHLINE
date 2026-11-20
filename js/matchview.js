@@ -26,7 +26,7 @@
     UI.lineupWarning(S);
     const m = G.startMatch();
     if (!m) { A['play-quick'](); return; }
-    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null });
+    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null, shown: [0, 0], log: [], plays: {}, noteMin: [-99, -99], live: null });
     MV.me = m.teams[0].isUser ? 0 : 1;
     const [h, a] = m.teams.map(t => S.clubs[t.club]);
     const L = W.userLeague(S);
@@ -45,6 +45,7 @@
       </div>
       <div class="narr-call" id="mv-call" aria-live="polite"><small id="mv-call-k">📻 En directo</small><p id="mv-call-t">Los equipos saltan al campo.</p></div>
       <div class="pitch-box"><span class="key-tag">▶ Jugada clave</span><canvas id="pitch" aria-label="Vista del partido"></canvas>
+        <div class="live-call" id="mv-live"><span class="lc-t">Los equipos saltan al campo.</span></div>
         <i class="pip-grip" aria-hidden="true"></i>
         <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
@@ -58,7 +59,9 @@
     document.body.appendChild(root);
     document.body.style.overflow = 'hidden';
     for (const e of m.events) addEvent(e);
+    MV.radio = new TL.Radio(m, S);
     MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
+    MV.pitch.onCall = onCall;
     clearInterval(MV.ballTimer);
     MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
@@ -76,10 +79,11 @@
     } else schedule();
   }
 
-  function addEvent(e) {
+  function addEvent(e, again) {
+    if (!again) { MV.log.push({ kind: 'ev', e }); if (e.type === 'goal') MV.shown[e.team]++; }
     const feed = el('mv-feed');
     if (!feed || !e.text) return;
-    if (e.type === 'sub' && e.crowd && !MV.skip && TL.SFX) {
+    if (!again && e.type === 'sub' && e.crowd && !MV.skip && TL.SFX) {
       if (e.crowd === 'ovation') { TL.SFX.ovation(1.4); TL.SFX.applause(4, 0.6); }
       else if (e.crowd === 'applause' || e.crowd === 'away') TL.SFX.applause(e.crowd === 'away' ? 2 : 3, e.crowd === 'away' ? 0.3 : 0.45);
       else if (e.crowd === 'whistles') TL.SFX.whistles(5, 0.35);
@@ -92,7 +96,93 @@
     d.innerHTML = `<span class="m">${e.min ? e.min + "'" : ''}</span><span class="i">${EV_ICON[e.type] || '•'}</span>
       <span class="x grow">${club ? `<b>${esc(club.code)}</b> · ` : ''}${e.text}</span>`;
     feed.prepend(d);
-    if (!big || e.type !== 'ko') call(e);
+    trimFeed(feed);
+    if (!again && (!big || e.type !== 'ko')) call(e);
+  }
+  function trimFeed(feed) { while (feed.children.length > 180) feed.lastElementChild.remove(); }
+
+  // ------------------------------------------------------------ Radio: jugada a jugada (lo cuenta el propio campo)
+  function onCall(c) {
+    if (!MV.radio || MV.skip || !MV.m) return;
+    if (narrOn() && !MV.showing) return;   // modo narrado: el campo oculto no se cuenta
+    const r = MV.radio.feed(c);
+    if (!r) return;
+    liveCall(r.call, r.prio, r.team);
+    if (r.note) addNote(r.note, r.team);
+    if (r.seq) upsertPlay(r.seq);
+  }
+  /** La frase del directo, sobre el campo: cada acción se lee (las de poco interés esperan su turno o se saltan). */
+  function liveCall(text, prio, team) {
+    const L = MV.live || (MV.live = { t: 0, prio: 0, pend: null, timer: null });
+    const now = performance.now(), gap = now - L.t;
+    const wait = prio >= 3 ? 0 : prio >= 2 ? 350 : 750;
+    if (gap < wait && prio <= L.prio) {
+      L.pend = { text, prio, team };
+      clearTimeout(L.timer);
+      L.timer = setTimeout(() => { const p = L.pend; L.pend = null; if (p) showLive(p.text, p.team, p.prio); }, wait - gap);
+      return;
+    }
+    showLive(text, team, prio);
+  }
+  function showLive(text, team, prio) {
+    const box = el('mv-live');
+    if (!box || !text) return;
+    MV.live.t = performance.now(); MV.live.prio = prio;
+    box.querySelector('.lc-t').textContent = text;
+    box.className = `live-call side-${team === MV.me ? 0 : team < 0 ? 'n' : 1} ${prio >= 2 ? 'hot' : ''}`;
+    void box.offsetWidth; box.classList.add('in');
+  }
+  /** Crónica de cada jugada en la narración: una entrada por posesión que crece mientras dura. */
+  function upsertPlay(q) {
+    let item = MV.plays[q.id];
+    if (!item) { if (q.n < 2) return; item = MV.plays[q.id] = { kind: 'play', q }; MV.log.push(item); }
+    item.q = q;
+    const feed = el('mv-feed');
+    if (!feed) return;
+    const d = feed.querySelector(`[data-play="${q.id}"]`);
+    if (d) d.querySelector('.pt').textContent = q.text;
+    else { feed.prepend(playEl(q)); trimFeed(feed); }
+  }
+  function playEl(q) {
+    const d = document.createElement('div');
+    const club = G.S.clubs[MV.m.teams[q.team].club];
+    d.className = `ev play side-${q.team === MV.me ? 0 : 1}`;
+    d.dataset.play = q.id;
+    d.innerHTML = `<span class="m">${q.min ? q.min + "'" : ''}</span><span class="i">📻</span><span class="x grow"><b>${esc(club.code || '')}</b> · <span class="pt"></span></span>`;
+    d.querySelector('.pt').textContent = q.text;
+    return d;
+  }
+  /** Apuntes tácticos (cómo defiende o presiona cada equipo), sin repetirlos cada minuto. */
+  function addNote(text, team, again, min) {
+    if (min == null) min = MV.m.min;
+    if (!again) {
+      if (team >= 0 && MV.m.min - MV.noteMin[team] < 4) return;
+      if (team >= 0) MV.noteMin[team] = MV.m.min;
+      MV.log.push({ kind: 'note', text, team, min });
+    }
+    const feed = el('mv-feed');
+    if (!feed) return;
+    const d = document.createElement('div');
+    d.className = `ev note side-${team === MV.me ? 0 : 1}`;
+    d.innerHTML = `<span class="m">${min ? min + "'" : ''}</span><span class="i">📋</span><span class="x grow"></span>`;
+    d.querySelector('.x').textContent = text;
+    feed.prepend(d);
+    trimFeed(feed);
+  }
+  /** Un evento del motor se cuenta cuando se ve en el campo (el gol, cuando entra). */
+  function revealEv(e) {
+    if (!MV.m) return;
+    addEvent(e);
+    if (e.type === 'goal') { TL.FX.pop(el('mv-score')); crowdSongs([e]); }
+    updateHead();
+    if (MV.tab !== 'feed') renderTab();
+    if (!MV.skip && !MV.paused && !MV.finished) { const r = pauseReason(e); if (r) pause(r, e); }
+  }
+  /** Los eventos de un minuto: lo que el campo escenifica se cuenta al verse; lo demás, ya. */
+  function stepEvents(evs, instant) {
+    const staged = MV.pitch && MV.pitch.onEv ? evs.filter(e => MV.pitch.stages(e)) : [];
+    evs.forEach(e => { if (!staged.includes(e)) addEvent(e); });
+    if (MV.pitch) MV.pitch.push(evs, instant);
   }
   /** La frase del narrador, grande, arriba (como en la radio). */
   function call(e) {
@@ -101,6 +191,7 @@
     const club = e.team >= 0 ? G.S.clubs[MV.m.teams[e.team].club] : null;
     t.innerHTML = e.text;
     k.textContent = `${e.min ? e.min + "' · " : ''}${EV_ICON[e.type] || '📻'} ${club ? club.name : 'En directo'}`;
+    if (MV.live || el('mv-live')) { MV.live = MV.live || { t: 0, prio: 0 }; showLive(t.textContent, e.team, 3); }
     const box = el('mv-call');
     box.className = `narr-call ${e.type === 'goal' ? 'goal' : ''} side-${e.team === MV.me ? 0 : e.team < 0 ? 'n' : 1}`;
     void box.offsetWidth; box.classList.add('in');
@@ -114,7 +205,10 @@
     root.classList.toggle('narr', on);
     root.classList.remove('narr-show');
     MV.showing = false;
-    if (on && MV.pitch) MV.pitch.flush();
+    if (MV.pitch) {
+      if (on) { MV.pitch.flush(); MV.pitch.onEv = null; }
+      else MV.pitch.onEv = revealEv;
+    }
     requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
   /** ¿Merece la pena enseñar esta jugada en el campo? */
@@ -153,7 +247,7 @@
 
   function updateHead() {
     const m = MV.m;
-    el('mv-score').textContent = `${m.score[0]}-${m.score[1]}`;
+    el('mv-score').textContent = `${MV.shown[0]}-${MV.shown[1]}`;
     el('mv-min').textContent = m.done ? 'Final' : (m.min ? m.min + "'" : "0'");
     el('mv-prog').style.width = Math.min(100, m.min / 90 * 100) + '%';
   }
@@ -191,6 +285,8 @@
     // El reloj espera a que el campo termine de escenificar la jugada en curso
     const narr = narrOn();
     if (MV.pitch && !MV.skip && MV.pitch.busy() && (!narr || MV.showing)) { schedule(70); return; }
+    // Partido completo: cada minuto se ve un rato de juego antes de que avance el reloj
+    if (MV.pitch && !MV.skip && !narr && !MV.pitch.ready()) { schedule(40); return; }
     // Narrado: acaba de terminar la jugada clave → el campo se esconde y sigue la radio
     if (narr && MV.showing) { showKey(false); reveal(); schedule(500); return; }
     const evs = m.step();
@@ -206,11 +302,10 @@
       schedule(120);
       return;
     }
-    evs.forEach(addEvent);
-    if (MV.pitch) MV.pitch.push(evs, !!MV.skip || narr);
-    if (evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
+    stepEvents(evs, !!MV.skip || narr);
+    if ((narr || MV.skip || !MV.pitch) && evs.some(e => e.type === 'goal')) { const sc = el('mv-score'); TL.FX.pop(sc); }
     updateHead();
-    crowdSongs(evs);
+    if (!evs.some(e => e.type === 'goal')) crowdSongs(evs);
     if (MV.tab !== 'feed') renderTab();
     finishStep(evs);
   }
@@ -235,7 +330,8 @@
       schedule(0);
       return;
     }
-    const hit = evs.map(e => [e, pauseReason(e)]).find(([, r]) => r);
+    const live = MV.pitch && MV.pitch.onEv && !narrOn();
+    const hit = !live && evs.map(e => [e, pauseReason(e)]).find(([, r]) => r);
     if (hit) { pause(hit[1], hit[0]); return; }
     schedule();
   }
@@ -266,7 +362,13 @@
   function onFinal() {
     clearTimeout(MV.timer);
     MV.finished = true;
-    if (MV.pitch) setTimeout(() => MV.pitch && MV.pitch.end(), 1200);
+    const fin = () => {
+      if (!MV.pitch || !MV.m) return;
+      if (MV.pitch.busy()) { setTimeout(fin, 250); return; }
+      MV.shown = MV.m.score.slice(); updateHead();
+      setTimeout(() => MV.pitch && MV.pitch.end(), 700);
+    };
+    if (MV.pitch) fin(); else MV.shown = MV.m.score.slice();
     MV.prompt = null;
     updateHead();
     renderFoot();
@@ -418,7 +520,12 @@
     document.querySelectorAll('#mv-tabs button').forEach(x => x.classList.toggle('on', x === b));
     if (MV.tab === 'feed') {
       el('mv-body').innerHTML = '<div id="mv-feed"></div>';
-      for (const e of MV.m.events) addEvent(e);
+      const feed = el('mv-feed');
+      for (const it of MV.log.slice(-180)) {
+        if (it.kind === 'ev') addEvent(it.e, true);
+        else if (it.kind === 'play') feed.prepend(playEl(it.q));
+        else addNote(it.text, it.team, true, it.min);
+      }
     } else renderTab();
   };
 
@@ -543,8 +650,7 @@
       clearTimeout(MV.timer);
       while (!m.done) {
         const evs = m.step();
-        evs.forEach(addEvent);
-        if (MV.pitch) MV.pitch.push(evs, true);
+        stepEvents(evs, true);
         if (m.min === 45 && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
       }
       MV.htDone = true;
@@ -653,6 +759,7 @@
     const m = MV.m, S = G.S;
     if (!m || MV.summary) return;
     MV.summary = true;
+    MV.shown = m.score.slice();
     G.completeRound(m);
     // En el resumen manda la lectura: fuera el campo y la radio
     const root = el('match'); if (root) root.classList.add('over');

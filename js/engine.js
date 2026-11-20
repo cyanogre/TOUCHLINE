@@ -204,7 +204,8 @@
       '¡Gol de {p}! Remate cruzado que entra junto al palo.', '¡{p} marca! El estadio estalla.',
       '¡Gol de {p}! Aparece en el segundo palo y empuja a la red.', '¡{p}! Disparo seco desde la frontal. ¡Gol!'
     ],
-    assist: ['Gran pase de {a}.', 'Asistencia de {a}.', 'Centro medido de {a}.', '{a} la puso en bandeja.', 'Jugada iniciada por {a}.'],
+    assist: ['Gran pase de {a}.', 'Asistencia de {a}.', '{a} la puso en bandeja.', 'Jugada iniciada por {a}.'],
+    assistX: ['Centro medido de {a}.', '{a} la puso en bandeja.', 'Asistencia de {a}.'],
     // Goles según el tipo de remate (la vista 2D dibuja exactamente esto)
     g_header: ['¡Gol de cabeza de {p}! Se eleva por encima de todos.', '¡{p} cabecea a la red! Testarazo imparable.'],
     g_volley: ['¡Volea de {p}! ¡Golazo!', '¡{p} la engancha de volea y la clava!'],
@@ -602,7 +603,7 @@
         else {
           const k = sx && TXT['g_' + sx.shotType] ? 'g_' + sx.shotType : 'goal';
           txt = say(k, { p: shooter.short });
-          if (assister) txt += ' ' + say('assist', { a: assister.short });
+          if (assister) txt += ' ' + say(sx && (sx.origin === 'cross' || sx.origin === 'corner' || sx.shotType === 'header') ? 'assistX' : 'assist', { a: assister.short });
         }
       }
       this._ev('goal', i, shooter.id, assister && assister.id, txt, Object.assign({ kind, late: this.min >= 88 }, sx || {}));

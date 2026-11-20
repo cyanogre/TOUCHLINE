@@ -143,14 +143,15 @@
       this.cam = { x: (VIEW.x0 + VIEW.x1) / 2, y: (VIEW.y0 + VIEW.y1) / 2, z: 1, tx: null, ty: null, tz: 1 };
       this.slow = 1; this.slowT = 1;
       this.banner = null;
-      this.decide = 0.8;
-      this.nextThrow = 14 + Math.random() * 20;
-      this.runner = null;
       this.st = this._stadium();
       this.crowd = this._crowd();
       for (const i of [0, 1]) for (const o of match.teams[i].onPitch) this._spawn(i, o.pid);
       this._placeKickoff(0, true);
       this.ball.owner = this._kickTaker(0);
+      this.brain = new TL.Brain2D(this);
+      this.brain.ownTeam = 0; this.brain.lastTouch = 0;
+      this.stepT = 0;
+      this.handled = [];
       if (this.st.name) this._banner(this.st.name + (this.st.night ? ' · partido nocturno' : ''), '#ffffff', 2.6);
       for (const i of [0, 1]) {
         const club = this.S.clubs[match.teams[i].club];
@@ -400,148 +401,10 @@
       const half = (L / 2) * dir;                       // en su campo no hay fuera de juego
       return Math.max(second, this.ball.x * dir, half) / dir;
     }
-    /**
-     * Lo que decide hacer una jugadora sin balón cuando su equipo ataca. Elige una idea cada 2–5 s
-     * (según su puesto y dónde está la jugada) y la mantiene: así cada una se mueve por su cuenta.
-     */
-    _initiative(a, car, att) {
-      const slot = this.slotOf(a), line = F.LINE[slot];
-      if (line === 0) return;
-      const cd = this.depth(att, car.x), cl = this.lat(att, car.y);
-      let I = a.intent;
-      if (!I || I.until < this.t || I.car !== car.pid) {
-        const wide = /^(R|L)(B|WB|M|W)$/.test(slot);
-        const fb = /^(R|L)(B|WB)$/.test(slot);
-        const myLat = this.lat(att, a.ty), mySide = myLat > Wd / 2 ? 1 : -1, ballSide = cl > Wd / 2 ? 1 : -1;
-        const opts = [['hold', 3]];
-        if (line === 3) opts.push(['drop', 2], ['drift', 1.4], ['post', cd > 70 && (cl < 16 || cl > Wd - 16) ? 3 : 0.3]);
-        if (wide && !fb) opts.push(['touch', 2.2], ['inside', 1.6]);
-        if (line === 2 && !wide) opts.push(['between', 2], ['arrive', cd > 58 ? 2.6 : 0.4]);
-        if (fb) opts.push(['overlap', mySide === ballSide && cd > 40 ? 2.6 : 0.3]);
-        if (slot === 'CB') opts.push(['step', cd < 55 ? 0.8 : 0.1]);
-        a.intent = I = { k: U.weighted(opts, o => o[1])[0], car: car.pid, until: this.t + U.rand(2, 5), r: Math.random(), side: mySide };
-      }
-      const hd = this.depth(att, a.tx), hl = this.lat(att, a.ty);
-      let d = hd, l = hl, run = a.run;
-      switch (I.k) {
-        case 'drop': d = clamp(cd + 7 + I.r * 5, 30, 90); l = lerp(hl, cl, 0.5); run = 0.7; break;           // baja a recibir
-        case 'drift': l = clamp(hl + (I.r < 0.5 ? -1 : 1) * 12, 5, Wd - 5); run = 0.5; break;                // cae a banda
-        case 'post': d = 92; l = Wd / 2 + (cl > Wd / 2 ? 1 : -1) * 3; run = 0.95; break;                      // ataca el primer palo
-        case 'touch': l = I.side > 0 ? Wd - 2.5 : 2.5; d = hd + 3; run = 0.5; break;                          // abre el campo, pegada a la cal
-        case 'inside': l = lerp(hl, Wd / 2, 0.55); d = hd + 4; run = 0.65; break;                              // se mete por dentro
-        case 'between': d = clamp(cd + 11, 30, 85); l = lerp(hl, Wd / 2, 0.35); run = 0.6; break;             // entre líneas
-        case 'arrive': d = clamp(80 + I.r * 8, 0, 90); l = lerp(hl, Wd / 2, 0.6); run = 0.85; break;          // llega desde segunda línea
-        case 'overlap': d = clamp(cd + 10, 0, 92); l = I.side > 0 ? Wd - 3 : 3; run = 0.9; break;             // dobla por fuera
-        case 'step': d = hd + 9; run = 0.45; break;                                                              // la central sale con el balón
-        default: return;
-      }
-      [a.tx, a.ty] = this.world(att, d, l); a.run = run; a.role = 'idea';
-    }
     _targets() {
-      const b = this.ball;
-      // Quién ataca: el equipo de quien lleva el balón (si nadie lo lleva, el último que lo tuvo)
-      const car = b.owner != null ? this.A[b.owner] : null;
-      const att = car ? car.team : this.poss, def = 1 - att;
       let dtT = this.t - (this._tt == null ? this.t : this._tt); this._tt = this.t; dtT = isFinite(dtT) ? clamp(dtT, 0, 0.2) : 0;
-      for (const id in this.A) {
-        const a = this.A[id];
-        const h = this._home(a);
-        // Cada una reacciona al movimiento del bloque a su ritmo: unas van ya, otras se descuelgan un poco
-        if (!(a.shift > 0)) { let hsh = 0; for (const c of String(a.pid)) hsh = (hsh * 31 + c.charCodeAt(0)) % 997; a.shift = 0.7 + ((hsh * 0.618) % 1) * 1.8; }
-        if (!isFinite(a.hx) || !isFinite(a.hy) || Math.hypot(h[0] - a.hx, h[1] - a.hy) > 30) { a.hx = h[0]; a.hy = h[1]; }
-        const k = Math.min(1, dtT * a.shift);
-        a.hx += (h[0] - a.hx) * k; a.hy += (h[1] - a.hy) * k;
-        if (isFinite(a.hx) && isFinite(a.hy)) { a.tx = a.hx; a.ty = a.hy; } else { a.tx = a.hx = h[0]; a.ty = a.hy = h[1]; } a.run = 0.33;
-        a.role = null;
-      }
-      if (!this.ov || !this.ov.all) {
-        const morale = k => { const ps = this.team(k); return ps.length ? U.sum(ps, a => this.P(a.pid).mor == null ? 70 : this.P(a.pid).mor) / ps.length / 100 : 0.7; };
-        const field = k => this.team(k).filter(a => !this.isGK(a));
-        const og = this.ownX(def);
-        // Hacia dónde va el balón: el conductor un poco por delante, el destino del pase o el balón suelto
-        const bp = car ? { x: car.x + car.vx * 0.4, y: car.y + car.vy * 0.4 } : b.path ? { x: b.path.tx, y: b.path.ty } : { x: b.x, y: b.y };
-        if (!car && !b.path) {
-          // Balón suelto: de cada equipo va solo quien llega antes
-          for (const k of [0, 1]) { const best = field(k).sort((p, q) => this._reach(p, b) - this._reach(q, b))[0]; if (best) { best.tx = b.x; best.ty = b.y; best.run = 1; best.role = 'ball'; } }
-        } else {
-          // Presión: sale la defensora que antes llega; la segunda cubre por dentro, entre el balón y la portería
-          const defs = field(def).sort((p, q) => this._reach(p, bp) - this._reach(q, bp));
-          const press = 0.75 + 0.3 * morale(def) + (this.m.teams[def].mentality - 1) * 0.08;
-          // Roles estables (como en agent2d): se mantiene a quien ya presiona salvo que otra llegue claramente antes
-          const keep = (pid, best, margin) => { const a = pid != null && this.A[pid]; return a && a.team === def && !this.isGK(a) && this._reach(a, bp) < this._reach(best, bp) + margin ? a : best; };
-          let presser = defs[0] ? keep(this.mem && this.mem.press, defs[0], 0.6) : null;
-          const rest = defs.filter(d => d !== presser);
-          let cover = rest[0] ? keep(this.mem && this.mem.cover, rest[0], 0.8) : null;
-          if (cover === presser) cover = rest[0];
-          this.mem = this.mem || { marks: {} };
-          if (this.mem.def !== def) { this.mem = { marks: {}, def }; }
-          this.mem.press = presser ? presser.pid : null; this.mem.cover = cover ? cover.pid : null;
-          defs.splice(0, defs.length, ...[presser, cover].filter(Boolean), ...defs.filter(d => d !== presser && d !== cover));
-          if (presser) { presser.tx = bp.x + Math.sign(og - bp.x) * 0.9; presser.ty = bp.y; presser.run = clamp(press, 0.6, 1); presser.role = 'press'; }
-          if (cover) {
-            const k = 7 / Math.max(1, Math.hypot(og - bp.x, Wd / 2 - bp.y));
-            cover.tx = bp.x + (og - bp.x) * k; cover.ty = bp.y + (Wd / 2 - bp.y) * k; cover.run = 0.7; cover.role = 'cover';
-          }
-          // Marcas sin repetir: cada atacante peligrosa (las más cercanas a la portería) se la queda una defensora distinta
-          const free = defs.slice(2).filter(d => F.LINE[this.slotOf(d)] <= 2);
-          const threats = field(att).filter(a => a !== car).sort((p, q) => Math.abs(og - p.x) - Math.abs(og - q.x));
-          const marks = {};
-          for (const t of threats) {
-            let best = null, bd = 16 * 16;
-            // si ya la marcaba alguien libre y sigue cerca de su zona, sigue marcándola
-            const prevPid = Object.keys(this.mem.marks).find(k => this.mem.marks[k] === t.pid);
-            const prev = prevPid != null ? free.find(d => d.pid === +prevPid) : null;
-            if (prev && d2({ x: prev.tx, y: prev.ty }, t) < 20 * 20) best = prev;
-            else for (const d of free) { const dd = d2({ x: d.tx, y: d.ty }, t); if (dd < bd) { bd = dd; best = d; } }
-            if (!best) continue;
-            marks[best.pid] = t.pid;
-            free.splice(free.indexOf(best), 1);
-            const gx = og - t.x, gy = Wd / 2 - t.y, gl = Math.max(1, Math.hypot(gx, gy));
-            const w = F.LINE[this.slotOf(best)] === 1 ? 0.75 : 0.5;
-            best.tx = lerp(best.tx, t.x + gx / gl * 1.7, w); best.ty = lerp(best.ty, t.y + gy / gl * 1.7, w); best.run = 0.55; best.role = 'mark';
-          }
-          this.mem.marks = marks;
-        }
-        // Ataque: apoyos, amplitud, ruptura a la espalda y nadie en fuera de juego
-        if (car && !this.isGK(car)) {
-          const dx = this.dir[att];
-          if (this.hold) { car.tx = car.x; car.ty = car.y; car.run = 0.2; }
-          else {
-            const [mx] = this.world(att, 90, 0);
-            car.tx = dx > 0 ? Math.min(car.x + dx * 5, mx) : Math.max(car.x + dx * 5, mx);
-            car.ty = clamp(car.y + (Wd / 2 - car.y) * 0.08 + Math.sin(this.t * 1.3 + car.pid) * 2, 3, Wd - 3);
-            car.run = 0.55;
-          }
-          const mates = field(att).filter(a => a !== car);
-          // Dos apoyos cerca (uno por cada lado y por detrás de la línea del balón)
-          this.sup = this.sup && this.sup.car === car.pid && this.sup.until > this.t ? this.sup : { car: car.pid, until: this.t + 1.6, ids: mates.slice().sort((p, q) => d2(p, car) - d2(q, car)).slice(0, 2).map(a => a.pid) };
-          this.sup.ids.map(id => this.A[id]).filter(Boolean).forEach((m, k) => {
-            m.tx = lerp(m.tx, car.x + dx * (k ? -3 : 4), 0.4); m.ty = lerp(m.ty, car.y + (k ? -10 : 10), 0.4); m.run = 0.55; m.role = 'support';
-          });
-          // Amplitud: la de banda del lado contrario se abre
-          const farSide = car.y < Wd / 2 ? Wd - 5 : 5;
-          const winger = mates.filter(a => !a.role && [1, 2, 3].includes(F.LINE[this.slotOf(a)])).sort((p, q) => Math.abs(p.y - farSide) - Math.abs(q.y - farSide))[0];
-          if (winger) { winger.ty = lerp(winger.ty, farSide, 0.7); winger.role = 'width'; }
-          // Iniciativa propia: cada una, a su ritmo, decide qué hacer según su puesto y la jugada
-          for (const m of mates) if (!m.role) this._initiative(m, car, att);
-          // Fuera de juego: nadie se queda por delante de la línea (salvo quien tira la ruptura)
-          const line = this._offsideLine(att);
-          const run = this.runner && this.runner.until > this.t ? this.runner : null;
-          for (const m of mates) {
-            if (run && m.pid === run.pid) continue;
-            if ((m.tx - line) * dx > -0.6) { m.tx = line - dx * (0.8 + (m.pid % 3) * 0.4); }
-          }
-          this.offLine = line;
-        }
-        if (this.runner && this.runner.until > this.t && this.A[this.runner.pid]) {
-          const r = this.A[this.runner.pid];
-          r.tx = this.runner.tx; r.ty = this.runner.ty; r.run = 1; r.role = 'run';
-        }
-        if (b.path && b.path.to != null && this.A[b.path.to]) {
-          const r = this.A[b.path.to];
-          r.tx = b.path.tx; r.ty = b.path.ty; r.run = 0.95; r.role = 'receive';
-        }
-      }
+      // Juego abierto: lo decide el cerebro táctico (fases, estructura, presión, apoyos, desmarques)
+      if (!this.ov || !this.ov.all) this.brain.targets(this.instant ? 1 : dtT);
       for (const id in this.A) { const a = this.A[id]; a.tx = clamp(a.tx, 0.6, L - 0.6); a.ty = clamp(a.ty, 0.6, Wd - 0.6); }
       // Guion: posiciones forzadas (balón parado, celebraciones…)
       if (this.ov) {
@@ -664,6 +527,7 @@
         this.fetch = null;
         a.held = f.held;
         b.owner = a.pid; b.z = 0; this.poss = a.team;
+        this.brain.received(a, true);
         if (f.then) f.then();
       }
     }
@@ -678,6 +542,8 @@
         const k = (o.by != null && this.A[o.by]) || this.nearest(cand.length ? cand : Object.values(this.A), b);
         if (k) { this._fetch(k.pid, () => this._kick(tx, ty, Object.assign({}, o, { free: true }))); return; }
       }
+      const kicker = b.owner != null ? this.A[b.owner] : this._atBall(2);
+      if (kicker) { this.brain.kickTeam = kicker.team; this.brain.lastTouch = kicker.team; }
       const dist = Math.hypot(tx - b.x, ty - b.y);
       const T = o.T || (o.h > 1.5 ? 0.6 + dist / 26 : 0.12 + dist / 17);
       const nx = -(ty - b.y) / Math.max(0.1, dist), ny = (tx - b.x) / Math.max(0.1, dist);
@@ -699,8 +565,14 @@
         b.z = Math.max(0, lerp(p.fz, p.tz, u) + 4 * p.h * u * (1 - u));
         if (u >= 1) {
           b.path = null;
+          const r = p.to != null ? this.A[p.to] : null;
           if (p.done) p.done();
-          else if (p.to != null && this.A[p.to]) this._receive(p.to);
+          else if (r && !this.beat && !this.script.length && Math.hypot(r.x - b.x, r.y - b.y) > 2.2) {
+            // En juego abierto, si la receptora no ha llegado, el balón sigue su camino perdiendo fuerza
+            const dl = Math.max(0.1, Math.hypot(p.tx - p.fx, p.ty - p.fy)), v = Math.min(7, dl / p.T * 0.4);
+            b.z = 0; b.roll = { vx: (p.tx - p.fx) / dl * v, vy: (p.ty - p.fy) / dl * v };
+          }
+          else if (r) this._receive(p.to);
           else if (b.z > 0.2 && !b.owner) b.z = 0;
         }
       } else if (b.owner != null) {
@@ -741,110 +613,13 @@
       b.owner = pid;
       b.z = 0;
       this.poss = a.team;
+      this.brain.received(a, force);
     }
 
     // ------------------------------------------------------------ Juego abierto
     _openPlay(dt) {
-      const b = this.ball;
-      if (this.hold || this.over || this.beat || this.script.length || b.path || this.fetch || this.place) return;
-      if (b.owner == null) {
-        // Balón suelto: va a por él el más cercano de cada equipo; el primero que llega se lo queda
-        for (const i of [0, 1]) {
-          const n = this.team(i).filter(a => !(this.isGK(a) && this.depth(i, b.x) > 18)).sort((p, q) => this._reach(p, b) - this._reach(q, b))[0];
-          if (n) { n.tx = b.x; n.ty = b.y; n.run = 1; }
-        }
-        const n = this.nearest(Object.values(this.A), b);
-        if (n && d2(n, b) < 1.3) this._receive(n.pid);
-        return;
-      }
-      this.decide -= dt;
-      this.nextThrow -= dt;
-      if (this.decide > 0) return;
-      this.decide = U.rand(0.65, 1.35);
-      const car = this.A[b.owner];
-      if (!car) { b.owner = null; return; }
-      const i = car.team, opp = 1 - i, dir = this.dir[i];
-      // Saque de banda de vez en cuando (el balón sale fuera)
-      if (this.nextThrow <= 0 && !this.isGK(car)) {
-        this.nextThrow = 22 + Math.random() * 30;
-        this._throwIn(Math.random() < 0.5 ? i : opp);
-        return;
-      }
-      // ¿Pierde el balón? Tanto más cuanto menos posesión tiene su equipo en el partido
-      const share = this.m.min ? (i === 0 ? this.m.stats.possSum[0] : this.m.stats.possSum[1]) / this.m.min : 0.5;
-      const pressure = this.nearest(this.team(opp), car);
-      const close = pressure ? Math.sqrt(d2(pressure, car)) : 20;
-      const pLose = clamp(0.2 * (1.3 - share) + (close < 2 ? 0.08 : 0), 0.05, 0.4);
-      if (Math.random() < pLose) { this._turnover(car, pressure); return; }
-      // Pase: hacia delante si hay sitio, al pie o al espacio
-      const mates = this.team(i).filter(a => a !== car);
-      if (!mates.length) return;
-      const depthCar = this.depth(i, car.x);
-      const wide = car.y < 13 || car.y > Wd - 13;
-      if (depthCar > 82 && wide && Math.random() < 0.45) {
-        // Centro al área
-        const box = mates.filter(a => this.depth(i, a.x) > 82 && Math.abs(a.y - Wd / 2) < 12);
-        const tgt = box.length ? U.pick(box) : null;
-        const [tx, ty] = this.world(i, 95 + Math.random() * 5, Wd / 2 + U.rand(-7, 7));
-        this._kick(tx, ty, { h: 4.5, T: 1.05, to: tgt ? tgt.pid : null, done: () => this._contest() });
-        return;
-      }
-      const r = U.weighted(mates, a => {
-        const gain = (a.x - car.x) * dir;
-        const dist = Math.sqrt(d2(a, car));
-        const marked = this.nearest(this.team(opp), a);
-        const free = marked ? Math.min(1, Math.sqrt(d2(marked, a)) / 5) : 1;
-        const runs = this.runner && this.runner.pid === a.pid && this.runner.until > this.t ? 2.2 : 1;
-        return (gain > -6 ? 1 + Math.max(0, gain) / 10 : 0.35) * (dist < 34 ? 1 : 0.25) * (this.isGK(a) ? 0.12 : 1) * (0.3 + free) * runs;
-      });
-      // Desmarque al espacio para el balón en profundidad
-      if (!this.runner || this.runner.until < this.t) {
-        // La que está en la línea del fuera de juego arranca a la espalda de la defensa cuando la conductora puede levantar la cabeza
-        const line = this._offsideLine(i);
-        const fw = mates.filter(a => F.LINE[this.slotOf(a)] >= 2 && Math.abs((a.x - line) * dir) < 6 && !this.isGK(a));
-        if (fw.length && close > 4 && depthCar > 35 && Math.random() < 0.45) {
-          const f = fw.sort((p, q) => Math.abs(p.x - line) - Math.abs(q.x - line))[0];
-          const tx = clamp(line + dir * U.rand(8, 14), 3, L - 3), ty = clamp(f.y + (Wd / 2 - f.y) * 0.25 + U.rand(-4, 4), 5, Wd - 5);
-          this.runner = { pid: f.pid, tx, ty, until: this.t + 2.2 };
-        }
-      }
-      const dist = Math.sqrt(d2(r, car));
-      const through = this.runner && this.runner.pid === r.pid && this.runner.until > this.t;
-      if (through) {
-        const [tx, ty] = [this.runner.tx, this.runner.ty];
-        this._kick(tx, ty, { h: 0.1, to: r.pid });
-      } else {
-        const lead = 0.4;
-        this._kick(r.x + r.vx * lead, r.y + r.vy * lead, { h: dist > 26 ? clamp(dist * 0.13, 2, 8) : 0.05, to: r.pid });
-      }
-    }
-
-    /** Pérdida: entrada, intercepción o despeje. */
-    _turnover(car, presser) {
-      const opp = 1 - car.team;
-      const r = Math.random();
-      if (presser && d2(presser, car) < 9 && r < 0.55) {
-        // Entrada limpia
-        presser.tx = car.x; presser.ty = car.y; presser.run = 1;
-        if (Math.random() < 0.3) { presser.state = 'slide'; presser.until = this.t + 0.5; }
-        this._receive(presser.pid);
-        this.poss = opp;
-        return;
-      }
-      if (r < 0.8) {
-        // Pase interceptado
-        const mates = this.team(car.team).filter(a => a !== car);
-        const tgt = mates.length ? U.pick(mates) : null;
-        const cut = tgt ? this.nearest(this.team(opp), { x: (car.x + tgt.x) / 2, y: (car.y + tgt.y) / 2 }) : presser;
-        if (cut) this._kick(cut.x, cut.y, { h: 0.05, to: cut.pid });
-        return;
-      }
-      // Despeje en largo del rival
-      if (presser) {
-        this._receive(presser.pid);
-        const [tx, ty] = this.world(opp, U.rand(50, 72), U.rand(8, Wd - 8));
-        this._kick(tx, ty, { h: 9, T: 1.6, done: () => this._contest() });
-      }
+      if (this.hold || this.over) return;
+      this.brain.tick(dt);
     }
 
     /** Disputa de un balón dividido o aéreo: se lo queda el más cercano. */
@@ -883,7 +658,7 @@
           if (P.rid == null) { done(); return; }
         }
         const r = this.A[P.rid];
-        r.tx = b.x; r.ty = b.y; r.run = 0.85;
+        r.tx = b.x; r.ty = b.y; r.run = 0.95;
         if (Math.hypot(r.x - b.x, r.y - b.y) < 1.1) {
           b.owner = r.pid; b.z = 0;
           const far = Math.hypot(P.x - b.x, P.y - b.y) > 14;
@@ -910,7 +685,7 @@
         const r = this.A[P.rid];
         if (!r) { done(); return; }
         b.owner = r.pid;
-        r.tx = P.x - this.dir[r.team] * 0.4; r.ty = P.y; r.run = 0.55;
+        r.tx = P.x - this.dir[r.team] * 0.4; r.ty = P.y; r.run = 0.8;
         if (Math.hypot(r.x - P.x, r.y - P.y) < 1.2) {
           // la deja en el punto; si no es ella quien saca, se aparta
           if (P.to != null && P.to !== r.pid && this.A[P.to]) { r.tx = r.x - this.dir[r.team] * 4; }
@@ -926,18 +701,22 @@
       // si no hay nadie cerca, se queda ahí y va el más cercano
     }
 
-    _throwIn(i) {
+    /** Saque de banda donde salió el balón: lo saca el equipo que no la tocó (la que esté más cerca va a por él). */
+    _throwInAt(i, x, top) {
       const b = this.ball;
-      const top = b.y < Wd / 2;
-      const x = clamp(b.x + U.rand(-8, 8), 6, L - 6), y = top ? -0.3 : Wd + 0.3;
+      const y = top ? -0.3 : Wd + 0.3;
       const taker = this.nearest(this.team(i).filter(a => !this.isGK(a)), { x, y });
       if (!taker) return;
-      const mate = this.nearest(this.team(i).filter(a => a !== taker && !this.isGK(a)), { x: x + this.dir[i] * 6, y: top ? 8 : Wd - 8 });
+      this.poss = i;
+      this.brain.restartBy(i, 'throw');
       this._seq([
-        { d: 0.5, start: () => { b.owner = null; b.path = null; this._kick(x, y, { h: 0.6, T: 0.4, sfx: false }); } },
-        { d: 1.1, start: () => { this.ov = { p: { [taker.pid]: { x, y, run: 0.9 } } }; this.poss = i; } },
-        { d: 0.5, start: () => { taker.held = true; this._receive(taker.pid); } },
-        { d: 0.6, start: () => { taker.held = false; this.ov = null; if (mate) this._kick(mate.x, mate.y, { h: 1.6, T: 0.6, to: mate.pid, sfx: false }); } }
+        { d: 0.9, start: () => { b.path = null; b.roll = null; this.ov = { p: { [taker.pid]: { x, y, run: 0.9 } } }; this._placeBall(x, y, 1, taker.pid, i); } },
+        { d: 0.5, start: () => { taker.held = true; b.owner = taker.pid; b.x = x; b.y = y; } },
+        { d: 0.45, start: () => {
+          taker.held = false; this.ov = null;
+          const mate = this.brain.throwTarget(taker) || this.nearest(this.team(i).filter(a => a !== taker && !this.isGK(a)), { x: x + this.dir[i] * 6, y: top ? 8 : Wd - 8 });
+          if (mate) { this._kick(mate.x + mate.vx * 0.3, mate.y + mate.vy * 0.3, { h: 1.6, T: 0.6, to: mate.pid, sfx: false, free: true }); this.brain.say('pass', { team: i, p: taker.pid, q: mate.pid, type: 'throw' }); }
+        } }
       ]);
     }
 
@@ -946,8 +725,8 @@
       if (!gk) return [];
       const [x, y] = this.world(i, 5.5, Wd / 2 + (Math.random() < 0.5 ? -6 : 6));
       return [
-        { d: 1.3, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this._cut(0.6); } },
-        { d: 0.3, start: () => { this.ov = null; const [tx, ty] = this.world(i, U.rand(48, 66), U.rand(10, Wd - 10)); this._kick(tx, ty, { h: 11, T: 1.8, by: gk.pid, done: () => this._contest() }); } }
+        { d: 0.5, start: () => { this._placeBall(x, y, 1.1, gk.pid, i); this.poss = i; this.ov = { p: { [gk.pid]: { x: x - this.dir[i] * 1.2, y, run: 0.6 } } }; this.brain.restartBy(i, 'gk'); } },
+        { d: 0.3, start: () => { this.ov = null; if (this.A[gk.pid]) { this.ball.owner = gk.pid; this.poss = i; } this.brain.ownTeam = i; this.brain.next = this.t + 0.5; } }
       ];
     }
 
@@ -991,6 +770,20 @@
       this.cutAt = this.t;
     }
 
+    /** Corte de realización a una jugada: la poseedora aparece con el balón en la zona y el resto se recoloca (con destello). */
+    _cutTo(i, d, l, pid) {
+      const [x, y] = this.world(i, clamp(d, 2, L - 2), clamp(l, 2, Wd - 2));
+      const a = (pid != null && this.A[pid] && !this.isGK(this.A[pid])) ? this.A[pid] : this.nearest(this.team(i).filter(p => !this.isGK(p)), { x, y });
+      if (!a) return false;
+      a.x = x; a.y = y; a.vx = a.vy = 0;
+      const b = this.ball;
+      b.path = null; b.roll = null; b.owner = a.pid; b.x = x + this.dir[i] * 0.5; b.y = y; b.z = 0;
+      this.poss = i; this.fetch = null; this.place = null;
+      this.brain.afterScript(); this.brain.ownTeam = i; this.brain.lastTouch = i;
+      this._cut(0.92);
+      return true;
+    }
+
     _clearStates() {
       for (const id in this.A) { const a = this.A[id]; if (a.state !== 'down') a.state = null; a.held = false; }
       this.coaches.forEach(c => { c.state = null; c.goTo = null; });
@@ -1019,9 +812,25 @@
         if (bt.end) bt.end();
         if (bt.slow) this.slowT = 1;
         this.beat = null;
+        if (!this.script.length) this._afterScript();
       }
       return true;
     }
+    /** Acaba una escena: lo que quedara por contar se cuenta y el juego sigue desde donde quedó. */
+    _afterScript() {
+      if (!this.over && this.ov && !this.ov.keep) this.ov = null;
+      this.brain.afterScript();
+      if (!this.queue.length) this._revealAll();
+    }
+    /** El narrador cuenta un evento del motor justo cuando se ve en el campo. */
+    _reveal(e) {
+      if (!e || e._shown) return;
+      e._shown = true;
+      const k = this.handled.indexOf(e);
+      if (k >= 0) this.handled.splice(k, 1);
+      if (this.onEv) this.onEv(e);
+    }
+    _revealAll() { for (const e of this.handled.slice()) this._reveal(e); this.handled = []; }
 
     _banner(text, color, secs, big) { text = TL.t ? TL.t(text) : text; this.banner = { text, color: color || '#fff', until: this.t + (secs || 1.4), born: this.t, big: !!big }; }
     _focus(x, y, z) { this.cam.tx = x; this.cam.ty = y; this.cam.tz = z || 1.6; }
@@ -1033,9 +842,19 @@
     }
 
     // ------------------------------------------------------------ Eventos del motor
+    /** ¿Se ha visto suficiente juego para que avance el reloj? (segundos de campo por minuto, según la velocidad) */
+    ready() {
+      const per = { 1: 2.4, 2: 1.7, 4: 1.2, 8: 0.85, 16: 0.55 }[this.speed] || 1.2;
+      return this.t - this.stepT >= per;
+    }
+    /** ¿Este evento se ve en el campo (y se cuenta cuando pasa)? */
+    stages(e) { return KEY_EVENTS.includes(e.type); }
     push(evs, instant) {
+      this.stepT = this.t;
       for (const e of evs) {
         if (!KEY_EVENTS.includes(e.type)) continue;
+        // Falta sin tarjeta ni texto: la comete quien llegue al choque en el juego (el reloj no se para)
+        if (e.type === 'foul' && !e.text && !instant) { this.handled.push(e); this._reveal(e); this.brain.foulLater(e); continue; }
         this.queue.push(e);
         // El motor ya los ha quitado del campo: siguen en pantalla hasta que se vea la jugada
         if (e.type === 'red' || e.type === 'inj') this.keep.add(e.pid);
@@ -1048,7 +867,10 @@
     flush() {
       this.instant = true;
       // Lo que se estaba escenificando ya no vale: el reloj ha saltado
-      this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1; this.fetch = null;
+      this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1; this.fetch = null; this.place = null;
+      this.brain.ag = null;
+      for (const e of this.queue) this.handled.push(e);
+      this._revealAll();
       this.keep.clear();
       this._clearStates();
       this._unfocus();
@@ -1089,20 +911,27 @@
       const own = b.owner != null && this.A[b.owner];
       if (own) { b.x = own.x + this.dir[own.team] * 0.5; b.y = own.y; this.poss = own.team; }
       this.ref.x = this.ref.tx; this.ref.y = this.ref.ty;
+      this.brain.afterScript(true);
     }
 
     _take(pred) {
       const k = this.queue.findIndex(pred);
-      return k >= 0 ? this.queue.splice(k, 1)[0] : null;
+      const e = k >= 0 ? this.queue.splice(k, 1)[0] : null;
+      if (e) this.handled.push(e);
+      return e;
     }
 
     _handle(e) {
       const i = e.team, sfx = TL.SFX;
+      this.handled.push(e);
+      // Lo que no tiene desenlace se cuenta al empezar; los remates, cuando se ve cómo acaban
+      if (!['goal', 'save', 'miss', 'disallowed', 'penmiss', 'foul', 'yellow', 'red', 'pen', 'fk', 'refmiss', 'offside'].includes(e.type)) this._reveal(e);
       switch (e.type) {
         case 'corner': {
+          if (e.fromPlay) this._seq(this._deflect(i));
           const shot = this._take(x => ['goal', 'save', 'miss', 'disallowed'].includes(x.type) && x.team === i);
           if (shot) this._shotSeq(shot, 'corner');
-          else this._seq(this._cornerSetup(i, null));
+          else this._seq(this._cornerSetup(i, null).concat(this._cornerPlay(i)));
           break;
         }
         case 'goal': case 'save': case 'miss': case 'disallowed':
@@ -1151,7 +980,121 @@
       return this.world(i, d, Wd / 2 + U.rand(-spread, spread));
     }
 
+    /**
+     * La ocasión nace de la jugada que se estaba viendo: quien lleva el balón se la da a la rematadora
+     * (o al asistente, o la pone al área desde la banda), o remata ella misma si es la elegida.
+     */
+    _shotFromPlay(e, origin) {
+      const i = e.team, dir = this.dir[i], b = this.ball;
+      const car = b.owner != null ? this.A[b.owner] : null;
+      if (!car || car.team !== i || b.path) return null;
+      const shooter = this.A[e.pid] ? e.pid : null;
+      if (shooter == null) return null;
+      const type = e.shotType || 'placed';
+      const outcome = e.type === 'goal' || e.type === 'disallowed' ? 'goal' : e.type;
+      const late = this.m.min >= 85;
+      const epic = outcome === 'goal' || origin === 'counter' || type === 'chip' || (late && outcome !== 'miss');
+      const air = type === 'header' || type === 'volley';
+      let [sx, sy] = this._shotSpot(i, type);
+      const ass = e.pid2 != null && this.A[e.pid2] && e.pid2 !== shooter ? e.pid2 : null;
+      const say = (p, q, type2) => this.brain.say('pass', { team: i, p, q, type: type2 });
+      const beats = [];
+      this.ov = { p: {} };
+      const rebound = type === 'tapin' && /rechace/.test(e.text || '') && car.pid !== shooter;
+      if (rebound) {
+        const gk = this.gkOf(1 - i), gx = this.goalX(i), side = sy < Wd / 2 ? -1 : 1;
+        // Quien dispara primero lo hace desde la frontal: si quien lleva el balón está lejos, se la da a quien está cerca (o conduce hasta allí)
+        const [fx, fy] = this.world(i, U.rand(84, 89), Wd / 2 + U.rand(-8, 8));
+        const near = this.team(i).filter(a => a.pid !== shooter && !this.isGK(a)).sort((p, q) => Math.hypot(p.x - fx, p.y - fy) - Math.hypot(q.x - fx, q.y - fy))[0];
+        const first = ass != null && this.A[ass] && Math.hypot(this.A[ass].x - fx, this.A[ass].y - fy) < 22 ? ass : near ? near.pid : car.pid;
+        if (first !== car.pid) {
+          beats.push({ d: 0.05, ball: true, start: () => { say(car.pid, first, 'prog'); this.ov.p[first] = { x: fx, y: fy, run: 1 }; this.ov.p[shooter] = { x: lerp(this.A[shooter].x, sx, 0.5), y: lerp(this.A[shooter].y, sy, 0.5), run: 1 }; this._kick(fx, fy, { h: 0.05, to: first }); } });
+          beats.push({ d: 0.2, start: () => { this._receive(first, true); } });
+        } else if (this.depth(i, car.x) < 80) {
+          beats.push({ d: clamp(Math.hypot(fx - car.x, fy - car.y) / 6, 0.3, 1.6), start: () => { this.ov.p[first] = { x: fx, y: fy, run: 1 }; this.ov.p[shooter] = { x: sx, y: sy, run: 1 }; } });
+        }
+        // Disparo, la portera la saca con una mano… y la rematadora llega antes que nadie
+        beats.push({ d: 0.05, ball: true, slow: 0.7, start: () => {
+          this.ov.p[shooter] = { x: sx, y: sy, run: 1 };
+          this._focus(lerp(this.ball.x, gx, 0.6), Wd / 2, 1.45);
+          if (gk) { gk.state = 'dive'; gk.dive = side * dir; gk.until = this.t + 1.1; this.ov.p[gk.pid] = { x: gx - dir * 1.0, y: Wd / 2 + side * 2, run: 1 }; }
+          this._kick(gx - dir * 0.9, Wd / 2 + side * 2.2, { h: 0.3, T: 0.5, done: () => {} });
+        } });
+        beats.push({ d: 0.05, ball: true, slow: 0.6, start: () => {
+          if (!this.instant && TL.SFX) TL.SFX.save && TL.SFX.save();
+          // El rechace cae donde llega la rematadora (que ya venía lanzada hacia el área)
+          const S = this.A[shooter];
+          let px = sx, py = sy, T = 0.45;
+          if (S) {
+            const d = Math.hypot(sx - S.x, sy - S.y), can = 6.2 * (S.pace || 1) * 0.6;
+            if (d > can) { px = S.x + (sx - S.x) * can / d; py = S.y + (sy - S.y) * can / d; }
+            T = Math.max(0.45, Math.hypot(px - S.x, py - S.y) / (6.2 * (S.pace || 1)) + 0.15);
+            this.ov.p[shooter] = { x: px, y: py, run: 1 };
+          }
+          this._kick(px, py, { h: 0.7, T, free: true, done: () => {} });
+        } });
+        beats.push(...this._finish(e, shooter, type, outcome, epic));
+        return beats;
+      }
+      if (car.pid === shooter && !air) {
+        // Ella misma: se planta en la zona de remate y dispara
+        const dd = Math.hypot(sx - car.x, sy - car.y);
+        if (dd > 22) { sx = lerp(car.x, sx, 22 / dd); sy = lerp(car.y, sy, 22 / dd); }
+        beats.push({ d: clamp(Math.hypot(sx - car.x, sy - car.y) / 6, 0.3, 1.4), slow: epic ? 0.75 : 1, start: () => {
+          this.ov.p[shooter] = { x: sx, y: sy, run: 1 };
+          if (epic) this._focus(sx, sy, 1.45);
+        } });
+      } else {
+        let from = car.pid;
+        // Centro: desde la banda (si quien la lleva no está en la banda, primero abre a una compañera)
+        const wide = a => Math.abs(this.lat(i, a.y) - Wd / 2) > 15 && this.depth(i, a.x) > 64;
+        if (origin === 'cross' || air) {
+          if (!wide(car)) {
+            const mate = (ass != null && this.A[ass]) || this.team(i).filter(a => a.pid !== shooter && !this.isGK(a) && a !== car).sort((p, q) => Math.abs(this.lat(i, q.y) - Wd / 2) - Math.abs(this.lat(i, p.y) - Wd / 2))[0];
+            if (mate) {
+              const [cx, cy] = this.world(i, U.rand(84, 94), this.lat(i, mate.y) < Wd / 2 ? U.rand(4, 9) : Wd - U.rand(4, 9));
+              beats.push({ d: 0.05, ball: true, start: () => { this.ov.p[mate.pid] = { x: cx, y: cy, run: 1 }; this.ov.p[shooter] = { x: sx - dir * 7, y: sy, run: 0.9 }; say(car.pid, mate.pid, 'wide'); this._kick(cx, cy, { h: 0.05, to: mate.pid }); } });
+              beats.push({ d: 0.35, start: () => { this._receive(mate.pid, true); } });
+              from = mate.pid;
+            }
+          }
+          beats.push({ d: 0.05, ball: true, slow: epic ? 0.6 : 1, start: () => {
+            this.ov.p[shooter] = { x: sx, y: sy, run: 1 };
+            if (epic) this._focus(sx, sy, 1.5);
+            say(from, null, 'cross');
+            this._kick(sx, sy, { h: 4.2, T: 1.0, tz: type === 'header' ? 1.9 : 0.8, done: () => {} });
+          } });
+        } else {
+          // Pase: si la asistente está a mano, primero ella; después a la rematadora, que llega a su sitio
+          if (ass != null && ass !== car.pid) {
+            const A2 = this.A[ass];
+            if (Math.hypot(A2.x - car.x, A2.y - car.y) < 32) {
+              beats.push({ d: 0.05, ball: true, start: () => { this.ov.p[shooter] = { x: sx - dir * 5, y: sy, run: 0.95 }; say(car.pid, ass, 'pass'); this._kick(A2.x + A2.vx * 0.4, A2.y + A2.vy * 0.4, { h: 0.05, to: ass }); } });
+              beats.push({ d: 0.3, start: () => { this._receive(ass, true); } });
+              from = ass;
+            }
+          }
+          beats.push({ d: 0.05, ball: true, slow: epic ? 0.65 : 1, start: () => {
+            const S = this.A[shooter], b = this.ball;
+            if (S) {
+              // ¿Llega a tiempo? Si no, el pase va un poco antes, a su carrera
+              const T = 0.12 + Math.hypot(sx - b.x, sy - b.y) / 17, dS = Math.hypot(sx - S.x, sy - S.y), can = (T + 0.15) * 6.2 * (S.pace || 1);
+              if (dS > can) { const k = can / dS; sx = S.x + (sx - S.x) * k; sy = S.y + (sy - S.y) * k; }
+            }
+            this.ov.p[shooter] = { x: sx, y: sy, run: 1 };
+            if (epic) this._focus(sx, sy, 1.45);
+            say(from, shooter, origin === 'counter' ? 'through' : 'prog');
+            this._kick(sx, sy, { h: type === 'volley' ? 2.5 : 0.05, tz: type === 'volley' ? 0.8 : 0, to: shooter });
+          } });
+          beats.push({ d: type === 'solo' ? 0.7 : 0.25, start: () => { if (!air) this._receive(shooter, true); if (type === 'solo') this.ov.p[shooter] = { x: sx + dir * 3, y: sy + U.rand(-3, 3), run: 1 }; } });
+        }
+      }
+      beats.push(...this._finish(e, shooter, type, outcome, epic));
+      return beats;
+    }
+
     _shotSeq(e, origin) {
+      if (e.fromPlay && origin !== 'corner') { const bs = this._shotFromPlay(e, origin); if (bs) { this._seq(bs); return; } }
       const i = e.team, dir = this.dir[i];
       const shooter = this.A[e.pid] ? e.pid : (this.team(i).find(a => F.LINE[this.slotOf(a)] === 3) || {}).pid;
       if (shooter == null) return;
@@ -1235,6 +1178,7 @@
           if (gk) { gk.state = 'dive'; gk.dive = -side * dir; gk.until = this.t + 1.2; this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {}; this.ov.p[gk.pid] = { x: gx - dir * 1.2, y: Wd / 2 - side * 1.5, run: 1 }; }
           this._kick(gx + dir * 1.3, ty, { fz, tz, h: type === 'chip' ? 3.6 : type === 'long' ? 1.2 : type === 'fk' ? 1.5 : 0.2, T, curve: type === 'fk' ? side * 2.4 : type === 'placed' ? side * 0.6 : 0, done: () => {
             this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 };
+            if (e.type === 'goal') this._reveal(e);
           } });
         } else if (outcome === 'save') {
           const ty = Wd / 2 + side * U.rand(0.5, GW / 2 - 0.4);
@@ -1243,21 +1187,21 @@
             this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {};
             this.ov.p[gk.pid] = { x: gx - dir * 1.0, y: ty, run: 1 };
           }
-          this._kick(gx - dir * 1.0, ty, { fz, tz: air ? 0.8 : 0.4, h: type === 'chip' ? 3 : 0.3, T, done: () => {} });
+          this._kick(gx - dir * 1.0, ty, { fz, tz: air ? 0.8 : 0.4, h: type === 'chip' ? 3 : 0.3, T, done: () => { this._reveal(e); } });
         } else {
           const mk = e.miss || (air ? 'header' : 'wide');
           if (mk === 'blocked') {
             const blk = this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), { x: lerp(this.ball.x, gx, 0.25), y: lerp(this.ball.y, Wd / 2, 0.25) });
             const [bx, by] = blk ? [blk.x, blk.y] : [lerp(this.ball.x, gx, 0.2), this.ball.y];
             if (blk) { blk.state = 'slide'; blk.until = this.t + 0.6; }
-            this._kick(bx, by, { fz, tz: 0.5, h: 0.2, T: 0.22, done: () => {} });
+            this._kick(bx, by, { fz, tz: 0.5, h: 0.2, T: 0.22, done: () => { this._reveal(e); } });
           } else if (mk === 'post') {
             const ty = Wd / 2 + side * GW / 2;
-            this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); } });
+            this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this._reveal(e); } });
           } else {
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
             const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 2) : U.rand(GW / 2 + 0.8, GW / 2 + 7));
-            this._kick(gx + dir * 2.5, ty, { fz, tz: over ? U.rand(3, 5) : 0.4, h: 0.5, T: T * 1.1, done: () => {} });
+            this._kick(gx + dir * 2.5, ty, { fz, tz: over ? U.rand(3, 5) : 0.4, h: 0.5, T: T * 1.1, done: () => { this._reveal(e); } });
           }
         }
       } });
@@ -1347,6 +1291,7 @@
         { d: e.viaVar ? 2.2 : 0.3, start: () => { if (e.viaVar) { this._banner('Revisión VAR', '#5db8ff', 2); this.refOv = { x: L / 2 + 2, y: Wd + 1.2, run: 0.9 }; this.monitor = this.t + 2.2; } } },
         { d: 1.8, start: () => {
           this.refOv = null;
+          this._reveal(e);
           this._banner('GOL ANULADO', '#ff6b6b', 1.7, true);
           if (!this.instant && TL.SFX) TL.SFX.boo();
           this.netShake = null;
@@ -1370,8 +1315,9 @@
     /** Córner: el área se llena, cada uno con su marca, el portero en la línea. */
     _cornerSetup(i, shooter) {
       const dir = this.dir[i], gx = this.goalX(i);
-      return [{ d: 2.6, start: () => {
-        const top = Math.random() < 0.5;
+      return [{ d: 2.0, start: () => {
+        const top = this.cornerTop != null ? this.cornerTop : Math.random() < 0.5;
+        this.cornerTop = null;
         const cy = top ? 0.4 : Wd - 0.4;
         const b = this.ball;
         this._placeBall(gx - dir * 0.4, cy, 1.4, null, i);
@@ -1409,6 +1355,50 @@
       }, end: () => { this.refOv = null; } }];
     }
 
+    /** Córner sin remate: centro al área y la defensa (o la portera) la despeja. */
+    _cornerPlay(i) {
+      return [
+        { d: 0.1, ball: true, start: () => {
+          const [tx, ty] = this.world(i, U.rand(93, 99), Wd / 2 + U.rand(-6, 6));
+          const taker = this.cornerTaker;
+          this.brain.say('pass', { team: i, p: taker, q: null, type: 'cross' });
+          this._kick(tx, ty, { h: 6, T: 1.15, by: taker != null ? taker : undefined, team: i, done: () => {} });
+        } },
+        { d: 0.4, start: () => {
+          this.ov = null;
+          const b = this.ball;
+          const g = this.gkOf(1 - i);
+          const w = g && Math.hypot(g.x - b.x, g.y - b.y) < 5 && Math.random() < 0.5 ? g : this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), b);
+          if (!w) return;
+          w.jump = this.t;
+          this._receive(w.pid, true);
+          if (this.isGK(w)) { w.held = true; this.brain.say('poss', { team: 1 - i, p: w.pid, how: 'catch' }); }
+          else this.brain.mustClear = w.pid;
+        } }
+      ];
+    }
+    /** El ataque acaba en córner: el centro lo toca una defensa y se va por la línea de fondo. */
+    _deflect(i) {
+      const dir = this.dir[i], gx = this.goalX(i);
+      return [
+        { d: 0.05, ball: true, start: () => {
+          const b = this.ball, car = b.owner != null ? this.A[b.owner] : null;
+          const [tx, ty] = this.world(i, U.rand(93, 97), Wd / 2 + U.rand(-6, 6));
+          this.brain.say('pass', { team: i, p: car ? car.pid : null, q: null, type: 'cross' });
+          this._kick(tx, ty, { h: 1.4, T: 0.75, free: true, done: () => {} });
+        } },
+        { d: 0.05, ball: true, start: () => {
+          const b = this.ball, d = this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), b);
+          if (d) { d.state = 'slide'; d.until = this.t + 0.6; d.tx = b.x; d.ty = b.y; }
+          const top = b.y < Wd / 2;
+          this.cornerTop = top;
+          this.brain.lastTouch = 1 - i;
+          this._kick(gx + dir * 1.6, top ? U.rand(1, 6) : Wd - U.rand(1, 6), { h: 1.1, T: 0.55, free: true, done: () => {} });
+        } },
+        { d: 0.5, start: () => { this.brain.say('out', { team: i, kind: 'corner' }); } }
+      ];
+    }
+
     /** Falta peligrosa: barrera a 9,15 m, portero al palo largo, lanzador detrás. */
     _freeKickSeq(e, fromGoal) {
       const i = e.team;
@@ -1417,8 +1407,14 @@
       const taker = goalEv ? goalEv.pid : e.pid != null ? e.pid : (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] + this.P(c.pid).st[2]) - (this.P(a.pid).st[1] + this.P(a.pid).st[2]))[0] || {}).pid;
       if (taker == null) return;
       const dir = this.dir[i], gx = this.goalX(i);
-      const [bx, by] = this.world(i, U.rand(79, 85), Wd / 2 + U.rand(-9, 9));
-      const beats = [{ d: 2.6, start: () => {
+      let [bx, by] = this.world(i, U.rand(79, 85), Wd / 2 + U.rand(-9, 9));
+      const car = this.ball.owner != null ? this.A[this.ball.owner] : null;
+      const live = !fromGoal && e.fromPlay && car && car.team === i && !this.ball.path;
+      if (live) [bx, by] = this.world(i, clamp(this.depth(i, car.x), 72, 85), clamp(this.lat(i, car.y), Wd / 2 - 17, Wd / 2 + 17));
+      const beats = [];
+      if (live) beats.push(this._foulBeat(car, i));
+      beats.push({ d: 2.6, start: () => {
+        if (goalEv || fromGoal) this._reveal(e);
         this._banner('Falta peligrosa', '#ffffff', 1.2);
         if (!this.instant && TL.SFX) TL.SFX.whistle(false);
         this._placeBall(bx, by, 1.4, null, i);
@@ -1441,15 +1437,15 @@
         this.refOv = { x: wx + px * 3, y: wy + py * 3, run: 0.7 };
         this.wall = { until: this.t + 2.6 };
         this._cut(0.9);
-      }, end: () => { this.refOv = null; } },
-      { d: 0.6, slow: goalEv ? 0.5 : 1, start: () => { if (this.A[taker]) { this.ov.p[taker] = { x: bx, y: by, run: 0.7 }; } if (goalEv) this._focus(lerp(bx, gx, 0.5), Wd / 2, 1.45); } }];
+      }, end: () => { this.refOv = null; } });
+      beats.push({ d: 0.6, slow: goalEv ? 0.5 : 1, start: () => { if (this.A[taker]) { this.ov.p[taker] = { x: bx, y: by, run: 0.7 }; } if (goalEv) this._focus(lerp(bx, gx, 0.5), Wd / 2, 1.45); } });
       if (goalEv) beats.push(...this._finish(goalEv, taker, 'fk', 'goal', true));
       else {
         const intoWall = Math.random() < 0.5;
         beats.push({ d: 0.05, ball: true, start: () => {
           if (this.A[taker]) this._receive(taker);
-          if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { h: 0.8, tz: 1.5, T: 0.3, done: () => {} }); }
-          else this._kick(gx + dir * 2, Wd / 2 + U.rand(-5, 5), { h: 2.2, tz: 3.2, T: 0.85, curve: 2, done: () => {} });
+          if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { h: 0.8, tz: 1.5, T: 0.3, done: () => { this._reveal(e); } }); }
+          else this._kick(gx + dir * 2, Wd / 2 + U.rand(-5, 5), { h: 2.2, tz: 3.2, T: 0.85, curve: 2, done: () => { this._reveal(e); } });
         } });
         beats.push({ d: 0.8, start: () => {
           if (!this.instant && TL.SFX) TL.SFX.groan();
@@ -1460,17 +1456,37 @@
       this._seq(beats);
     }
 
+    /** Falta sobre quien lleva el balón: entra la rival más cercana, cae y pita el árbitro. */
+    _foulBeat(victim, i) {
+      return { d: 1.0, start: () => {
+        const f = this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), victim);
+        if (f) { f.state = 'slide'; f.until = this.t + 0.6; f.x = lerp(f.x, victim.x, 0.4); f.y = lerp(f.y, victim.y, 0.4); }
+        victim.state = 'down'; victim.until = this.t + 1.4; victim.fall = Math.random() * 6;
+        this.ball.owner = null; this.ball.roll = { vx: this.dir[i] * 2, vy: U.rand(-1, 1) };
+        if (!this.instant && TL.SFX) TL.SFX.whistle(false);
+        this.ov = { all: 'stay', p: {} };
+      } };
+    }
+
     /** Penalti: derribo en el área, el árbitro señala, todos fuera del área. */
     _penaltySeq(e) {
       const i = e.team, dir = this.dir[i];
       const victim = this.A[e.pid] ? e.pid : (this.team(i).find(a => F.LINE[this.slotOf(a)] === 3) || {}).pid;
       const fouler = e.pid2 != null && this.A[e.pid2] ? e.pid2 : null;
-      const [vx, vy] = this.world(i, U.rand(91, 97), Wd / 2 + U.rand(-9, 9));
+      let [vx, vy] = this.world(i, U.rand(91, 97), Wd / 2 + U.rand(-9, 9));
       const [spx, spy] = this.world(i, L - 11, Wd / 2);
       const beats = [];
+      const carrying = victim != null && this.ball.owner === victim && !this.ball.path;
+      if (carrying) {
+        const v = this.A[victim];
+        [vx, vy] = this.world(i, clamp(this.depth(i, v.x) + 7, 89, 99), clamp(this.lat(i, v.y) + (Wd / 2 - this.lat(i, v.y)) * 0.3, Wd / 2 - 16, Wd / 2 + 16));
+      }
       if (victim != null) {
-        beats.push({ d: 0.1, ball: true, start: () => { this.poss = i; this.ov = { p: { [victim]: { x: vx, y: vy, run: 1 } } }; if (fouler != null) this.ov.p[fouler] = { x: () => this.A[victim].x, y: () => this.A[victim].y, run: 1 }; this._kick(vx, vy, { h: 0.05, to: victim }); } });
-        beats.push({ d: 0.7, start: () => { this._receive(victim); } });
+        if (carrying) beats.push({ d: 0.8, start: () => { this.poss = i; this.ov = { p: { [victim]: { x: vx, y: vy, run: 1 } } }; if (fouler != null) this.ov.p[fouler] = { x: () => this.A[victim].x, y: () => this.A[victim].y, run: 1 }; } });
+        else {
+          beats.push({ d: 0.1, ball: true, start: () => { this.poss = i; this.ov = { p: { [victim]: { x: vx, y: vy, run: 1 } } }; if (fouler != null) this.ov.p[fouler] = { x: () => this.A[victim].x, y: () => this.A[victim].y, run: 1 }; this._kick(vx, vy, { h: 0.05, to: victim }); } });
+          beats.push({ d: 0.7, start: () => { this._receive(victim); } });
+        }
         beats.push({ d: 0.9, start: () => {
           const v = this.A[victim]; if (v) { v.state = 'down'; v.until = this.t + 1.8; }
           if (fouler != null && this.A[fouler]) { this.A[fouler].state = 'slide'; this.A[fouler].until = this.t + 0.6; }
@@ -1480,6 +1496,7 @@
         } });
       }
       beats.push({ d: 1.4, start: () => {
+        this._reveal(e);
         this._banner('PENALTI', '#f2c94c', 1.5, true);
         this.refOv = { x: spx - dir * 1.5, y: spy + 1.5, run: 1 };
         this.ref.state = 'point'; this.ref.until = this.t + 1.6;
@@ -1529,9 +1546,9 @@
           const ty = Wd / 2 + side * U.rand(1.2, GW / 2 - 0.4);
           const dive = goal ? (Math.random() < 0.7 ? -side : side) : saved ? side : (Math.random() < 0.5 ? side : -side);
           if (gk) { gk.state = 'dive'; gk.dive = dive * dir; gk.until = this.t + 1.3; this.ov.p[gk.pid] = { x: gx - dir * 0.6, y: Wd / 2 + dive * 2.4, run: 1 }; }
-          if (goal) this._kick(gx + dir * 1.3, ty, { fz: 0, tz: U.rand(0.2, 2), h: 0.3, T: 0.42, done: () => { this.netShake = { x: gx, until: this.t + 0.7 }; } });
-          else if (saved) this._kick(gx - dir * 0.6, Wd / 2 + side * 2.4, { fz: 0, tz: 0.6, h: 0.2, T: 0.4, done: () => {} });
-          else this._kick(gx + dir * 2, Wd / 2 + side * U.rand(GW / 2 + 0.5, GW / 2 + 3), { fz: 0, tz: Math.random() < 0.5 ? 3 : 0.5, h: 0.4, T: 0.45, done: () => {} });
+          if (goal) this._kick(gx + dir * 1.3, ty, { fz: 0, tz: U.rand(0.2, 2), h: 0.3, T: 0.42, done: () => { this.netShake = { x: gx, until: this.t + 0.7 }; this._reveal(e); } });
+          else if (saved) this._kick(gx - dir * 0.6, Wd / 2 + side * 2.4, { fz: 0, tz: 0.6, h: 0.2, T: 0.4, done: () => { this._reveal(e); } });
+          else this._kick(gx + dir * 2, Wd / 2 + side * U.rand(GW / 2 + 0.5, GW / 2 + 3), { fz: 0, tz: Math.random() < 0.5 ? 3 : 0.5, h: 0.4, T: 0.45, done: () => { this._reveal(e); } });
         } },
         ...(goal ? [
           { d: 0.1, start: () => { const mine = i === this.me; this._banner('¡GOOOL!', mine ? '#b8f53d' : '#ffffff', 2, true); if (!this.instant && TL.SFX) { TL.SFX.goal(mine); TL.SFX.net(); } if (mine && TL.FX) TL.FX.confetti(); this._sparkStand(i); } },
@@ -1561,6 +1578,8 @@
       if (card === 'red') { this.keep.add(fouler); f.red = true; }
       const hard = card || e.hard;
       const spot = { x: clamp(victim.x, 2, L - 2), y: clamp(victim.y, 2, Wd - 2) };
+      // Si no es penalti, la falta es fuera del área de quien la comete
+      if (this.depth(1 - i, spot.x) > L - 17.5 && Math.abs(spot.y - Wd / 2) < 21) spot.x = this.world(1 - i, L - 18, 0)[0];
       const beats = [
         { d: 0.65, start: () => {
           this.poss = 1 - i;
@@ -1568,6 +1587,7 @@
           this.ov = { p: { [fouler]: { x: () => victim.x, y: () => victim.y, run: 1 }, [victim.pid]: { x: victim.x + this.dir[1 - i] * 4, y: victim.y, run: 0.6 } } };
         } },
         { d: 0.1, start: () => {
+          if (!card) this._reveal(e);
           if (hard) { f.state = 'slide'; f.until = this.t + 0.7; }
           victim.state = 'down'; victim.until = this.t + (card ? 2.6 : 1.5); victim.fall = Math.random() * 6;
           this.ball.owner = null; this.ball.roll = { vx: this.dir[1 - i] * 3, vy: U.rand(-1, 1) };
@@ -1587,6 +1607,7 @@
         } });
         beats.push({ d: 1.5, start: () => {
           this.ref.state = 'card'; this.ref.card = card; this.ref.until = this.t + 1.5;
+          this._reveal(e);
           this._icon(fouler, card === 'red' ? 'red' : 'yellow', 1.6);
           if (!this.instant && TL.SFX) { TL.SFX.card(); if (card === 'red') TL.SFX.boo(); }
           if (card === 'red') this._banner('¡ROJA!', '#ff4040', 1.4, true);
@@ -1596,14 +1617,10 @@
       beats.push({ d: 0.8, start: () => {
         // Se saca la falta en corto
         this.refOv = null;
-        const taker = this.nearest(this.team(1 - i).filter(a => a !== victim), spot);
-        this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null);
+        const taker = this.nearest(this.team(1 - i).filter(a => a !== victim && !this.isGK(a)), spot);
+        this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null, 1 - i);
         this.ov = null;
-        if (taker) {
-          this._receive(taker.pid);
-          const mate = this.nearest(this.team(1 - i).filter(a => a !== taker && a !== victim && !this.isGK(a)), { x: spot.x + this.dir[1 - i] * 8, y: spot.y });
-          if (mate) setTimeout(() => { if (this.ball.owner === taker.pid) this._kick(mate.x, mate.y, { h: 0.05, to: mate.pid, sfx: false }); }, 250);
-        }
+        this.brain.restartBy(1 - i, 'fk');
       } });
       this._seq(beats);
     }
@@ -1634,7 +1651,7 @@
         { d: 0.1, ball: true, start: () => { this.poss = i; this.ov = { p: { [v]: { x: vx, y: vy, run: 1 } } }; this._kick(vx, vy, { h: 0.05, to: v }); } },
         { d: 0.6, start: () => { this._receive(v); } },
         { d: 0.2, start: () => { const a = this.A[v]; if (a) { a.state = 'down'; a.until = this.t + 2; } this.ball.owner = null; this.ball.roll = { vx: dir * 2, vy: 0 }; } },
-        { d: 0.1, start: () => { this._banner('¿¡No es penalti!?', '#ff6b6b', 1.5, true); if (!this.instant && TL.SFX) TL.SFX.boo(); this.ref.state = 'wave'; this.ref.until = this.t + 1.4; } },
+        { d: 0.1, start: () => { this._reveal(e); this._banner('¿¡No es penalti!?', '#ff6b6b', 1.5, true); if (!this.instant && TL.SFX) TL.SFX.boo(); this.ref.state = 'wave'; this.ref.until = this.t + 1.4; } },
         this._protestBeat(i, 1.6)
       ]);
     }
@@ -1681,12 +1698,14 @@
         { d: 0.1, start: () => {
           this.poss = i;
           this.ov = { p: { [e.pid]: { x: tx, y: ty, run: 1 } } };
-          const carrier = this.nearest(this.team(i).filter(a => a !== runner && !this.isGK(a)), { x: tx - dir * 22, y: ty });
+          const own = this.ball.owner != null ? this.A[this.ball.owner] : null;
+          const carrier = own && own.team === i && own !== runner ? own : this.nearest(this.team(i).filter(a => a !== runner && !this.isGK(a)), { x: tx - dir * 22, y: ty });
           if (carrier && this.ball.owner !== carrier.pid) this._receive(carrier.pid);
         } },
         { d: 0.5, ball: true, start: () => { this._kick(tx, ty, { h: 0.1, to: e.pid }); } },
         { d: 1.3, start: () => {
           ar.flag = this.t + 1.6;
+          this._reveal(e);
           if (!this.instant && TL.SFX) TL.SFX.whistle(false);
           this._banner('Fuera de juego', '#ffd23f', 1.1);
           this.ov = { all: 'stay', p: {} };
@@ -1694,8 +1713,8 @@
         { d: 0.6, start: () => {
           this.ov = null;
           const taker = this.nearest(this.team(1 - i), { x: tx, y: ty });
-          this._placeBall(tx, ty, 0.5, taker ? taker.pid : null);
-          if (taker) { this._receive(taker.pid); const [lx, ly] = this.world(1 - i, U.rand(45, 60), U.rand(10, Wd - 10)); setTimeout(() => { if (this.ball.owner === taker.pid) this._kick(lx, ly, { h: 7, T: 1.4, done: () => this._contest() }); }, 300); }
+          this._placeBall(tx, ty, 0.5, taker ? taker.pid : null, 1 - i);
+          this.brain.restartBy(1 - i, 'fk');
         } }
       ]);
     }
@@ -1750,8 +1769,13 @@
     }
 
     _update(dt, real) {
+      this.brain.dt = dt;
       this._sync();
-      if (!this.beat && !this.script.length && this.queue.length) this._handle(this.queue.shift());
+      if (!this.beat && !this.script.length && this.queue.length && !this.fetch && !this.place) {
+        const e = this.queue[0];
+        if (!this.brain.leading(e)) { this.queue.shift(); this._handle(e); }
+      }
+      if (!this.beat && !this.script.length && !this.queue.length && this.handled.length) this._revealAll();
       this._runScript(dt);
       this._targets();
       if (this.fetch) this._fetchStep();
