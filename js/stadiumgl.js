@@ -156,13 +156,15 @@ void main(){
     const a = o.t * 0.01;
     // Día, tarde (sol bajo y cálido: sombras largas) o noche (focos)
     const dusk = o.time === 'tarde', night = o.time === 'noche';
-    const tint = night ? [0.78, 0.84, 1.0] : dusk ? [1.12, 0.9, 0.72] : [1, 1, 1];
+    const wetSky = o.weather === 'lluvia';
+    let tint = night ? [0.78, 0.84, 1.0] : dusk ? [1.12, 0.9, 0.72] : [1, 1, 1];
+    if (wetSky) tint = tint.map((v, i) => v * [0.8, 0.85, 0.92][i]);   // cielo cubierto: luz más fría y apagada
     gl.uniform3f(u.tint, tint[0], tint[1], tint[2]);
     gl.viewport(0, 0, cv.width, cv.height);
     gl.uniform2f(u.tilt, o.tilt.x, o.tilt.y);
     // Sol según la hora: a mediodía alto (sombras cortas); por la tarde cada vez más bajo (sombras largas que crecen); de noche, la luz de los focos
     const prog = Math.min(1, (o.min || 0) / 90);
-    const el = night ? 0.6 : dusk ? 0.42 - prog * 0.24 : 0.9 - prog * 0.08;
+    const el = wetSky && !night ? 0.97 : night ? 0.6 : dusk ? 0.42 - prog * 0.24 : 0.9 - prog * 0.08;   // con nubes, sombras casi verticales y suaves
     const az = (night ? -2.2 : dusk ? 0.35 : -0.6 + prog * 0.5) + a * 0.15;
     gl.uniform3f(u.sun, Math.cos(az) * (1 - el) - o.tilt.x * 0.3, Math.sin(az) * (1 - el) - o.tilt.y * 0.3, el);
     gl.uniform1f(u.t, o.t);

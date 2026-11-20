@@ -320,7 +320,8 @@
         code: (home.code || home.name.slice(0, 3)).toUpperCase(), name: home.stadium || '',
         night: (this.S.week * 7 + home.id) % 3 === 0,
         time: (this.S.week * 7 + home.id) % 3 === 0 ? 'noche' : (this.S.week * 5 + home.id) % 3 === 0 ? 'tarde' : 'dia',
-        weather: 'despejado',
+        // Del tiempo, de momento solo la lluvia (pixelada); el resto queda despejado
+        weather: weatherFor(this.S, home, h) === 'lluvia' ? 'lluvia' : 'despejado',
         hour: (this.S.week * 7 + home.id) % 3 === 0 ? ['20:00', '21:00', '21:15'][h % 3] : (this.S.week * 5 + home.id) % 3 === 0 ? ['17:30', '18:30', '19:00'][h % 3] : ['12:00', '14:00', '16:15'][h % 3]
       };
     }
@@ -1860,6 +1861,7 @@
       this.t += dt;
       this._update(dt, real);
       this._draw(real);
+      this._rain(real);
       this.raf = requestAnimationFrame(this._loop);
     }
 
@@ -2277,6 +2279,50 @@
     }
 
     /** Lluvia, nieve o calor (ondas y destellos del sol en la lente), sobre todo lo demás. */
+    /**
+     * Lluvia pixelada: gotas del tamaño de un píxel del dibujo del estadio (14 px por metro), pegadas a su rejilla,
+     * en tres planos de profundidad; salpicaduras de píxeles sobre el césped y un velo gris de cielo cubierto.
+     */
+    _rain(real) {
+      if (this.st.weather !== 'lluvia' || !this.X) return;
+      const c = this.cx, W = this.w, H = this.h, s = this.s, X = this.X, Y = this.Y;
+      const ps = Math.max(1, Math.round(s / 14));              // un píxel del dibujo, en pantalla
+      const k = Math.min(0.05, real);
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      c.fillStyle = 'rgb(28 36 50 / 0.16)'; c.fillRect(0, 0, W, H);
+      const want = Math.round(W * H / 520);
+      const R = this.rainP || (this.rainP = []);
+      while (R.length < want) R.push({ x: Math.random() * W, y: Math.random() * H, z: [0.45, 0.7, 1][R.length % 3] });
+      if (R.length > want) R.length = want;
+      const cols = ['rgb(160 180 205 / 0.28)', 'rgb(185 205 228 / 0.42)', 'rgb(215 230 248 / 0.6)'];
+      for (let layer = 0; layer < 3; layer++) {
+        c.fillStyle = cols[layer];
+        for (let i = layer; i < R.length; i += 3) {
+          const d = R[i];
+          d.y += 620 * d.z * k; d.x -= 70 * d.z * k;
+          if (d.y > H) { d.y -= H + 8; d.x = Math.random() * (W + 40); }
+          if (d.x < -4) d.x += W + 8;
+          const len = (layer + 2) * ps, gx = Math.round(d.x / ps) * ps, gy = Math.round(d.y / ps) * ps;
+          // Gota inclinada por el viento: dos tramos desplazados un píxel
+          c.fillRect(gx, gy, ps, len >> 1 || ps); c.fillRect(gx + ps, gy - (len - (len >> 1)), ps, len - (len >> 1) || ps);
+        }
+      }
+      // Salpicaduras sobre el campo (en coordenadas del mundo: se mueven con la cámara)
+      const S = this.splash || (this.splash = []);
+      const born = Math.min(12, Math.round((W * H / 3500) * k));
+      for (let i = 0; i < born; i++) S.push({ x: -6 + Math.random() * (L + 12), y: -4 + Math.random() * (Wd + 8), a: 0 });
+      c.fillStyle = 'rgb(220 235 250 / 0.55)';
+      for (let i = S.length - 1; i >= 0; i--) {
+        const p = S[i]; p.a += k;
+        if (p.a > 0.22) { S.splice(i, 1); continue; }
+        const x = Math.round(X(p.x) / ps) * ps, y = Math.round(Y(p.y) / ps) * ps;
+        if (x < 0 || y < 0 || x > W || y > H) continue;
+        if (p.a < 0.08) c.fillRect(x, y, ps, ps);
+        else { const r = ps * (p.a < 0.15 ? 1 : 2); c.fillRect(x - r, y - ps, ps, ps); c.fillRect(x + r, y - ps, ps, ps); }
+      }
+      if (S.length > 400) S.splice(0, S.length - 400);
+    }
+
     _weatherFx(real) {
       const w = this.st.weather, c = this.cx, W = this.w, H = this.h;
       if (!w || w === 'despejado' || w === 'nublado') return;
