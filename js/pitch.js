@@ -1936,6 +1936,7 @@
       if (art) {
         c.fillStyle = '#20242a'; c.fillRect(0, 0, this.w, this.h); c.drawImage(art, X(ART_VIEW.x0), Y(ART_VIEW.y0), (ART_VIEW.x1 - ART_VIEW.x0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s);
         this._fans(X, Y, s);
+        this._snowGround(X, Y, s);
         this._boards(X, Y, s);
       }
       else {
@@ -2470,13 +2471,16 @@
      * Empieza en las gradas, techos y bordes del campo (lo alto y lo que no se pisa) y se va extendiendo
      * hacia el centro; si existe assets/estadio/nieve.jpg (blanco = donde cuaja antes), manda ese mapa.
      */
+    /** Manto de nieve sobre el césped (debajo de jugadores y balón). */
+    _snowGround(X, Y, s) {
+      if (this.st.weather !== 'nieve') return;
+      const cover = Math.min(0.95, 0.12 + (this.m.min || 0) / 90 * 0.75 + (this._snowBoost || 0));
+      const cv = this._snowMap(cover), c = this.cx;
+      if (cv) { c.save(); c.imageSmoothingEnabled = false; c.drawImage(cv, X(ART_VIEW.x0), Y(ART_VIEW.y0), (ART_VIEW.x1 - ART_VIEW.x0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s); c.restore(); }
+    }
     _snow(real, ps) {
       const c = this.cx, W = this.w, H = this.h, X = this.X, Y = this.Y, s = this.s, k = Math.min(0.05, real);
       c.fillStyle = 'rgb(200 212 230 / 0.07)'; c.fillRect(0, 0, W, H);
-      // Manto de nieve
-      const cover = Math.min(0.92, 0.2 + (this.m.min || 0) / 90 * 0.65 + (this._snowBoost || 0));
-      const cv = this._snowMap(cover);
-      if (cv) { c.save(); c.imageSmoothingEnabled = false; c.drawImage(cv, X(ART_VIEW.x0), Y(ART_VIEW.y0), (ART_VIEW.x1 - ART_VIEW.x0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s); c.restore(); }
       // Copos
       const want = Math.round(W * H / 700), F = this.flakes || (this.flakes = []);
       while (F.length < want) F.push({ x: Math.random() * W, y: Math.random() * H, z: [0.4, 0.7, 1][F.length % 3], ph: Math.random() * 6.28, sw: 0.6 + Math.random() * 0.8 });
@@ -2498,11 +2502,12 @@
     _snowMap(cover) {
       if (this._snowCv && Math.abs(cover - this._snowAt) < 0.015) return this._snowCv;
       if (!this._snowImg) {
-        // Mapa de nieve propio (opcional): blanco = donde cuaja antes
+        // Mapa de nieve (assets/estadio/nieve-top.webp, enderezado como las demás capas): blanco = donde cuaja antes; negro = nunca
         this._snowImg = new Image();
         this._snowImg.onload = () => { this._snowT = null; this._snowAt = -1; };
-        this._snowImg.src = 'assets/estadio/nieve.jpg';
+        this._snowImg.src = 'assets/estadio/nieve-top.webp';
       }
+      if (!this._snowImg.complete) return null;
       if (!this._snowT) {
         const mask = TL.StadiumGL && TL.StadiumGL.image && TL.StadiumGL.image('mask'), hi = TL.StadiumGL && TL.StadiumGL.image('height');
         if (!mask) return null;
@@ -2516,7 +2521,7 @@
         const nz = this._noise(24, 16, 11), T = new Float32Array(w * h);
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
           const i = y * w + x, o = i * 4, n = nz.v[(y % nz.h) * nz.w + (x % nz.w)];
-          if (sd) { T[i] = 1 - sd[o] / 255 * 0.8 - n * 0.25; continue; }
+          if (sd) { const v = sd[o] / 255; T[i] = v < 0.06 ? 2 : 1.02 - v + (n - 0.5) * 0.06; continue; }
           // Sin mapa propio: cuaja antes en lo alto (gradas, techos) y en los bordes del campo, después hacia el centro
           const wx = ART_VIEW.x0 + (x + 0.5) / w * VW, wy = ART_VIEW.y0 + (y + 0.5) / h * VH;
           const inside = wx > 0 && wx < L && wy > 0 && wy < Wd;
