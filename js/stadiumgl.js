@@ -63,13 +63,19 @@ void main(){
   vec2 q = uv - par * h;
   h = texture2D(tH, q).r;
   q = uv - par * h;
+  // Líneas del campo (blancas en la máscara: rojo, verde y azul altos a la vez): sin volumen ni desplazamiento,
+  // quedan planas y rectas sobre el césped
+  vec4 m0 = texture2D(tM, uv);
+  float lineM = smoothstep(.5, .72, min(m0.r, min(m0.g, m0.b)));
+  q = mix(q, uv, lineM);
+  h = mix(h, 0., lineM);
   vec4 gg = texture2D(tG, q);
   vec3 col = mode > 0.5 ? gg.rgb : texture2D(tC, q).rgb;
   vec4 m = texture2D(tM, q);
   float grass = smoothstep(.5,.8,m.g) * (1.-smoothstep(.4,.7,m.r));
   // Normales: solo dan relieve a lo que tiene volumen (el césped se queda plano: sin bandas)
   vec3 n = normalize(texture2D(tN, q).rgb*2.-1.);
-  n = normalize(mix(n, vec3(0.,0.,1.), grass));
+  n = normalize(mix(n, vec3(0.,0.,1.), max(grass, lineM)));
   vec3 L = normalize(sun);
   // Luz relativa a una superficie plana: lo plano conserva su color, el relieve se ilumina o se oscurece
   float rel = dot(n, L) - L.z;
