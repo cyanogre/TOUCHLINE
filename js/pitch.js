@@ -1280,7 +1280,7 @@
             this._kick(bx, by, { fz, tz: 0.5, h: 0.2, T: 0.22, done: () => { this._reveal(e); } });
           } else if (mk === 'post') {
             const ty = Wd / 2 + side * GW / 2;
-            this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this._reveal(e); } });
+            this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this.postShake = { x: gx, until: this.t + 0.45 }; this._reveal(e); } });
           } else {
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
             const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 2) : U.rand(GW / 2 + 0.8, GW / 2 + 7));
@@ -2038,6 +2038,22 @@
       c.beginPath(); c.arc(X(b.x), Y(b.y) - b.z * s * 0.9, br, 0, 6.283); c.fillStyle = '#ffffff'; c.fill();
       c.lineWidth = 1; c.strokeStyle = '#1a1a1a'; c.stroke();
       c.beginPath(); c.arc(X(b.x) - br * 0.25, Y(b.y) - b.z * s * 0.9 - br * 0.2, br * 0.35, 0, 6.283); c.fillStyle = '#2b2b2b'; c.fill();
+      // Porterías por encima (capa aparte): el balón que entra queda dentro de la red; tiemblan con el gol o el palo
+      if (art) {
+        const gi = TL.StadiumGL.image('goals');
+        if (gi) {
+          for (const side of [0, 1]) {
+            const gx = side ? L : 0;
+            let jx = 0;
+            if (this.netShake && this.netShake.until > this.t && Math.abs(this.netShake.x - gx) < 1) jx = Math.sin(this.t * 70) * 0.35;
+            if (this.postShake && this.postShake.until > this.t && Math.abs(this.postShake.x - gx) < 1) jx = Math.sin(this.t * 90) * 0.25;
+            // mitad del estadio de cada lado
+            const wx0 = side ? L / 2 : ART_VIEW.x0, wx1 = side ? ART_VIEW.x1 : L / 2;
+            const sx = (wx0 - ART_VIEW.x0) / (ART_VIEW.x1 - ART_VIEW.x0) * gi.naturalWidth, sw = (wx1 - wx0) / (ART_VIEW.x1 - ART_VIEW.x0) * gi.naturalWidth;
+            c.drawImage(gi, sx, 0, sw, gi.naturalHeight, X(wx0 + jx), Y(ART_VIEW.y0), (wx1 - wx0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s);
+          }
+        }
+      }
       // Nombre del que lleva el balón
       if (b.owner != null && this.A[b.owner] && !b.path) {
         const a = this.A[b.owner];

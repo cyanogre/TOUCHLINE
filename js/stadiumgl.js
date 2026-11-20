@@ -13,7 +13,7 @@
   'use strict';
   const TL = window.TL;
   // Imágenes ya enderezadas a vista cenital (tools: se generan una vez desde las originales): ~200 KB en vez de 1,2 MB y sin cálculo al cargar
-  const FILES = { color: 'assets/estadio/color-top.webp', normal: 'assets/estadio/normal-top.webp', mask: 'assets/estadio/mascara-top.webp', height: 'assets/estadio/altura-top.webp' };
+  const FILES = { color: 'assets/estadio/color-top.webp', normal: 'assets/estadio/normal-top.webp', mask: 'assets/estadio/mascara-top.webp', height: 'assets/estadio/altura-top.webp', goals: 'assets/estadio/porterias-top.webp' };
   // Esquinas del campo en las imágenes (2000×1116): arriba-izq, arriba-der, abajo-izq, abajo-der
   const CORNERS = [[362, 188], [1636, 188], [292, 951], [1709, 951]];
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -94,7 +94,7 @@ void main(){
   function load() {
     if (S.state !== 'idle') return;
     S.state = 'loading';
-    let left = 4;
+    let left = Object.keys(FILES).length;
     for (const k in FILES) {
       const im = new Image();
       im.onload = () => { if (--left === 0) S.state = 'loaded'; };
