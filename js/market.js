@@ -184,11 +184,14 @@
   function renewEnd(S, y) { return S.season + 1 + y; }
   function renewOptions(S, p) {
     const out = [];
+    // Un cedido (a tu club o desde tu club) no se renueva durante la cesión: su contrato es con el club dueño
+    if (TL.Locker && TL.Locker.onLoan(S, p.id)) return out;
     for (let y = 1; y <= maxYears(p); y++) if (renewEnd(S, y) > p.contract) out.push(y);
     return out;
   }
 
   function renew(S, p, years) {
+    if (TL.Locker && TL.Locker.onLoan(S, p.id)) return { ok: false, msg: 'Está cedido: su contrato se habla con el club dueño cuando acabe la cesión.' };
     const wage = renewDemand(S, p);
     const err = canAfford(S, 0, wage - p.wage, 0, 1.05);
     if (err && !/plantilla/.test(err)) return { ok: false, msg: err };
