@@ -355,6 +355,9 @@
       this.dpr = dpr;
       this.w = r.width; this.h = r.height;
       this.sc = Math.min(this.w / (VIEW.x1 - VIEW.x0), this.h / (VIEW.y1 - VIEW.y0));
+      // Para el filtro CRT: la capa encaja justo encima del lienzo
+      const box = this.cv.parentElement;
+      if (box) { box.style.setProperty('--crt-x', this.cv.offsetLeft + 'px'); box.style.setProperty('--crt-y', this.cv.offsetTop + 'px'); box.style.setProperty('--crt-w', r.width + 'px'); box.style.setProperty('--crt-h', r.height + 'px'); }
     }
 
     // ------------------------------------------------------------ Utilidades
