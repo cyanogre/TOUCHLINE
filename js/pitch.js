@@ -2321,6 +2321,40 @@
         else { const r = ps * (p.a < 0.15 ? 1 : 2); c.fillRect(x - r, y - ps, ps, ps); c.fillRect(x + r, y - ps, ps, ps); }
       }
       if (S.length > 400) S.splice(0, S.length - 400);
+      this._lensDrops(real, ps);
+    }
+
+    /** Gotas que caen en la lente de la cámara: refractan la imagen (invertida, como una gota de verdad), resbalan y se secan. */
+    _lensDrops(real, ps) {
+      const c = this.cx, W = this.w, H = this.h, dpr = this.dpr;
+      const D = this.lens || (this.lens = []);
+      if (D.length < 14 && Math.random() < real * 1.6) {
+        const r = (5 + Math.random() * 9) * Math.max(1, ps);
+        D.push({ x: Math.random() * W, y: Math.random() * H * 0.9, r, age: 0, life: 4 + Math.random() * 6, slide: Math.random() < 0.35 ? 0 : 6 + Math.random() * 18 });
+      }
+      for (let i = D.length - 1; i >= 0; i--) {
+        const d = D[i]; d.age += real;
+        if (d.age > d.life) { D.splice(i, 1); continue; }
+        // Algunas resbalan cuando ya pesan; al final se encogen al secarse
+        if (d.slide && d.age > 1.2) d.y += d.slide * real;
+        const k = d.age < 0.15 ? d.age / 0.15 : d.age > d.life - 1 ? (d.life - d.age) : 1;
+        const r = d.r * (0.6 + 0.4 * k), x = Math.round(d.x / ps) * ps, y = Math.round(d.y / ps) * ps;
+        c.save();
+        c.globalAlpha = Math.min(1, k) * 0.9;
+        c.beginPath(); c.ellipse(x, y, r, r * 1.12, 0, 0, 6.283); c.clip();
+        // Lo que se ve a través de la gota: un trozo más amplio de la imagen, dado la vuelta y encogido
+        const src = r * 3.2;
+        c.translate(x, y); c.scale(-1, -1);
+        try { c.drawImage(this.cv, (x - src) * dpr, (y - src) * dpr, src * 2 * dpr, src * 2 * dpr, -r, -r * 1.12, r * 2, r * 2.24); } catch (e) { /* lienzo no listo */ }
+        c.restore();
+        c.save(); c.globalAlpha = Math.min(1, k);
+        // Borde oscuro abajo y brillo arriba (píxeles)
+        c.strokeStyle = 'rgb(10 20 30 / 0.35)'; c.lineWidth = Math.max(1, ps);
+        c.beginPath(); c.ellipse(x, y, r, r * 1.12, 0, 0.2, Math.PI - 0.2); c.stroke();
+        c.fillStyle = 'rgb(255 255 255 / 0.75)'; c.fillRect(x - r * 0.4, y - r * 0.55, Math.max(1, ps), Math.max(1, ps));
+        c.fillStyle = 'rgb(255 255 255 / 0.35)'; c.fillRect(x - r * 0.4 + ps, y - r * 0.55, Math.max(1, ps), Math.max(1, ps));
+        c.restore();
+      }
     }
 
     _weatherFx(real) {
