@@ -1862,6 +1862,7 @@
       this._update(dt, real);
       this._draw(real);
       this._rain(real);
+      this._tube();
       this.raf = requestAnimationFrame(this._loop);
     }
 
@@ -2322,6 +2323,34 @@
       }
       if (S.length > 400) S.splice(0, S.length - 400);
       this._lensDrops(real, ps);
+    }
+
+    /**
+     * Filtro CRT: curva la imagen como el cristal abombado de una tele de tubo (distorsión de barril).
+     * Se hace en dos pasadas por franjas: las filas se estrechan hacia arriba y abajo y las columnas hacia los lados,
+     * así los bordes se arquean hacia fuera y el centro se ve un poco más cerca.
+     */
+    _tube() {
+      const box = this.cv.closest && this.cv.closest('.match');
+      if (!box || !box.classList.contains('crt') || box.classList.contains('mini')) return;
+      const cv = this.cv, w = cv.width, h = cv.height, K = 0.07, N = 40;
+      const mk = () => { const b = document.createElement('canvas'); b.width = w; b.height = h; return b; };
+      if (!this._tb || this._tb[0].width !== w || this._tb[0].height !== h) this._tb = [mk(), mk()];
+      const [a, b] = this._tb, ga = a.getContext('2d'), gb = b.getContext('2d'), c = this.cx;
+      ga.clearRect(0, 0, w, h); ga.drawImage(cv, 0, 0);
+      // Pasada 1: filas (más estrechas cuanto más lejos del centro en vertical)
+      gb.clearRect(0, 0, w, h);
+      for (let i = 0; i < N; i++) {
+        const y0 = Math.floor(i * h / N), y1 = Math.floor((i + 1) * h / N), v = ((y0 + y1) / 2 / h) * 2 - 1, sx = 1 - K * v * v, dw = w * sx;
+        gb.drawImage(a, 0, y0, w, y1 - y0, (w - dw) / 2, y0, dw, y1 - y0);
+      }
+      // Pasada 2: columnas
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
+      for (let i = 0; i < N; i++) {
+        const x0 = Math.floor(i * w / N), x1 = Math.floor((i + 1) * w / N), u = ((x0 + x1) / 2 / w) * 2 - 1, sy = 1 - K * u * u, dh = h * sy;
+        c.drawImage(b, x0, 0, x1 - x0, h, x0, (h - dh) / 2, x1 - x0, dh);
+      }
+      c.restore();
     }
 
     /** Gotas que caen en la lente de la cámara: refractan la imagen (invertida, como una gota de verdad), resbalan y se secan. */
