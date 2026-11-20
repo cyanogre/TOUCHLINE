@@ -75,10 +75,7 @@ void main(){
   vec2 wpos = vec2(-21. + uv.x * 147., -16.5 + uv.y * 99.);
   float inX = smoothstep(-0.9, -0.2, wpos.x) * (1. - smoothstep(105.2, 105.9, wpos.x));
   float inY = smoothstep(-0.9, -0.2, wpos.y) * (1. - smoothstep(68.2, 68.9, wpos.y));
-  // y el hueco de cada portería, detrás de la línea de gol (para que su sombra no se despegue de ella)
-  float gY = smoothstep(29.3, 30., wpos.y) * (1. - smoothstep(38., 38.7, wpos.y));
-  float gX = smoothstep(-3.6, -3., wpos.x) * (1. - smoothstep(108., 108.6, wpos.x));
-  float pitchM = mode > 0.5 ? 1. : max(lineM, max(inX * inY, gX * gY));
+  float pitchM = mode > 0.5 ? 1. : max(lineM, inX * inY);
   q = mix(q, uv, pitchM);
   h = mix(h, 0.176, lineM);   // la línea, a la altura del césped
   vec4 gg = texture2D(tG, q);
