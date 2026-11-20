@@ -49,7 +49,8 @@
   const VS = `attribute vec2 p; varying vec2 uv; void main(){ uv = vec2(p.x*0.5+0.5, 0.5-p.y*0.5); gl_Position = vec4(p,0.,1.); }`;
   const FS = `precision mediump float;
 varying vec2 uv;
-uniform sampler2D tC, tN, tM, tH;
+uniform sampler2D tC, tN, tM, tH, tG;
+uniform float mode;      // 0 = estadio, 1 = solo las porterías (misma luz y misma profundidad)
 uniform vec2 tilt;       // gesto del ratón/dedo (-1..1)
 uniform vec3 sun;        // dirección de la luz
 uniform float t, night, aspect;
@@ -62,7 +63,8 @@ void main(){
   vec2 q = uv - par * h;
   h = texture2D(tH, q).r;
   q = uv - par * h;
-  vec3 col = texture2D(tC, q).rgb;
+  vec4 gg = texture2D(tG, q);
+  vec3 col = mode > 0.5 ? gg.rgb : texture2D(tC, q).rgb;
   vec4 m = texture2D(tM, q);
   float grass = smoothstep(.5,.8,m.g) * (1.-smoothstep(.4,.7,m.r));
   // Normales: solo dan relieve a lo que tiene volumen (el césped se queda plano: sin bandas)
@@ -86,7 +88,7 @@ void main(){
     f += 0.5/(1.+18.*dot(a-vec2(1.,1./aspect), a-vec2(1.,1./aspect)));
     c += col * f * night * vec3(1.,.97,.88) * (0.6 + 0.4*n.z) * (1. - sh*0.5);
   }
-  gl_FragColor = vec4(c, 1.);
+  gl_FragColor = mode > 0.5 ? vec4(c, gg.a) : vec4(c, 1.);
 }`;
 
   const S = { state: 'idle', imgs: {}, warped: null, gl: null };
@@ -129,8 +131,16 @@ void main(){
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, W[k]);
       gl.uniform1i(gl.getUniformLocation(pr, ['tC', 'tN', 'tM', 'tH'][i]), i);
     });
+    // Porterías (con transparencia) en la unidad 4
+    if (W.goals) {
+      const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, W.goals);
+      gl.uniform1i(gl.getUniformLocation(pr, 'tG'), 4);
+    }
     const U = n => gl.getUniformLocation(pr, n);
-    return { cv, gl, u: { wet: U('wet'), snow: U('snow'), heat: U('heat'), cover: U('cover'), tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect') } };
+    return { cv, gl, u: { wet: U('wet'), snow: U('snow'), heat: U('heat'), cover: U('cover'), tint: U('tint'), tilt: U('tilt'), sun: U('sun'), t: U('t'), night: U('night'), aspect: U('aspect'), mode: U('mode') } };
   }
 
   /**
@@ -177,8 +187,17 @@ void main(){
     gl.uniform1f(u.heat, w === 'calor' ? 1 : 0);
     gl.uniform1f(u.cover, w === 'despejado' || w === 'calor' ? 0 : w === 'nublado' ? 0.6 : 1);
     gl.uniform1f(u.aspect, cv.height / cv.width);
+    // Primero el estadio (se copia a un lienzo aparte) y después, en el mismo lienzo GL, solo las porterías
+    gl.uniform1f(u.mode, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    return cv;
+    const base = S.baseCv || (S.baseCv = document.createElement('canvas'));
+    if (base.width !== cv.width || base.height !== cv.height) { base.width = cv.width; base.height = cv.height; }
+    base.getContext('2d').drawImage(cv, 0, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(u.mode, 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    S.goalsCv = cv;
+    return base;
   }
 
   // Si el estadio dibujado está activo, se descarga en segundo plano nada más abrir el juego
@@ -186,5 +205,5 @@ void main(){
     const q = new URLSearchParams(location.search).get('campo');
     if (q === 'arte' || (!q && localStorage.getItem('touchline.campo') === '1')) setTimeout(load, 1500);
   } catch (e) { /* nada */ }
-  TL.StadiumGL = { image: k => (S.state === 'loaded' ? S.imgs[{ mask: 'mask' }[k] || k] : null), render, load, ready: () => S.state === 'loaded' || S.state === 'error' };
+  TL.StadiumGL = { image: k => (S.state === 'loaded' ? S.imgs[{ mask: 'mask' }[k] || k] : null), render, goals: () => S.goalsCv || null, load, ready: () => S.state === 'loaded' || S.state === 'error' };
 })();

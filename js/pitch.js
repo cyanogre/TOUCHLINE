@@ -2099,7 +2099,10 @@
       c.globalAlpha = 1;
       // Porterías por encima (capa aparte): el balón que entra queda dentro de la red; tiemblan con el gol o el palo
       if (art) {
-        const gi = TL.StadiumGL.image('goals');
+        // Las porterías salen del mismo sombreador que el estadio: misma luz y mismo desplazamiento de profundidad
+        const gl = TL.StadiumGL.goals && TL.StadiumGL.goals();
+        const gi = gl || TL.StadiumGL.image('goals');
+        const gw = gi && (gi.naturalWidth || gi.width), gh = gi && (gi.naturalHeight || gi.height);
         if (gi) {
           for (const side of [0, 1]) {
             const gx = side ? L : 0;
@@ -2108,8 +2111,8 @@
             if (this.postShake && this.postShake.until > this.t && Math.abs(this.postShake.x - gx) < 1) jx = Math.sin(this.t * 90) * 0.25;
             // mitad del estadio de cada lado
             const wx0 = side ? L / 2 : ART_VIEW.x0, wx1 = side ? ART_VIEW.x1 : L / 2;
-            const sx = (wx0 - ART_VIEW.x0) / (ART_VIEW.x1 - ART_VIEW.x0) * gi.naturalWidth, sw = (wx1 - wx0) / (ART_VIEW.x1 - ART_VIEW.x0) * gi.naturalWidth;
-            c.drawImage(gi, sx, 0, sw, gi.naturalHeight, X(wx0 + jx), Y(ART_VIEW.y0), (wx1 - wx0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s);
+            const sx = (wx0 - ART_VIEW.x0) / (ART_VIEW.x1 - ART_VIEW.x0) * gw, sw = (wx1 - wx0) / (ART_VIEW.x1 - ART_VIEW.x0) * gw;
+            c.drawImage(gi, sx, 0, sw, gh, X(wx0 + jx), Y(ART_VIEW.y0), (wx1 - wx0) * s, (ART_VIEW.y1 - ART_VIEW.y0) * s);
           }
         }
       }
