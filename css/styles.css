@@ -1579,13 +1579,18 @@ body.shake-s { animation: shake-s .35s; }
   background: rgb(8 17 13 / 0.72); border: 1px solid rgb(255 255 255 / 0.18); opacity: .8; }
 .match.crt .crt-btn { opacity: 1; border-color: var(--accent); }
 .match.mini .crt-btn, .match.narr .crt-btn { display: none; }
-.match.crt .pitch-box::after { content: ''; position: absolute; left: var(--crt-x, 10px); top: var(--crt-y, 6px); width: var(--crt-w, 100%); height: var(--crt-h, 100%); pointer-events: none; z-index: 1; border-radius: 10px;
+.match.crt .pitch-box::after { content: ''; position: absolute; left: var(--crt-x, 10px); top: var(--crt-y, 6px); width: var(--crt-w, 100%); height: var(--crt-h, 100%); pointer-events: none; z-index: 1; border-radius: 9% / 12%;
+  /* Tele de tubo: esquinas muy redondeadas, cristal abombado (más oscuro en los bordes) y un reflejo */
+  box-shadow: inset 0 0 18px 6px rgb(0 0 0 / .55), inset 0 0 3px 1px rgb(0 0 0 / .8);
   background:
-    radial-gradient(120% 120% at 50% 50%, transparent 58%, rgb(0 0 0 / .45) 100%),
+    radial-gradient(70% 45% at 30% 18%, rgb(255 255 255 / .10), transparent 70%),
+    radial-gradient(110% 110% at 50% 50%, transparent 55%, rgb(0 0 0 / .55) 100%),
     repeating-linear-gradient(0deg, rgb(0 0 0 / .22) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgb(255 0 60 / .05) 0 1px, rgb(0 255 120 / .04) 1px 2px, rgb(60 120 255 / .05) 2px 3px);
   mix-blend-mode: multiply; animation: crtFlicker 3.5s infinite steps(60); }
-.match.crt #pitch { filter: saturate(1.15) contrast(1.08) blur(.25px); }
+.match.crt #pitch { filter: saturate(1.15) contrast(1.08) blur(.25px); border-radius: 9% / 12%; }
+.match.crt .pitch-box::before { content: ''; position: absolute; left: var(--crt-x, 10px); top: var(--crt-y, 6px); width: var(--crt-w, 100%); height: var(--crt-h, 100%); pointer-events: none; z-index: 2; border-radius: 9% / 12%;
+  box-shadow: 0 0 0 4px #0b0d0c, 0 0 0 7px #26292a, 0 6px 18px rgb(0 0 0 / .5); }
 @keyframes crtFlicker { 0%, 100% { opacity: .95; } 48% { opacity: .88; } 50% { opacity: 1; } 52% { opacity: .9; } }
 
 /* Elegir balón */
