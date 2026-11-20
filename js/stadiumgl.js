@@ -12,7 +12,8 @@
 (function () {
   'use strict';
   const TL = window.TL;
-  const FILES = { color: 'assets/estadio/color.jpg', normal: 'assets/estadio/normal.jpg', mask: 'assets/estadio/mascara.jpg', height: 'assets/estadio/altura.jpg' };
+  // Imágenes ya enderezadas a vista cenital (tools: se generan una vez desde las originales): ~200 KB en vez de 1,2 MB y sin cálculo al cargar
+  const FILES = { color: 'assets/estadio/color-top.webp', normal: 'assets/estadio/normal-top.webp', mask: 'assets/estadio/mascara-top.webp', height: 'assets/estadio/altura-top.webp' };
   // Esquinas del campo en las imágenes (2000×1116): arriba-izq, arriba-der, abajo-izq, abajo-der
   const CORNERS = [[362, 188], [1636, 188], [292, 951], [1709, 951]];
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -106,7 +107,7 @@ void main(){
   function setupGL(W) {
     const cv = document.createElement('canvas');
     // Se pinta a resolución moderada (es fondo) para ir fluido en móvil
-    cv.width = Math.round(W.color.width * 0.75); cv.height = Math.round(W.color.height * 0.75);
+    cv.width = Math.round(W.color.naturalWidth * 0.85); cv.height = Math.round(W.color.naturalHeight * 0.85);
     const gl = cv.getContext('webgl', { premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) return null;
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
@@ -137,7 +138,7 @@ void main(){
     if (S.state !== 'loaded') return null;
     if (!S.warped) {
       S.warped = {};
-      for (const k in FILES) S.warped[k] = warp(S.imgs[k], o.VIEW, o.L, o.Wd, 12);
+      for (const k in FILES) S.warped[k] = S.imgs[k];
       try { S.gl = setupGL(S.warped); } catch (e) { S.gl = null; }
     }
     if (!S.gl) return S.warped.color;
@@ -163,5 +164,10 @@ void main(){
     return cv;
   }
 
+  // Si el estadio dibujado está activo, se descarga en segundo plano nada más abrir el juego
+  try {
+    const q = new URLSearchParams(location.search).get('campo');
+    if (q === 'arte' || (!q && localStorage.getItem('touchline.campo') === '1')) setTimeout(load, 1500);
+  } catch (e) { /* nada */ }
   TL.StadiumGL = { render, load, ready: () => S.state === 'loaded' || S.state === 'error' };
 })();

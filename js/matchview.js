@@ -48,6 +48,7 @@
         <div class="live-call" id="mv-live"><span class="lc-t">Los equipos saltan al campo.</span></div>
         <i class="pip-grip" aria-hidden="true"></i>
         <button class="pip-size" data-act="mv-pip-size" aria-label="Cambiar tamaño" title="Más grande / más pequeño">⇲</button>
+        <button class="cam-btn" data-act="mv-cam" aria-label="Cámara" title="Cámara: campo entero, TV o cerca"><span id="mv-cam-l">Cámara</span></button>
         <button class="pitch-toggle" data-act="mv-mini" aria-label="Minimizar o ampliar el campo" title="Minimizar / ampliar el campo"><span class="pt-min">▾ Minimizar</span><span class="pt-max">⤢</span></button></div>
       <div class="mtabs"><div class="seg" id="mv-tabs">
           <button class="on" data-act="mv-tab" data-k="feed">Narración</button>
@@ -62,6 +63,9 @@
     MV.radio = new TL.Radio(m, S);
     MV.pitch = new TL.Pitch(el('pitch'), m, MV.me);
     MV.pitch.onCall = onCall;
+    MV.pitch.zoom = settings().zoom || 1;
+    MV.pitch.onZoom = z => { settings().zoom = z; camLabel(); };
+    setTimeout(camLabel, 0);
     clearInterval(MV.ballTimer);
     MV.ballTimer = setInterval(markBall, 120);
     MV.pitch.speed = settings().speed || 1;
@@ -620,6 +624,14 @@
     });
   }
   A['mv-narr'] = () => { const on = !narrOn(); settings().narr = on; setNarr(on); renderFoot(); G.save(); UI.toast(on ? 'Partido narrado: verás las jugadas clave.' : 'Partido completo en el campo.'); };
+  const CAMS = [[1, 'Campo entero'], [1.8, 'Cámara TV'], [2.6, 'Cerca']];
+  function camLabel() { const l = el('mv-cam-l'); if (l && MV.pitch) { const z = MV.pitch.zoom || 1; l.textContent = z < 1.3 ? '🎥 Campo' : z < 2.2 ? '🎥 TV' : '🎥 Cerca'; } }
+  A['mv-cam'] = () => {
+    if (!MV.pitch || MV.pipDragged) return;
+    const z = MV.pitch.zoom || 1, k = CAMS.findIndex(c => c[0] > z + 0.05);
+    const nx = CAMS[k < 0 ? 0 : k];
+    MV.pitch.setZoom(nx[0]); UI.toast(nx[1]);
+  };
   A['mv-mini'] = () => { if (MV.pipDragged) return; const on = !el('match').classList.contains('mini'); settings().mini = on; setMini(on); };
   A['mv-pip-size'] = () => {
     if (MV.pipDragged) return;

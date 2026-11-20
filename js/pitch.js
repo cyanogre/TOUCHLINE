@@ -188,12 +188,32 @@
       this.cv.addEventListener('pointerleave', () => { if (this.tilt) this.tilt.tx = this.tilt.ty = 0; });
       this.cv.addEventListener('pointerup', e => { if (e.pointerType === 'touch' && this.tilt) this.tilt.tx = this.tilt.ty = 0; });
       this.cv.style.touchAction = 'pan-y';
+      this.cv.addEventListener('wheel', e => {
+        if (this.cv.closest('.mini')) return;
+        e.preventDefault();
+        this.setZoom((this.zoom || 1) * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+      }, { passive: false });
+      const touches = new Map();
+      let pinch0 = null;
+      this.cv.addEventListener('touchstart', e => { if (e.touches.length === 2) { const [a, b] = e.touches; pinch0 = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z: this.zoom || 1 }; } }, { passive: true });
+      this.cv.addEventListener('touchmove', e => {
+        if (e.touches.length !== 2 || !pinch0) return;
+        e.preventDefault();
+        const [a, b] = e.touches; this.setZoom(pinch0.z * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / pinch0.d);
+      }, { passive: false });
+      this.cv.addEventListener('touchend', () => { pinch0 = null; touches.clear(); });
       this._resize = () => this.resize();
       window.addEventListener('resize', this._resize);
       this.resize();
       this._last = performance.now();
       this._loop = this._loop.bind(this);
       this.raf = requestAnimationFrame(this._loop);
+    }
+
+    /** Zoom de la cámara (1 = campo entero; más, sigue el balón). */
+    setZoom(z) {
+      this.zoom = clamp(z, 1, 3);
+      if (this.onZoom) this.onZoom(this.zoom);
     }
 
     destroy() { cancelAnimationFrame(this.raf); window.removeEventListener('resize', this._resize); }
@@ -1834,7 +1854,16 @@
       this._openPlay(dt);
       // Cámara
       const c = this.cam;
-      const tz = c.tz, tx = c.tx != null ? c.tx : (VIEW.x0 + VIEW.x1) / 2, ty = c.ty != null ? c.ty : (VIEW.y0 + VIEW.y1) / 2;
+      let tz = c.tz, tx = c.tx != null ? c.tx : (VIEW.x0 + VIEW.x1) / 2, ty = c.ty != null ? c.ty : (VIEW.y0 + VIEW.y1) / 2;
+      // Cámara de realización: sigue el balón (un poco por delante de la jugada) con el zoom elegido
+      const zoom = this.cv.closest('.mini') ? 1 : this.zoom || 1;
+      if (c.tx == null && zoom > 1.05 && this.ball) {
+        const b = this.ball, own = b.owner != null && this.A[b.owner];
+        const lx = b.path ? lerp(b.x, b.path.tx, 0.5) : b.x + (own ? own.vx * 0.8 : 0), ly = b.path ? lerp(b.y, b.path.ty, 0.5) : b.y + (own ? own.vy * 0.5 : 0);
+        c.fx = c.fx == null ? lx : lerp(c.fx, lx, Math.min(1, real * 1.6));
+        c.fy = c.fy == null ? ly : lerp(c.fy, ly, Math.min(1, real * 1.2));
+        tx = c.fx; ty = c.fy; tz = Math.max(tz, zoom);
+      }
       const k = Math.min(1, real * 3.2);
       c.z += (tz - c.z) * k; c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
       if (c.tx != null && this.ball) { c.tx = lerp(c.tx, this.ball.x, Math.min(1, real * 1.5)); c.ty = lerp(c.ty, this.ball.y, Math.min(1, real * 1.5)); }
