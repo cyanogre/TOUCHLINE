@@ -321,6 +321,8 @@
     renderTitle();
   };
   A['opt-music'] = () => { Music.toggle(); UI.refresh(); };
+  A['opt-crt'] = () => { try { localStorage.setItem('touchline.crt', localStorage.getItem('touchline.crt') !== '0' ? '0' : '1'); } catch (e) { /* nada */ } UI.refresh(); };
+  A['opt-campo'] = () => { try { localStorage.setItem('touchline.campo', localStorage.getItem('touchline.campo') !== '0' ? '0' : '1'); } catch (e) { /* nada */ } UI.toast('Se aplicará al recargar la página'); UI.refresh(); };
   A['opt-sfx'] = () => { TL.SFX.setOn(!TL.SFX.on()); TL.SFX.toggle(TL.SFX.on()); UI.refresh(); };
   A['opt-mentor'] = () => { TL.Mentor.setOn(!TL.Mentor.on()); UI.refresh(); };
   UI.Music = Music;
@@ -1677,6 +1679,8 @@
         <div class="title-toggles" style="justify-content:flex-start;margin-top:10px">
           <button data-act="opt-music">🎵 Música: <b>${Music.on() ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-sfx">🔊 Sonido: <b>${TL.SFX.on() ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-crt">📺 Filtro CRT: <b>${localStorage.getItem('touchline.crt') !== '0' ? 'Sí' : 'No'}</b></button>
+          <button data-act="opt-campo">🏟️ Estadio dibujado: <b>${localStorage.getItem('touchline.campo') !== '0' ? 'Sí' : 'No'}</b></button>
           <button data-act="opt-mentor">${profeIc()} Consejos del Profe: <b>${TL.Mentor.on() ? 'Sí' : 'No'}</b></button></div>
         <div class="mt">${TL.I18N.picker()}</div>
         <p class="note mt">La partida se guarda automáticamente en este navegador tras cada jornada. Datos de jugadores: ${esc(S.source)}.</p></section>
