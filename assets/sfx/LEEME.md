@@ -56,6 +56,8 @@ Para `canticos`, prueba varias melodías: «la la la la», «oh oh oh», palmas 
 | `limit-break` | Un jugador rompe su límite (cinemática **LIMIT BREAK**) | 3-5 s | Anime power-up: rising energy charge, then a huge explosive impact with a deep bass drop and sparkling shimmer, epic |
 | `evento` | Se para el calendario por un evento (el «¡bum!») | <1 s | Short dramatic comic impact hit, punchy boom with a quick whoosh |
 | `alma` | Equipas o consigues un alma (modo fantasía) | 1-2 s | Mystical ethereal chime, magical soul energy swirling, soft choir pad |
+| `cortinilla` | Cortinilla de tele en los cortes y repeticiones (falta, córner, fuera de juego…) | 0,6-1 s | Fast TV sports broadcast transition whoosh, swoosh sweep with a short bright digital sting at the end |
 
 Para el **limit break** basta con un archivo: `assets/sfx/limit-break/1.mp3`. El estallido de la cinemática llega a los 1,6 s: si el audio tiene el golpe fuerte más o menos ahí, irán sincronizados.
 
+Para `cortinilla`, prueba variantes: un barrido más grave y otro más agudo, uno con un «clic» digital al final, otro con un golpe de bombo suave. Que no duren más de un segundo: la cortinilla dura 0,95 s.
