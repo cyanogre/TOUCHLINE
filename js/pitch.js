@@ -772,9 +772,13 @@
     _ballBoy(x, y) {
       const b = this.ball;
       this.spare.push({ x: b.x, y: b.y, t: this.t });
-      // El que da el balón: justo fuera de la línea más cercana al sitio del saque
+      // El que da el balón nuevo está en su puesto junto a la línea más cercana al saque, pero en el lado
+      // contrario a por donde se fue el viejo: así el balón nuevo nunca viene de donde se perdió el otro
+      const old0 = this.spare[this.spare.length - 1];
       const dG = Math.min(x, L - x), dT = Math.min(y, Wd - y);
-      const bx = dG < dT ? (x < L / 2 ? -2.2 : L + 2.2) : clamp(x, 1, L - 1), by = dG < dT ? clamp(y, Wd / 2 - 14, Wd / 2 + 14) : (y < Wd / 2 ? -1.6 : Wd + 1.6);
+      let bx, by;
+      if (dG < dT) { bx = x < L / 2 ? -2.2 : L + 2.2; by = Wd / 2 + (old0.y > Wd / 2 ? -13 : 13); }
+      else { by = y < Wd / 2 ? -1.6 : Wd + 1.6; bx = clamp(x + (old0.x > x ? -12 : 12), 2, L - 2); }
       const giver = actor('boy', bx, by, { until: this.t + 3.2 }); giver.tx = bx; giver.ty = by;
       giver.state = 'throw'; giver.throwAt = this.t;
       const old = this.spare[this.spare.length - 1];
