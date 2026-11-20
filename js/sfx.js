@@ -271,7 +271,7 @@
     gol: 1, 'gol-rival': 0.7, ocasion: 0.75, palo: 0.8, parada: 0.75, chut: 0.55, red: 0.6, pitido: 0.55, 'pitido-final': 0.6,
     tarjeta: 0.6, abucheo: 0.7, lamento: 0.7, aplausos: 0.75, silbidos: 0.6, ovacion: 0.95, canticos: 0.7, ambiente: 0.35,
     boton: 0.35, atras: 0.35, seleccion: 0.3, exito: 0.55, error: 0.45, dinero: 0.55, nivel: 0.6, fichaje: 0.65, titulo: 1,
-    'limit-break': 1, evento: 0.75, alma: 0.8, cortinilla: 0.6
+    'limit-break': 1, evento: 0.75, alma: 0.8, cortinilla: 0.6, 'cortinilla-voz': 0.8
   };
   // Lo que puede sonar en la portada y los menús va primero
   const FIRST = ['aplausos', 'boton', 'seleccion', 'atras', 'exito', 'error', 'dinero', 'fichaje', 'nivel', 'evento', 'alma'];
