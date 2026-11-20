@@ -70,12 +70,12 @@ void main(){
   vec4 m0 = texture2D(tM, uv);
   float lineM = smoothstep(.5, .72, min(m0.r, min(m0.g, m0.b)));
   // Máscara rectangular solo del área de juego (de línea a línea, con el grosor de las líneas): ahí el suelo no se
-  // desplaza con el gesto, así césped y líneas van juntos y no se duplican. Las porterías se quedan pegadas a esa
-  // misma zona (tampoco se desplazan); el resto del estadio conserva la profundidad.
+  // desplaza con el gesto, así césped y líneas van juntos y no se duplican; el resto del estadio conserva la profundidad.
   vec2 wpos = vec2(-21. + uv.x * 147., -16.5 + uv.y * 99.);
   float inX = smoothstep(-0.9, -0.2, wpos.x) * (1. - smoothstep(105.2, 105.9, wpos.x));
   float inY = smoothstep(-0.9, -0.2, wpos.y) * (1. - smoothstep(68.2, 68.9, wpos.y));
-  float pitchM = mode > 0.5 ? 1. : max(lineM, inX * inY);
+  // Las porterías se desplazan con la zona que hay detrás de la línea de gol (la que conserva la profundidad)
+  float pitchM = mode > 0.5 ? 0. : max(lineM, inX * inY);
   q = mix(q, uv, pitchM);
   h = mix(h, 0.176, lineM);   // la línea, a la altura del césped
   vec4 gg = texture2D(tG, q);
