@@ -160,7 +160,7 @@
       this.ars = [actor('ar', L * 0.25, Wd + 0.9), actor('ar', L * 0.75, -0.9)];
       this.fourth = actor('4th', L / 2, TECH_Y + 1.2);
       this.coaches = [0, 1].map(i => actor('coach', L / 2 + (i === 0 ? -11 : 11), TECH_Y, { team: i, base: L / 2 + (i === 0 ? -11 : 11) }));
-      this.warm = [0, 1].map(i => [0, 1].map(k => actor('warm', i === 0 ? 6 + k * 3 : L - 6 - k * 3, -1.8, { team: i, k })));
+      this.warm = [0, 1].map(i => [0, 1, 2].map(k => actor('warm', i === 0 ? 14 + k * 3 : L - 14 - k * 3, Wd + 3.8, { team: i, k })));
       this.medics = [];
       this.fx = [];
       this.sparks = [];
@@ -527,11 +527,18 @@
         const attacking = this.poss === i && this.depth(i, b.x) > L * 0.66;
         c.tx = c.base + Math.sin(this.t * 0.25 + i * 3) * 3; c.ty = attacking ? TECH_Y + 1.3 : TECH_Y; c.run = attacking ? 0.5 : 0.18;
       });
-      // Suplentes calentando en la segunda parte
+      // Suplentes calentando detrás de las vallas de la banda de enfrente, cada equipo en su mitad:
+      // trote de ida y vuelta, algún sprint, desplazamientos laterales y estiramientos. Cuantos más cambios
+      // le quedan al equipo y más avanzado el partido, más gente calentando (y más intensidad si hay un cambio cerca)
+      const t = this.t;
       this.warm.forEach((ws, i) => ws.forEach(w => {
-        const goal = this.ownX(i) === 0 ? 0 : L;
-        const base = goal === 0 ? 5 : L - 5;
-        w.tx = base + (goal === 0 ? 1 : -1) * (3 + Math.sin(this.t * 0.4 + w.k * 2) * 3); w.ty = -1.8 - w.k * 0.9; w.run = 0.3;
+        const tm = this.m.teams[i], left = (tm.maxSubs || 5) - (tm.subs || 0);
+        w.on = left > 0 && w.k < Math.min(left, (this.m.min || 0) >= 60 ? 3 : (this.m.min || 0) >= 30 ? 2 : 1);
+        const x0 = i === 0 ? 12 + w.k * 4 : L - 12 - w.k * 4, ph = (t * 0.35 + w.k * 2.1) % 6;
+        const hot = this.subSoon === i;
+        if (ph < 3.6 || hot) { w.tx = x0 + Math.sin(t * (hot ? 0.9 : 0.55) + w.k * 1.7) * 7; w.ty = Wd + 3.8 + w.k * 0.7; w.run = hot ? 0.75 : ph > 2.8 ? 0.85 : 0.35; w.state = null; }
+        else if (ph < 4.8) { w.tx = w.x; w.ty = Wd + 3.8 + w.k * 0.7 + Math.sin(t * 3 + w.k) * 0.8; w.run = 0.3; }   // lateral
+        else { w.tx = w.x; w.ty = w.y; w.run = 0; w.state = 'stretch'; }
       }));
     }
 
@@ -1303,7 +1310,7 @@
             } });
           } else {
             const wy = Wd / 2 + side * U.rand(GW / 2 + 0.6, GW / 2 + 3);
-            this._kick(gx + dir * 2.5, wy, { fz, tz: U.rand(0.3, 2.8), h: 0.5, T: T * 1.1, done: () => { this._reveal(e); } });
+            this._kick(gx + dir * U.rand(4, 9), wy, { fz, tz: 0.3, h: 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         } else if (outcome === 'save') {
           const ty = Wd / 2 + side * U.rand(0.5, GW / 2 - 0.4);
@@ -1324,9 +1331,12 @@
             const ty = Wd / 2 + side * GW / 2;
             this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this.postShake = { x: gx, until: this.t + 0.45 }; this._reveal(e); } });
           } else {
+            // Fuera de verdad: por encima del larguero acaba en la grada de detrás de la portería; desviado, se
+            // marcha rozando el palo hasta la zona de fuera del campo
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
-            const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 2) : U.rand(GW / 2 + 0.8, GW / 2 + 7));
-            this._kick(gx + dir * 2.5, ty, { fz, tz: over ? U.rand(3, 5) : 0.4, h: 0.5, T: T * 1.1, done: () => { this._reveal(e); } });
+            const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 3) : U.rand(GW / 2 + 1.2, GW / 2 + 9));
+            const tx = gx + dir * (over ? U.rand(8, 14) : U.rand(4, 9));
+            this._kick(tx, ty, { fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         }
       } });
@@ -1808,6 +1818,7 @@
     }
 
     _subSeq(e) {
+      this.subSoon = e.team; setTimeout(() => { if (this.subSoon === e.team) this.subSoon = null; }, 4000);
       this._seq([{ d: 1.6, start: () => {
         this.keep.delete(e.pid2);
         this.board = { team: e.team, inN: this.num[e.pid], outN: this.num[e.pid2], until: this.t + 2.2 };
@@ -1936,7 +1947,7 @@
       this.ars.forEach(a => { a.ty = a === this.ars[0] ? Wd + 0.9 : -0.9; this._move(a, dt); });
       this._move(this.fourth, dt);
       this.coaches.forEach(c => this._move(c, dt));
-      if (this.m.min >= 46) this.warm.forEach(ws => ws.forEach(w => this._move(w, dt)));
+      this.warm.forEach(ws => ws.forEach(w => { if (w.on) this._move(w, dt); }));
       this.medics.forEach(m => this._move(m, dt));
       this._ballUpdate(dt);
       this._openPlay(dt);
@@ -2083,7 +2094,7 @@
       for (const id in this.A) people.push(this.A[id]);
       for (const a of this.leaving) people.push(a);
       people.push(this.ref, this.fourth, ...this.ars, ...this.coaches, ...this.medics);
-      if (this.m.min >= 46) this.warm.forEach(ws => people.push(...ws));
+      this.warm.forEach(ws => ws.forEach(w => { if (w.on) people.push(w); }));
       people.sort((a, b) => a.y - b.y);
       c.textAlign = 'center'; c.textBaseline = 'middle';
       for (const a of people) this._person(a, X, Y, R, s);
@@ -3258,9 +3269,13 @@
         return;
       }
       if (a.kind === 'warm') {
-        const r = R * 0.75;
-        c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fillStyle = this.colors[a.team].main; c.globalAlpha = 0.6; c.fill(); c.globalAlpha = 1;
-        c.lineWidth = 1.2; c.strokeStyle = '#ff9a3d'; c.stroke(); // peto de calentamiento
+        const r = R * 0.72, st = a.state === 'stretch';
+        c.beginPath(); c.ellipse(x + 1, y + r * 0.9, r * 0.9, r * 0.33, 0, 0, 6.283); c.fillStyle = 'rgb(0 0 0 / 0.25)'; c.fill();
+        // Peto fosforito (distinto para cada equipo) sobre la camiseta
+        c.beginPath(); c.arc(x, y - (st ? 0 : Math.abs(Math.sin(this.t * 8 + a.k)) * r * 0.25), r, 0, 6.283);
+        c.fillStyle = a.team === 0 ? '#d4ff3a' : '#ff7b1c'; c.fill();
+        c.lineWidth = 1.6; c.strokeStyle = this.colors[a.team].main; c.stroke();
+        if (st) { c.fillStyle = '#f2d2b6'; c.fillRect(x - r * 1.5, y - r * 0.2, r * 0.6, r * 0.4); c.fillRect(x + r * 0.9, y - r * 0.2, r * 0.6, r * 0.4); }   // brazos estirando
       }
     }
   }
