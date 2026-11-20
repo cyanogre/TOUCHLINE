@@ -778,8 +778,11 @@
       const giver = actor('boy', bx, by, { until: this.t + 3.2 }); giver.tx = bx; giver.ty = by;
       giver.state = 'throw'; giver.throwAt = this.t;
       const old = this.spare[this.spare.length - 1];
-      const fetcher = actor('boy', bx + (bx < 0 ? -1.5 : bx > L ? 1.5 : 3), by + (by < 0 ? -1 : by > Wd ? 1 : 0), { until: this.t + 7, fetch: old });
-      this.boys.push(giver, fetcher);
+      // Si ha caído en la grada, se lo queda la gente (nadie baja a por él): desaparece entre el público.
+      // Si se ha quedado en la zona de fuera del campo, va a por él otro recogepelotas.
+      const inStands = old.x < -5 || old.x > L + 5 || old.y < -4.5 || old.y > Wd + 4.5;
+      if (inStands) { old.crowd = true; old.t = this.t; this.boys.push(giver); }
+      else this.boys.push(giver, actor('boy', bx + (bx < 0 ? -1.5 : bx > L ? 1.5 : 3), by + (by < 0 ? -1 : by > Wd ? 1 : 0), { until: this.t + 7, fetch: old }));
       b.owner = null; b.roll = null; b.x = bx; b.y = by; b.z = 1.2;
       const d = Math.hypot(x - bx, y - by);
       b.path = { fx: bx, fy: by, fz: 1.2, tx: x, ty: y, tz: 0, h: Math.min(2.2, 0.6 + d * 0.06), T: clamp(d / 14, 0.45, 1.1), t: 0, to: null, curve: 0, nx: 0, ny: 0 };
@@ -795,7 +798,7 @@
         this._move(k, dt);
       }
       this.boys = this.boys.filter(k => k.until > this.t);
-      this.spare = this.spare.filter(o => !(o.taken && !this.boys.some(k => k.fetch === o)) && this.t - o.t < 9);
+      this.spare = this.spare.filter(o => !(o.taken && !this.boys.some(k => k.fetch === o)) && this.t - o.t < (o.crowd ? 1.6 : 9));
     }
 
     _placeStep() {
