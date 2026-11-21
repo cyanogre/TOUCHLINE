@@ -1642,7 +1642,30 @@
         <p class="note mt">Si el puesto ya está ocupado, el nuevo sustituye al actual (con una indemnización de 6 semanas de sueldo). Los veteranos que se retiran en tu club también pueden entrar aquí.</p></section></div>`;
   }
   A['staff-role'] = el => { UI.staffRole = el.dataset.k; UI.refresh(); };
-  A['staff-hire'] = el => { const r = TL.Staff.hire(G.S, el.dataset.id); toast(r.msg, !r.ok); if (r.ok) { TL.SFX.success(); TL.FX.sparkle(el); G.save(); UI.refresh(); } };
+  /** Presentación de un técnico nuevo: unas palabras, con su voz (fija según su nombre; las técnicas, más aguda). */
+  function presentStaff(S, c) {
+    const R = TL.Staff.ROLES[c.role], fem = /^(Elena|Carmen|Lucía|Marta|Sara|Ana|Inés|Julia|Nuria|Paula)\b/.test(c.name);
+    const a = (m, f) => (fem ? f : m), club = S.clubs[S.user].name;
+    const Q = {
+      physio: ['Aquí no se lesiona nadie sin pasar antes por mi camilla.', 'Prevenir es mejor que curar. Empezamos mañana con estiramientos.'],
+      fitness: ['Vais a correr como nunca. Y me lo vais a agradecer en el minuto noventa.', 'Pretemporada todo el año, míster. Confía en mí.'],
+      coach: ['Los chavales tienen talento. Mi trabajo es que lo saquen.', 'Cada entrenamiento cuenta. Vamos a mejorar uno a uno.'],
+      assistant: [`Estaré a tu lado en cada partido, míster. Lo que necesites.`, 'Un vestuario unido gana partidos. De eso me encargo yo.'],
+      gk: ['Los porteros son otra raza. Yo hablo su idioma.', 'Paradas, salidas y juego con el pie. Vamos a trabajarlo todo.'],
+      youth: ['En la cantera está el futuro del club. Vamos a cuidarla.', 'Dame tiempo y te traigo cracks de la casa.'],
+      scout: ['Tengo ojos en medio mundo. Si hay un diamante, lo encontraremos.', `Encantad${a('o', 'a')} de estar aquí. Ya tengo una lista de nombres para enseñarte.`]
+    }[c.role] || [`Encantad${a('o', 'a')} de llegar al ${club}. Vamos a trabajar.`];
+    const q = Q[c.name.length % Q.length];
+    sheet(sheetHead(R.icon + ' ' + R.name) + `<div class="office"><div class="office-head"><p style="margin:0;line-height:1.45"><b>${esc(c.name)}</b> se incorpora al cuerpo técnico y saluda:</p></div>
+      <p class="sign-quote">«${esc(q)}»</p>
+      <div class="btn-row mt"><button class="btn primary" data-act="close-sheet">¡Bienvenid${a('o', 'a')}!</button></div></div>`);
+    if (TL.SFX && TL.SFX.babble && TL.SFX.on && TL.SFX.on()) { let h = 0; for (const ch of c.name) h = (h * 31 + ch.charCodeAt(0)) % 9973; TL.SFX.babble.talk(q, { seed: h, fem }, 450); }
+  }
+  A['staff-hire'] = el => {
+    const c = (TL.Staff.market(G.S) || []).find(x => x.id === el.dataset.id);
+    const r = TL.Staff.hire(G.S, el.dataset.id); toast(r.msg, !r.ok);
+    if (r.ok) { TL.SFX.success(); TL.FX.sparkle(el); G.save(); UI.refresh(); if (c) setTimeout(() => presentStaff(G.S, c), 600); }
+  };
   A['staff-fire'] = el => confirmBox(`¿Despedir al ${TL.Staff.ROLES[el.dataset.k].name.toLowerCase()}?`, 'Tendrás que pagar 6 semanas de sueldo de indemnización.', 'Despedir', () => { const r = TL.Staff.fire(G.S, el.dataset.k); toast(r.msg, !r.ok); G.save(); UI.refresh(); }, true);
 
   function clubSummary(S) {

@@ -1609,3 +1609,15 @@ body.shake-s { animation: shake-s .35s; }
 .ball-cell.locked { position: relative; }
 
 .sign-quote { margin: 12px 4px 4px; font-size: 18px; font-weight: 600; line-height: 1.4; font-style: italic; color: var(--text); }
+
+/* Carga inicial (solo la primera vez) */
+#preload { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 30%, #12301f, #050a07 70%); transition: opacity .45s; }
+#preload.out { opacity: 0; pointer-events: none; }
+#preload .pl-box { width: min(420px, 86vw); text-align: center; }
+#preload .pl-logo { font: 900 clamp(38px, 11vw, 64px)/1 'Barlow Condensed', sans-serif; letter-spacing: .04em; color: #fff; text-shadow: 0 3px 0 #0b1020, 0 0 24px rgb(184 245 61 / .35); }
+#preload .pl-step { margin: 18px 0 10px; color: var(--muted, #9db3a6); font-weight: 600; min-height: 1.3em; }
+#preload .pl-bar { height: 14px; border-radius: 99px; background: #0d1a12; border: 1px solid #24432f; overflow: hidden; }
+#preload .pl-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #6fd13a, #b8f53d); box-shadow: 0 0 12px rgb(184 245 61 / .6); transition: width .25s; }
+#preload .pl-num { margin: 8px 0 0; font-variant-numeric: tabular-nums; color: #d9ead0; font-weight: 700; }
+#preload .pl-note { margin: 14px 0 0; font-size: 13px; color: #7f9a8a; }
+#preload .pl-skip { margin-top: 14px; opacity: .7; }

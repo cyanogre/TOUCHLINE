@@ -6,6 +6,8 @@
 
   function boot() {
     TL.UI.renderTitle();
+    // La primera vez: pantalla de carga con todo lo pesado (estadio, voces, sonidos, música)
+    if (TL.Preload && !TL.Preload.done()) TL.Preload.run(() => {});
     // Tras cambiar de base de datos (recarga), sigue con lo que se iba a hacer
     let then = null;
     try { then = sessionStorage.getItem('touchline.then'); sessionStorage.removeItem('touchline.then'); } catch (e) { /* nada */ }
