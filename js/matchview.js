@@ -207,8 +207,8 @@
   }
 
   // ------------------------------------------------------------ Partido narrado: solo se ve la jugada clave
-  // Por defecto, retransmisión de jugadas clave; el partido completo se elige con el botón
-  const narrOn = () => settings().narr !== false;
+  // Por defecto, el partido entero en el campo; la retransmisión de jugadas clave se elige con el botón
+  const narrOn = () => settings().narr === true;
   function setNarr(on) {
     const root = el('match');
     if (!root) return;
