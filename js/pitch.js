@@ -1349,7 +1349,22 @@
       const air = type === 'header' || type === 'volley';
       const T = { power: 0.42, placed: 0.55, header: 0.5, chip: 1.05, long: 0.8, volley: 0.45, tapin: 0.28, solo: 0.5, pen: 0.42, fk: 0.85 }[type] || 0.5;
       const sfx = TL.SFX;
+      // Supertiro (modo fantasía): carga con su nombre en grande, cámara lenta y el balón con su efecto y colores
+      const sp = e.special && TL.Special ? TL.Special.get(e.special) : null;
+      if (sp) {
+        epic = true;
+        beats.push({ d: 1.1, slow: 0.35, start: () => {
+          const a = this.A[shooter];
+          this._banner(sp.name.toUpperCase(), sp.c, 1.9, true);
+          if (TL.FX) TL.FX.flash && TL.FX.flash();
+          if (!this.instant && TL.SFX) (TL.SFX.rec ? TL.SFX.rec('limit-break', TL.SFX.boom) : TL.SFX.boom && TL.SFX.boom());
+          if (a) { if (sp.jump) a.jump = this.t; this.superAura = { pid: shooter, c: sp.c, c2: sp.c2, until: this.t + 2.6 }; }
+          // Los de dos: el compañero más cercano salta con él
+          if (sp.duo && a) { const m = this.nearest(this.team(i).filter(x => x.pid !== shooter && !this.isGK(x)), a); if (m) { m.jump = this.t; this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {}; this.ov.p[m.pid] = { x: a.x - this.dir[i] * 1.2, y: a.y + 0.8, run: 1 }; } }
+        } });
+      }
       beats.push({ d: 0.05, ball: true, slow: epic ? 0.45 : 1, start: () => {
+        if (sp) this.superFx = { fx: sp.fx, c: sp.c, until: this.t + 3 };
         const b = this.ball;
         if (air) { b.z = type === 'header' ? 1.9 : 0.8; const a = this.A[shooter]; if (a) { a.jump = this.t; a.x = lerp(a.x, b.x, 0.85); a.y = lerp(a.y, b.y, 0.85); } }
         else if (this.A[shooter]) this._receive(shooter);
@@ -1408,6 +1423,7 @@
             this._kick(tx, ty, { fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         }
+        if (sp && sp.curve && this.ball.path) this.ball.path.curve = sp.curve;
       } });
       // Después del remate
       if (outcome === 'goal') {
@@ -2173,6 +2189,16 @@
       people.sort((a, b) => a.y - b.y);
       c.textAlign = 'center'; c.textBaseline = 'middle';
       for (const a of people) this._person(a, X, Y, R, s);
+      // Aura del supertiro alrededor del que lo lanza (y chispas de sus colores)
+      const SA = this.superAura && this.superAura.until > this.t ? this.superAura : null;
+      if (SA && this.A[SA.pid]) {
+        const a = this.A[SA.pid], ax = X(a.x), ay = Y(a.y) - (a.jump && this.t - a.jump < 0.8 ? Math.sin((this.t - a.jump) / 0.8 * Math.PI) * R * 2.2 : 0);
+        const k = Math.min(1, (SA.until - this.t) / 0.6), pul = 1 + Math.sin(this.t * 14) * 0.15;
+        const g = c.createRadialGradient(ax, ay, R * 0.4, ax, ay, R * 3.2 * pul);
+        g.addColorStop(0, hexA(SA.c, 0.75 * k)); g.addColorStop(0.5, hexA(SA.c2 || SA.c, 0.35 * k)); g.addColorStop(1, hexA(SA.c, 0));
+        c.fillStyle = g; c.beginPath(); c.arc(ax, ay, R * 3.2 * pul, 0, 6.283); c.fill();
+        for (let q = 0; q < 6; q++) { const an = this.t * 5 + q * 1.05, rr = R * (1.6 + (q % 3) * 0.5); c.fillStyle = q % 2 ? SA.c : (SA.c2 || '#fff'); c.fillRect(Math.round(ax + Math.cos(an) * rr), Math.round(ay + Math.sin(an) * rr * 0.7), 3, 3); }
+      }
       // Barrera marcada con el espray
       // Balón (sombra en el suelo, balón a su altura)
       const b = this.ball;
@@ -2180,7 +2206,8 @@
       c.beginPath(); c.ellipse(X(b.x) + b.z * 0.25 * s, Y(b.y) + br * 0.5, br * (1 - Math.min(0.5, b.z * 0.05)), br * 0.42, 0, 0, 6.283);
       c.fillStyle = `rgb(0 0 0 / ${0.38 - Math.min(0.25, b.z * 0.03)})`; c.fill();
       const fast = b.trail.length > 3 && Math.hypot(b.trail[b.trail.length - 1][0] - b.trail[0][0], b.trail[b.trail.length - 1][1] - b.trail[0][1]) > 2.2;
-      const BI = TL.Balls ? TL.Balls.selected() : 0, fx = TL.Balls ? TL.Balls.fx(BI) : 'estela', bc = TL.Balls ? TL.Balls.color(BI) : '#ffffff';
+      const BI = TL.Balls ? TL.Balls.selected() : 0, SF = this.superFx && this.superFx.until > this.t ? this.superFx : null;
+      const fx = SF ? SF.fx : TL.Balls ? TL.Balls.fx(BI) : 'estela', bc = SF ? SF.c : TL.Balls ? TL.Balls.color(BI) : '#ffffff';
       const bx = X(b.x), by = Y(b.y) - b.z * s * 0.9;
       this._ballFx(fx, bc, br, X, Y, s, fast);
       if (fx !== 'estela') this._ballParts(fx, X, Y, s, br, bc);
@@ -2295,9 +2322,9 @@
       // Luz del balón con efecto (su color): suave de día, muy visible de noche
       let ballLight = null;
       if (TL.Balls) {
-        const BI = TL.Balls.selected(), fx = TL.Balls.fx(BI);
+        const SF = this.superFx && this.superFx.until > this.t ? this.superFx : null, BI = TL.Balls.selected(), fx = SF ? SF.fx : TL.Balls.fx(BI);
         if (fx !== 'estela') {
-          const hex = TL.Balls.color(BI), b = this.ball, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
+          const hex = SF ? SF.c : TL.Balls.color(BI), b = this.ball, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
           const rgb = [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255), mx = Math.max(...rgb, 0.01);
           const flick = 1 + Math.sin(this.t * 13) * 0.08 + Math.sin(this.t * 7.3) * 0.06;
           ballLight = { u: (b.x - ART_VIEW.x0) / VW, v: (b.y - ART_VIEW.y0) / VH, r: 0.035 + b.z * 0.002, k: (0.12 + dark * 0.75) * flick, c: rgb.map(v => v / mx) };

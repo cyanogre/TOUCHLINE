@@ -627,7 +627,7 @@
       const gkv = gk ? eff(gk, 'GK') : 30;
       const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
       // Rasgos: el que remata y el portero rival
-      const pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
+      let pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
       this.stats.shots[i]++;
       // De dónde nace la ocasión (la vista 2D la dibuja así)
       const desp = t.desperate, line = F.LINE[o.slot];
@@ -639,9 +639,13 @@
         this.stats.corners[i]++;
         if (this.detail) this._ev('corner', i, null, null, Math.random() < 0.35 ? say('corner', { t: this.S.clubs[t.club].name }) : '');
       } else if (Math.random() < 0.08) this.stats.corners[i]++;
+      // Modo fantasía: a veces el rematador saca su supertiro (más acierto y una escena a lo grande)
+      const sp0 = TL.Special && TL.Special.of(this.S, shooter), sp = sp0 && Math.random() < U.clamp(0.05 + (shooter.st[1] - 74) * 0.006, 0.04, 0.12) ? sp0 : null;
+      if (sp) pGoal = Math.min(0.62, pGoal * 1.6);
       const goal = Math.random() < pGoal;
       const shotType = this._shotType(origin, goal, line);
       const sx = { origin, shotType };
+      if (sp) sx.special = sp.id;
       if (goal) {
         let assister = null;
         if (Math.random() < 0.75) {
