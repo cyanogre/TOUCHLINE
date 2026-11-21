@@ -374,7 +374,7 @@
     const text = TL.t ? TL.t(raw) : raw; // traducido antes de escribirse
     cur.tk = tokens(text);
     cur.n = 0; cur.syl = null;
-    if (TL.SFX && TL.SFX.babble) TL.SFX.babble.load();
+    if (babbleOn() && TL.SFX && TL.SFX.babble) TL.SFX.babble.load();
     cur.typing = true;
     cur.line = line;
     // Mientras suena la frase doblada, no hay pitidos encima
@@ -399,6 +399,14 @@
     type();
   }
 
+  function babbleOn() {
+    try {
+      const q = new URLSearchParams(location.search).get('silabas');
+      if (q != null) localStorage.setItem('touchline.silabas', q === '0' ? '0' : '1');
+      return localStorage.getItem('touchline.silabas') === '1';
+    } catch (e) { return false; }
+  }
+
   function type() {
     if (!cur || !cur.typing) return;
     const r = root();
@@ -409,7 +417,8 @@
     keepEnd(r);
     cur.face.say(t.ch);
     // Habla por sílabas (si ya cargó la voz); si no, los pitidos de siempre
-    const B = TL.SFX && TL.SFX.babble, quiet = cur.quietUntil > performance.now();
+    // Prueba: solo con ?silabas=1 en la dirección (se recuerda) o localStorage touchline.silabas = '1'
+    const B = babbleOn() && TL.SFX && TL.SFX.babble, quiet = cur.quietUntil > performance.now();
     if (B && B.ready()) {
       if (!cur.syl) { cur.syl = B.plan(cur.tk.map(x => x.ch)); cur.sylI = 0; }
       while (cur.sylI < cur.syl.length && cur.syl[cur.sylI].at < cur.n - 1) cur.sylI++;
