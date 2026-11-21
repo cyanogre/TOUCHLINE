@@ -1355,7 +1355,7 @@
         epic = true;
         beats.push({ d: 1.1, slow: 0.35, start: () => {
           const a = this.A[shooter];
-          this._banner(sp.name.toUpperCase(), sp.c, 1.9, true);
+          this.spTitle = { name: sp.name, c: sp.c, c2: sp.c2, at: performance.now() };
           if (TL.FX) TL.FX.flash && TL.FX.flash();
           if (!this.instant && TL.SFX) (TL.SFX.rec ? TL.SFX.rec('limit-break', TL.SFX.boom) : TL.SFX.boom && TL.SFX.boom());
           if (a) { if (sp.jump) a.jump = this.t; this.superAura = { pid: shooter, c: sp.c, c2: sp.c2, until: this.t + 2.6 }; }
@@ -1364,7 +1364,7 @@
         } });
       }
       beats.push({ d: 0.05, ball: true, slow: epic ? 0.45 : 1, start: () => {
-        if (sp) this.superFx = { fx: sp.fx, c: sp.c, until: this.t + 3 };
+        if (sp) { this.superFx = { id: sp.id, fx: sp.fx, c: sp.c, c2: sp.c2, until: this.t + 3, t0: this.t, x0: this.ball.x, y0: this.ball.y }; this.shock = { x: this.ball.x, y: this.ball.y, t: this.t, c: sp.c }; }
         const b = this.ball;
         if (air) { b.z = type === 'header' ? 1.9 : 0.8; const a = this.A[shooter]; if (a) { a.jump = this.t; a.x = lerp(a.x, b.x, 0.85); a.y = lerp(a.y, b.y, 0.85); } }
         else if (this.A[shooter]) this._receive(shooter);
@@ -1423,7 +1423,13 @@
             this._kick(tx, ty, { fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         }
-        if (sp && sp.curve && this.ball.path) this.ball.path.curve = sp.curve;
+        if (sp && this.ball.path) {
+          const P = this.ball.path;
+          if (sp.curve) P.curve = sp.curve;
+          ({ catapulta: () => { P.h = Math.max(P.h, 4.5); }, halcon: () => { P.h = Math.max(P.h, 5); P.ease = 'in'; }, fenix: () => { P.h = Math.max(P.h, 3.5); },
+            saeta: () => { P.T *= 0.55; P.h = 0.1; }, tigre: () => { P.T *= 0.75; P.h = 0.25; }, hoja: () => { P.h = Math.max(P.h, 3); },
+            monstruo: () => { P.T *= 1.2; }, ego: () => { P.T *= 0.85; } }[sp.id] || (() => {}))();
+        }
       } });
       // Después del remate
       if (outcome === 'goal') {
@@ -2219,6 +2225,7 @@
         c.lineWidth = 1; c.strokeStyle = '#1a1a1a'; c.stroke();
       }
       c.globalAlpha = 1;
+      if (SF) this._superDraw(SF, bx, by, br, X, Y, s);
       // Porterías por encima (capa aparte): el balón que entra queda dentro de la red; tiemblan con el gol o el palo
       if (art) {
         // Las porterías salen del mismo sombreador que el estadio: misma luz y mismo desplazamiento de profundidad
@@ -2900,6 +2907,22 @@
     }
     _wipeFx() {
       const c = this.cx, W = this.w, H = this.h;
+      // Nombre del supertiro: rótulo arriba que entra deslizando y se va (no tapa la jugada)
+      if (this.spTitle) {
+        const a = (performance.now() - this.spTitle.at) / 1000;
+        if (a > 2.6) this.spTitle = null;
+        else {
+          c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+          const T0 = this.spTitle, fs = Math.max(14, Math.round(H * 0.075)), k = Math.min(1, a / 0.18, (2.6 - a) / 0.3);
+          c.font = `italic 900 ${fs}px Barlow Condensed, sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
+          const tw = c.measureText(T0.name.toUpperCase()).width, x = W / 2 - tw / 2 + (1 - k) * -W * 0.6, y = H * 0.86;
+          const sk = fs * 0.35;
+          c.fillStyle = hexA(T0.c, 0.92); c.beginPath(); c.moveTo(x - fs * 0.6 + sk, y - fs * 0.62); c.lineTo(x + tw + fs * 0.6 + sk, y - fs * 0.62); c.lineTo(x + tw + fs * 0.6 - sk, y + fs * 0.62); c.lineTo(x - fs * 0.6 - sk, y + fs * 0.62); c.closePath(); c.fill();
+          c.fillStyle = T0.c2 || '#ffffff'; c.fillRect(x - fs * 0.6, y + fs * 0.62, tw + fs * 1.2, 3);
+          c.fillStyle = '#0b1020'; c.fillText(T0.name.toUpperCase(), x + 2, y + 2);
+          c.fillStyle = '#ffffff'; c.fillText(T0.name.toUpperCase(), x, y);
+        }
+      }
       // Rótulo inferior con lo que ha pasado, cuando la cortinilla ya se ha abierto
       if (this.lowerCap) {
         const a = (performance.now() - this.lowerCap.at) / 1000;
@@ -3312,6 +3335,70 @@
         default: break;
       }
       return q;
+    }
+
+    /** Animación propia de cada supertiro (alrededor del balón y en su estela). Los jugadores siguen siendo puntos. */
+    _superDraw(SF, bx, by, br, X, Y, s) {
+      const c = this.cx, t = this.t, age = t - SF.t0, T = this.ball.trail, P = k => [X(T[k][0]), Y(T[k][1]) - T[k][2] * s * 0.9];
+      const fade = Math.max(0, Math.min(1, (SF.until - t) / 0.6)), px = Math.max(2, Math.round(s * 0.18));
+      const dot = (x, y, col, z) => { c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), z || px, z || px); };
+      c.save(); c.globalAlpha = fade;
+      // Onda expansiva al golpear
+      const sh = this.shock;
+      if (sh && t - sh.t < 0.6) { const k = (t - sh.t) / 0.6; c.strokeStyle = hexA(sh.c, 1 - k); c.lineWidth = 3 * (1 - k) + 1; c.beginPath(); c.ellipse(X(sh.x), Y(sh.y), 6 * s * k, 4 * s * k, 0, 0, 6.283); c.stroke(); }
+      switch (SF.id) {
+        case 'catapulta': case 'espiral': { // espiral de fuego girando alrededor del balón
+          for (let q = 0; q < 14; q++) { const a = t * 14 + q * 0.45, r = br * (1.6 + (q % 4) * 0.35); dot(bx + Math.cos(a) * r, by + Math.sin(a) * r * 0.6, q % 2 ? SF.c : SF.c2); }
+          break;
+        }
+        case 'tigre': { // tres zarpazos que acompañan al balón
+          for (let q = -1; q <= 1; q++) { c.strokeStyle = hexA(SF.c, 0.9); c.lineWidth = px * 0.8; c.beginPath(); c.moveTo(bx - br * 3, by + q * br * 1.2 - br * 2); c.lineTo(bx + br * 0.5, by + q * br * 1.2 + br * 0.6); c.stroke(); }
+          break;
+        }
+        case 'hoja': { // hojas que caen del balón al bambolearse
+          for (let q = 0; q < 6; q++) { const k = (age * 2 + q / 6) % 1; dot(bx + Math.sin(age * 9 + q) * br * 2.5, by + k * br * 5, q % 2 ? SF.c : '#7fc23a', px * 1.4); }
+          break;
+        }
+        case 'dragon': { // cuerpo de dragón eléctrico serpenteando por la estela, con cabeza
+          for (let k = 0; k < T.length; k++) { const [x, y] = P(k); const w = Math.sin(t * 18 + k) * br * 1.4; dot(x, y + w, k % 2 ? SF.c : SF.c2, px * (1 + k / T.length)); }
+          dot(bx + br, by - br * 1.2, '#ffffff', px * 1.6); dot(bx + br * 1.8, by - br * 0.6, SF.c, px * 1.2);
+          break;
+        }
+        case 'saeta': { // rayo recto y fogonazos
+          if (T.length) { const [x0, y0] = P(0); c.strokeStyle = hexA(SF.c, 0.95); c.lineWidth = Math.max(2, br * 0.7); c.beginPath(); c.moveTo(x0, y0); c.lineTo(bx, by); c.stroke(); c.strokeStyle = '#ffffff'; c.lineWidth = 1.5; c.stroke(); }
+          if (Math.random() < 0.4) dot(bx + (Math.random() - 0.5) * br * 4, by + (Math.random() - 0.5) * br * 4, '#ffffff', px * 1.5);
+          break;
+        }
+        case 'fenix': { // alas de fuego que baten
+          const flap = Math.sin(t * 16) * 0.5 + 0.5;
+          for (const sd of [-1, 1]) for (let q = 1; q <= 6; q++) dot(bx + sd * q * br * 0.8, by - q * br * (0.3 + flap * 0.5) + q * q * br * 0.05, q % 2 ? SF.c : SF.c2, px * 1.2);
+          break;
+        }
+        case 'ego': { // anillos oscuros que se cierran sobre el balón
+          for (let q = 0; q < 3; q++) { const k = ((age * 1.6 + q / 3) % 1), r = br * (5 - k * 4); c.strokeStyle = hexA(SF.c, k); c.lineWidth = 2; c.beginPath(); c.arc(bx, by, r, 0, 6.283); c.stroke(); }
+          break;
+        }
+        case 'monstruo': { // sombra de monstruo que acompaña: dos ojos y zigzag
+          dot(bx - br * 2.2, by - br * 2.4, '#ffe033', px * 1.4); dot(bx - br * 1.2, by - br * 2.4, '#ffe033', px * 1.4);
+          for (let k = 1; k < T.length; k++) { const [x, y] = P(k); dot(x + (k % 2 ? br : -br), y, '#1a1a1a', px * 1.3); }
+          break;
+        }
+        case 'halcon': { // plumas blancas y alas abiertas en picado
+          for (const sd of [-1, 1]) for (let q = 1; q <= 5; q++) dot(bx + sd * q * br * 0.9, by - br * 0.6 - q * br * 0.25, q % 2 ? '#ffffff' : SF.c, px);
+          for (let q = 0; q < 3; q++) { const k = (age * 1.5 + q / 3) % 1; dot(bx + (q - 1) * br * 2, by - br + k * br * 4, '#ffffff', px); }
+          break;
+        }
+        case 'galaxia': { // estrellas en órbita
+          for (let q = 0; q < 10; q++) { const a = t * 4 + q * 0.63, r = br * (2 + (q % 3)); dot(bx + Math.cos(a) * r, by + Math.sin(a) * r * 0.55, ['#ffffff', SF.c, SF.c2][q % 3]); }
+          break;
+        }
+        case 'arcoiris': { // estela de bandas de colores
+          for (let k = 1; k < T.length; k++) { const [x0, y0] = P(k - 1), [x1, y1] = P(k); for (let b = 0; b < 5; b++) { c.strokeStyle = `hsl(${b * 60 + t * 200} 90% 60%)`; c.lineWidth = px; c.beginPath(); c.moveTo(x0, y0 + (b - 2) * px); c.lineTo(x1, y1 + (b - 2) * px); c.stroke(); } }
+          break;
+        }
+        default:
+      }
+      c.restore();
     }
 
     /** Gotas de sudor: caen desde la frente y se desvanecen; más y más seguidas cuanto más cansado. */
