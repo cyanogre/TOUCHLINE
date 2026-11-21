@@ -124,6 +124,8 @@
       if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
       const so = TL.Events && TL.Events.fantasy(S) && p.club === S.user && TL.Events.soulOf(S, p.id);
       if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${so.def.icon}</span>`);
+      const spx = TL.Special && TL.Special.of(S, p);
+      if (spx) t.push(`<span class="tag soul" style="--c1:${spx.c}" title="Supertiro: ${esc(spx.name)}">⚡</span>`);
       // Confianza tras un momento en el despacho: subidón o bajón de unas jornadas
       const cf = TL.Social && p.club === S.user ? TL.Social.conf(S, p.id) : null;
       if (cf) t.push(`<span class="tag cf ${cf.mult > 1 ? 'up' : 'down'}" title="${cf.mult > 1 ? 'Subidón' : 'Bajón'}">${cf.mult > 1 ? '🔥' : '🌧️'}</span>`);
@@ -703,16 +705,18 @@
   /** En la ficha del jugador: su alma y su objeto. */
   function gearSection(S, p) {
     const EV = TL.Events;
-    if (!EV || !S.ev || p.club !== S.user) return '';
+    const spx = TL.Special && TL.Special.of(S, p);
+    const spBox = spx ? `<div class="gear-it soul on" style="--c1:${spx.c}"><span class="gi-ic">⚡</span><span class="grow"><b>Supertiro: ${esc(spx.name)}</b><small>${esc(spx.desc)}</small></span></div>` : '';
+    if (!EV || !S.ev || p.club !== S.user) return spBox ? `<div class="group-title">Supertiro</div><div class="gear-sec">${spBox}</div>` : '';
     const fan = EV.fantasy(S), so = fan ? EV.soulOf(S, p.id) : null, it = EV.itemOf(S, p.id);
     const freeSouls = fan ? S.ev.souls.filter(x => x.pid == null && EV.canEquip(S, 'soul', x.k, p)) : [];
     const freeItems = S.ev.items.filter(x => x.pid == null && EV.canEquip(S, 'item', x.k, p));
-    if (!so && !it && !freeSouls.length && !freeItems.length) return '';
+    if (!so && !it && !freeSouls.length && !freeItems.length) return spBox ? `<div class="group-title">Supertiro</div><div class="gear-sec">${spBox}</div>` : '';
     const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     const pickers = [];
     if (!so && freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ Equipar un alma (${freeSouls.length})</button>`);
     if (!it && freeItems.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="item" data-id="${p.id}">🎒 Equipar un objeto (${freeItems.length})</button>`);
-    return `<div class="group-title">${fan ? 'Alma y objeto' : 'Objeto'}</div><div class="gear-sec">${so ? line('soul', so) : ''}${it ? line('item', it) : ''}${pickers.length ? `<div class="btn-row">${pickers.join('')}</div>` : ''}</div>`;
+    return `<div class="group-title">${fan ? 'Alma y objeto' : 'Objeto'}</div><div class="gear-sec">${spBox}${so ? line('soul', so) : ''}${it ? line('item', it) : ''}${pickers.length ? `<div class="btn-row">${pickers.join('')}</div>` : ''}</div>`;
   }
   A['gear-pick'] = el => {
     const S = G.S, kind = el.dataset.kind, p = S.players[+el.dataset.id], EV = TL.Events;
