@@ -564,6 +564,7 @@
       } else { a.sx = a.tx; a.sy = a.ty; }
       // Pequeños ajustes cuando está casi en su sitio: nadie se queda clavado
       let gx = a.sx, gy = a.sy;
+      if (a.kind === 'pl' && a.state !== 'walk') { gx = clamp(gx, -2.5, L + 2.5); gy = clamp(gy, -2, Wd + 2); }   // nunca a la grada
       // El portero no abandona su zona: sin el balón en los pies, nunca más allá del borde del área (con un poco de margen)
       if (a.kind === 'pl' && this.ball.owner !== a.pid && this.isGK(a)) {
         const i = a.team, own = this.dir[i] > 0 ? 0 : L, dep = Math.abs(gx - own);
@@ -624,6 +625,7 @@
     _fetchStep() {
       const f = this.fetch, a = this.A[f.pid], b = this.ball;
       if (!a) { this.fetch = null; return; }
+      if (this._outside(1) && !b.path && !this.place) { this.fetch = null; if (this.brain && this.brain._outCheck) this.brain._outCheck(); return; }
       a.tx = b.x - this.dir[a.team] * 0.5; a.ty = b.y; a.run = 1;
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const late = this.t - f.t0 > 6;
@@ -867,8 +869,11 @@
         }
       }
     }
+    _outside(m) { const b = this.ball, k = m == null ? 0.2 : m; return b.x < -k || b.x > L + k || b.y < -k || b.y > Wd + k; }
     _contest() {
       const b = this.ball;
+      // Fuera del campo: saque (banda, puerta o córner) en vez de ir a por él
+      if (this._outside()) { if (this.brain && this.brain._outCheck) this.brain._outCheck(); return; }
       const n = this.nearest(Object.values(this.A), b);
       b.z = 0;
       if (n && d2(n, b) < 9) { this._receive(n.pid); if (b.z > 1) n.jump = this.t; }
@@ -2355,14 +2360,35 @@
       const W8 = this.wave && t >= this.wave.start && t < this.wave.end ? this.wave : null;
       const front = W8 ? (((t - W8.start) * 1.7 * W8.dir) % 6.283 + 6.283) % 6.283 - Math.PI : 0;
       const ch = this.cheer && this.cheer.until > t ? this.cheer : null;
+      const sc0 = TL.SFX && TL.SFX.crowd, crAge = sc0 ? (performance.now() - sc0.at) / 1000 : 99;
+      let cr = crAge < ({ chant: 6, ovation: 5, applause: 3.5, whistles: 3, boo: 3, groan: 1.8, chance: 1.5, crowdSwell: 2 }[sc0 && sc0.kind] || 0) ? sc0.kind : null;
+      // ¿Qué afición reacciona? Se decide una vez por sonido, según la jugada en ese momento:
+      // ocasión y lamento → la del equipo que ataca; aplausos (parada) → la del que defiende; pitos y abucheos →
+      // la contraria al que tiene el balón; ovación → la del que va ganando; cánticos → sobre todo la local
+      if (cr && sc0 !== this._crEv) {
+        this._crEv = sc0; const at = this.poss != null ? this.poss : 0, sc1 = this.m.score || [0, 0];
+        this._crTeam = { chance: at, groan: at, applause: 1 - at, whistles: 1 - at, boo: 1 - at, ovation: sc1[0] >= sc1[1] ? 0 : 1, chant: 0, crowdSwell: at }[cr];
+      }
+      const crTeam = this._crTeam;
       // Mismo desplazamiento que el sombreador del estadio: uv' = uv + tilt·0,022·altura
       const g = this.tilt || { x: 0, y: 0 }, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
       const px = g.x * 0.022 * VW, py = g.y * 0.022 * (VH / VW) * VH;
       const nightK = this.st.time === 'noche' ? 1 : this.st.time === 'tarde' ? clamp(((this.m.min || 0) - 50) / 40, 0, 0.8) : 0;
       for (const f of this._fanPts) {
         let j = Math.sin(t * 1.5 + f.ph) * 0.04, arms = 0;
+        // Lo que se oye en la grada se ve: aplausos (brazos que suben y bajan), cánticos (botan al ritmo, sobre
+        // todo la afición local), pitos y abucheos (brazos arriba sueltos), ovación (todos en pie), lamento (se agachan)
+        if (cr && ((crTeam === 1) === !!f.aw || (cr === 'chant' && (f.ph * 131) % 1 < 0.15))) {
+          const home = !f.aw, mine = (f.ph * 131) % 1;
+          if (cr === 'applause' && mine < 0.7) arms = Math.sin(t * 16 + f.ph * 9) > 0.2 ? 1 : 0;
+          else if (cr === 'chant' && (home || mine < 0.25)) { j = Math.abs(Math.sin(t * 6.3)) * 0.28 + 0.02; arms = Math.sin(t * 6.3) > 0.6 ? 1 : 0; }
+          else if ((cr === 'whistles' || cr === 'boo') && mine < 0.45) { arms = Math.sin(t * 4 + f.ph * 5) > 0 ? 1 : 0; j = 0.05; }
+          else if (cr === 'ovation') { j = Math.abs(Math.sin(t * 8 + f.ph)) * 0.3; arms = mine < 0.8 ? 1 : 0; }
+          else if (cr === 'groan') j = -0.12;
+          else if (cr === 'chance' && mine < 0.6) { j = 0.18; arms = mine < 0.3 ? 1 : 0; }
+        }
         const mine = ch && (ch.team === 1) === !!f.aw;
-        if (mine || party) { j = Math.abs(Math.sin(t * 9 + f.ph)) * 0.4; arms = Math.sin(t * 9 + f.ph) > 0.3 ? 1 : 0; }
+        if (mine) { j = Math.abs(Math.sin(t * 9 + f.ph)) * 0.4; arms = Math.sin(t * 9 + f.ph) > 0.3 ? 1 : 0; }
         else if (excite > 0.3 && (f.ph * 97 % 1) < excite * 0.25) j = Math.abs(Math.sin(t * 7 + f.ph)) * 0.25;   // algunos botan solos
         if (W8) {
           let d = f.ang - front; d = Math.atan2(Math.sin(d), Math.cos(d));

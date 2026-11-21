@@ -553,6 +553,15 @@
   const synthStop = S.stopCrowd;
   S.stopCrowd = () => { bedTok++; if (bedLoop) { try { bedLoop.stop(); } catch (e) { /* nada */ } bedLoop = null; } synthStop(); };
 
+  // Cuando suena la grada (aplausos, pitos, ovación, cánticos, abucheos, lamentos), el campo lo sabe para que
+  // los puntitos del público se muevan a la vez: TL.SFX.crowd = { kind, at }
+  ['applause', 'whistles', 'ovation', 'chant', 'boo', 'groan', 'goal', 'chance', 'crowdSwell'].forEach(k => {
+    const f = S[k]; if (typeof f !== 'function') return;
+    S[k] = function () { S.crowd = { kind: k, at: performance.now() }; return f.apply(this, arguments); };
+  });
+  const rec0 = S.rec;
+  const CROWD = { aplausos: 'applause', silbidos: 'whistles', ovacion: 'ovation', canticos: 'chant', abucheo: 'boo', lamento: 'groan', gol: 'goal', 'gol-rival': 'goal', ocasion: 'chance', parada: 'applause' };
+  S.rec = function (cat) { if (CROWD[cat]) S.crowd = { kind: CROWD[cat], at: performance.now() }; return rec0.apply(this, arguments); };
   TL.SFX = S;
   // Los efectos grabados se empiezan a descargar al abrir la página, no al primer sonido
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', preloadSamples, { once: true });
