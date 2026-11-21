@@ -565,7 +565,7 @@
       .then(([idx, ab]) => {
         if (!idx || !ab) { BAB.st = 'none'; return; }
         BAB.idx = idx;
-        const c = ac(); if (!c) { BAB.st = 'none'; return; }
+        const c = ac(); if (!c) { BAB.st = 'new'; return; }   // sin audio todavía: se reintenta la próxima vez
         c.decodeAudioData(ab, b => { BAB.buf = b; BAB.st = 'ready'; }, () => { BAB.st = 'none'; });
       }).catch(() => { BAB.st = 'none'; });
   }
@@ -673,8 +673,10 @@
   /** Dice una frase entera (sin texto que se escriba): sílaba a sílaba a ritmo de animalés. */
   function babTalk(text, who, delay) {
     babLoad();
+    let tries = 0;
     const go = () => {
-      if (BAB.st !== 'ready') return;
+      // La primera vez la voz aún se está descargando: se espera (hasta ~6 s) en vez de quedarse mudo
+      if (BAB.st !== 'ready') { if ((BAB.st === 'loading' || BAB.st === 'new') && tries++ < 30) setTimeout(go, 200); return; }
       const v = voiceOf(who), plan = babPlan([...text]);
       plan.slice(0, 40).forEach((p, j) => setTimeout(() => babPlay(p.k, v), j * 95 + (/[.,!?]/.test(text[p.at - 1] || '') ? 120 : 0)));
     };
