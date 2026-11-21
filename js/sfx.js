@@ -615,7 +615,42 @@
     BAB.src = { s: sn, g };
     return true;
   }
-  S.babble = { load: babLoad, ready: () => BAB.st === 'ready', plan: babPlan, play: babPlay };
+  /**
+   * Modo «natural»: la frase entera programada de una vez, sílabas a su duración real, encadenadas con un fundido
+   * corto, pausas entre palabras y en la puntuación, acento en la penúltima sílaba de cada palabra y entonación
+   * (la frase baja hacia el final; las preguntas suben). Devuelve cuánto dura.
+   */
+  const NAT = { srcs: [] };
+  function babStop() { const c = ac(); if (!c) return; const t = c.currentTime; NAT.srcs.forEach(x => { try { x.g.gain.cancelScheduledValues(t); x.g.gain.setTargetAtTime(0, t, 0.02); x.s.stop(t + 0.1); } catch (e) { /* nada */ } }); NAT.srcs = []; }
+  function babSpeak(chars, o) {
+    const c = ac(); if (!c || !on() || BAB.st !== 'ready') return 0;
+    o = o || {};
+    babStop();
+    const plan = babPlan(chars), txt = chars.join('');
+    if (!plan.length) return 0;
+    // Palabras: grupos de sílabas separados por espacios o puntuación (para el acento y las pausas)
+    const gapAfter = i => { const a = plan[i].at, b = i + 1 < plan.length ? plan[i + 1].at : txt.length; const mid = txt.slice(a + plan[i].k.length - 1, b); return /[.!?…]/.test(mid) ? 0.32 : /[,;:]/.test(mid) ? 0.18 : /\s/.test(mid) ? 0.035 : 0; };
+    const word = []; let w = 0; plan.forEach((p, i) => { word.push(w); if (gapAfter(i) > 0) w++; });
+    const question = /\?\s*$/.test(txt.trim()) || /^\s*¿/.test(txt);
+    let t = c.currentTime + 0.03; const N = plan.length, base = (o.rate || 1) * Math.pow(2, (o.mood || 0) / 24);
+    for (let i = 0; i < N; i++) {
+      const p = plan[i], [t0, d] = BAB.idx[p.k];
+      const sameW = plan.map((_, j) => j).filter(j => word[j] === word[i]), pos = sameW.indexOf(i), stress = sameW.length > 1 ? pos === sameW.length - 2 : true;
+      const prog = i / Math.max(1, N - 1);
+      let pitch = base * (1.04 - prog * 0.08) * (stress ? 1.03 : 0.99) * (1 + (Math.random() - 0.5) * 0.03);
+      if (question && prog > 0.75) pitch *= 1 + (prog - 0.75) * 0.5;
+      const len = Math.max(0.07, (d - 0.05) * (stress ? 0.92 : 0.72)) / pitch;   // sílabas átonas más cortas, como al hablar deprisa
+      const sn = c.createBufferSource(), g = c.createGain(), vol = (o.vol || 0.6) * (stress ? 1 : 0.78);
+      sn.buffer = BAB.buf; sn.playbackRate.value = pitch;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.015); g.gain.setValueAtTime(vol, t + len - 0.03); g.gain.linearRampToValueAtTime(0, t + len + 0.015);
+      sn.connect(g); g.connect(master);
+      sn.start(t, t0 + 0.012, len + 0.03); sn.stop(t + len + 0.05);
+      NAT.srcs.push({ s: sn, g });
+      t += len - 0.025 + gapAfter(i);   // se solapan un poco (como el habla encadenada) y paran en la puntuación
+    }
+    return t - c.currentTime;
+  }
+  S.babble = { load: babLoad, ready: () => BAB.st === 'ready', plan: babPlan, play: babPlay, speak: babSpeak, stop: babStop };
 
   // Cuando suena la grada (aplausos, pitos, ovación, cánticos, abucheos, lamentos), el campo lo sabe para que
   // los puntitos del público se muevan a la vez: TL.SFX.crowd = { kind, at }
