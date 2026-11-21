@@ -1,6 +1,6 @@
 # Banda sonora
 
-- **`tema-del-juego.mp3`:** el tema principal («Strategic Swing»). Suena en los menús y siempre que el momento de la carrera no tenga música propia.
+- **`tema/`:** los temas principales (`tema/1.mp3` es «Strategic Swing»). Suenan en los menús y siempre que el momento de la carrera no tenga música propia. Mete más como `tema/2.mp3`, `tema/3.mp3`…: cada vez que se abre el juego suena uno distinto del de la última vez.
 - **Carpetas:** cada una es un momento de la carrera. Mete dentro los MP3 numerados seguidos: `1.mp3`, `2.mp3`, `3.mp3`… (hasta 12). Por ejemplo, `racha/1.mp3`.
 
 | Carpeta | Cuándo suena | Idea para la pista |
