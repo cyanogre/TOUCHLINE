@@ -340,6 +340,7 @@
   }
 
   function next() {
+    if (TL.SFX && TL.SFX.babble && TL.SFX.babble.stop) TL.SFX.babble.stop();   // la frase anterior se corta
     if (!cur) return;
     cur.i++;
     const line = cur.lines[cur.i];
@@ -402,8 +403,9 @@
   function babbleOn() {
     try {
       const q = new URLSearchParams(location.search).get('silabas');
-      if (q != null) localStorage.setItem('touchline.silabas', q === '0' ? '0' : '1');
-      return localStorage.getItem('touchline.silabas') === '1';
+      if (q != null) localStorage.setItem('touchline.silabas', q === '0' ? '0' : q === 'natural' ? 'natural' : '1');
+      const v = localStorage.getItem('touchline.silabas');
+      return v === '1' || v === 'natural' ? v : false;
     } catch (e) { return false; }
   }
 
@@ -419,7 +421,10 @@
     // Habla por sílabas (si ya cargó la voz); si no, los pitidos de siempre
     // Prueba: solo con ?silabas=1 en la dirección (se recuerda) o localStorage touchline.silabas = '1'
     const B = babbleOn() && TL.SFX && TL.SFX.babble, quiet = cur.quietUntil > performance.now();
-    if (B && B.ready()) {
+    if (B && B.ready() && babbleOn() === 'natural') {
+      // Modo natural: la frase entera se dice de una vez al empezar a escribirse
+      if (!cur.syl) { cur.syl = true; if (!quiet) B.speak(cur.tk.map(x => x.ch), { mood: cur.mood }); }
+    } else if (B && B.ready()) {
       if (!cur.syl) { cur.syl = B.plan(cur.tk.map(x => x.ch)); cur.sylI = 0; }
       while (cur.sylI < cur.syl.length && cur.syl[cur.sylI].at < cur.n - 1) cur.sylI++;
       const sy = cur.syl[cur.sylI];
@@ -458,6 +463,7 @@
   function finish(skipped) {
     if (!cur) return;
     clearTimeout(cur.timer);
+    if (TL.SFX && TL.SFX.babble && TL.SFX.babble.stop) TL.SFX.babble.stop();
     if (skipped) stopVoice();
     const job = cur;
     cur.face.stop();
