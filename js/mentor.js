@@ -350,11 +350,19 @@
     const hole = r.querySelector('.vn-hole');
     const target = line.sel ? document.querySelector(line.sel) : null;
     if (target) {
-      target.scrollIntoView({ block: 'center', behavior: 'auto' });
-      const b = target.getBoundingClientRect(), pad = 6;
-      Object.assign(hole.style, { display: 'block', left: b.left - pad + 'px', top: b.top - pad + 'px', width: b.width + pad * 2 + 'px', height: b.height + pad * 2 + 'px' });
-      r.classList.toggle('top', b.top + b.height / 2 > innerHeight * 0.55);
-      r.classList.add('spot');
+      target.scrollIntoView({ block: 'center', behavior: 'instant' });
+      // El hueco sigue al elemento: se recoloca mientras la página termina de desplazarse o se recoloca el diseño
+      const place = () => {
+        if (!cur || cur.lines[cur.i] !== line || !target.isConnected) return false;
+        const b = target.getBoundingClientRect(), pad = 6;
+        Object.assign(hole.style, { display: 'block', left: b.left - pad + 'px', top: b.top - pad + 'px', width: b.width + pad * 2 + 'px', height: b.height + pad * 2 + 'px' });
+        r.classList.toggle('top', b.top + b.height / 2 > innerHeight * 0.55);
+        return true;
+      };
+      place(); r.classList.add('spot');
+      let n = 0; const follow = () => { if (place() && ++n < 90) requestAnimationFrame(follow); };   // ~1,5 s
+      requestAnimationFrame(follow);
+      if (!r._spotScroll) { r._spotScroll = true; addEventListener('scroll', () => { if (cur && cur.lines[cur.i] && cur.lines[cur.i].sel) { const tg = document.querySelector(cur.lines[cur.i].sel); if (tg) { const b = tg.getBoundingClientRect(); Object.assign(hole.style, { left: b.left - 6 + 'px', top: b.top - 6 + 'px', width: b.width + 12 + 'px', height: b.height + 12 + 'px' }); } } }, { passive: true, capture: true }); }
     } else {
       hole.style.display = 'none';
       r.classList.remove('spot', 'top');
