@@ -541,7 +541,7 @@
       ${chips ? `<div class="ev-chips">${chips}</div>` : ''}
       <div class="col mt">${v.opts.map(o => `<button class="btn block office-opt ev-opt" data-act="ev-do" data-k="${o.k}"><b>${esc(o.l)}</b>${o.d ? `<small>${esc(o.d)}</small>` : ''}</button>`).join('')}</div>
     </div>`, { onClose: () => { if (UI.tab === 'home') render(false); } });
-    playerSpeaks(S, v.pid, v.body, 450);
+    speakEl(document.querySelector('.sheet .ev-body'), v.pid != null ? { pid: v.pid, fem: S.gender === 'F' } : null, 450);
   }
   UI.openEvent = openEvent;
   A['ev-open'] = () => openEvent(G.S);
@@ -1031,8 +1031,32 @@
       ${left ? '' : '<p class="note mo-full">Tu agenda de esta semana está llena. Si no caduca, podrás atenderlo la semana que viene.</p>'}
       <div class="col mt">${SO.options(S, m).map(o => `<button class="btn block office-opt mo-opt" data-act="mo-do" data-id="${m.id}" data-k="${o.key}" ${left ? '' : 'disabled'}><span class="mo-txt"><b>${esc(o.label)}</b>${o.desc ? `<small>${esc(o.desc)}</small>` : ''}</span>${o.mark ? `<span class="mo-mark ${o.mark === '✓' ? 'ok' : o.mark === '✗' ? 'ko' : ''}" title="${o.mark === '✓' ? 'Le va' : o.mark === '✗' ? 'No le va' : 'Ni fu ni fa'}">${o.mark}</span>` : ''}</button>`).join('')}</div>
       <p class="note mt">Agenda: ${left} de ${SO.agendaMax(S)} charlas libres esta semana.</p></div>`);
-    playerSpeaks(S, p.id, K.text(S, p, m.d), 350);
+    speakEl(document.querySelector('.sheet .office-head p'), { pid: p.id, fem: S.gender === 'F' }, 350);
   };
+  /**
+   * Escribe un texto poco a poco, como si la persona lo dijera, con su voz de animalés sincronizada sílaba a sílaba.
+   * Al terminar deja el formato original (negritas…). Tocar el texto lo completa de golpe.
+   */
+  function speakEl(el, who, delay) {
+    if (!el) return;
+    const html = el.innerHTML, text = el.textContent;
+    const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !text) return;
+    el.textContent = ''; el.classList.add('saying');
+    const voice = who && TL.SFX && TL.SFX.babble && TL.SFX.on && TL.SFX.on() ? TL.SFX.babble.typer(text, who) : null;
+    let i = 0, stop = false;
+    const end = () => { stop = true; el.innerHTML = html; el.classList.remove('saying'); };
+    el.addEventListener('click', end, { once: true });
+    const tick = () => {
+      if (stop || !el.isConnected) return;
+      i++; el.textContent = text.slice(0, i);
+      if (voice) voice(i - 1);
+      const ch = text[i - 1];
+      if (i < text.length) setTimeout(tick, /[.!?…]/.test(ch) ? 260 : /[,;:]/.test(ch) ? 150 : 34); else end();
+    };
+    setTimeout(tick, delay || 0);
+  }
+  UI.speakEl = speakEl;
   /** Lo que dice un jugador (lo que va entre «…» en el texto), con su voz de animalés, tras una pausa. */
   function playerSpeaks(S, pid, text, delay) {
     if (!TL.SFX || !TL.SFX.babble || !TL.SFX.on || !TL.SFX.on() || pid == null) return;
@@ -1052,7 +1076,7 @@
     sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     TL.Face.mount(document.querySelector('.sheet'), S.face);
-    playerSpeaks(S, p.id, r.msg, said ? 300 + said.length * 40 : 200);
+    speakEl(document.querySelector('.sheet .office-head p'), { pid: p.id, fem: S.gender === 'F' }, said ? 300 + said.length * 40 : 200);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     render(false);
   };
@@ -1074,7 +1098,7 @@
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     mountFaces(document.querySelector('.sheet'));
     TL.Face.mount(document.querySelector('.sheet'), S.face);
-    playerSpeaks(S, p.id, r.msg, said ? 300 + said.length * 40 : 200);
+    speakEl(document.querySelector('.sheet .office-head p'), { pid: p.id, fem: S.gender === 'F' }, said ? 300 + said.length * 40 : 200);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     UI.refresh();
   };
@@ -1659,7 +1683,8 @@
     sheet(sheetHead(R.icon + ' ' + R.name) + `<div class="office"><div class="office-head"><p style="margin:0;line-height:1.45"><b>${esc(c.name)}</b> se incorpora al cuerpo técnico y saluda:</p></div>
       <p class="sign-quote">«${esc(q)}»</p>
       <div class="btn-row mt"><button class="btn primary" data-act="close-sheet">¡Bienvenid${a('o', 'a')}!</button></div></div>`);
-    if (TL.SFX && TL.SFX.babble && TL.SFX.on && TL.SFX.on()) { let h = 0; for (const ch of c.name) h = (h * 31 + ch.charCodeAt(0)) % 9973; TL.SFX.babble.talk(q, { seed: h, fem }, 450); }
+    let h = 0; for (const ch of c.name) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+    speakEl(document.querySelector('.sheet .sign-quote'), { seed: h, fem }, 450);
   }
   A['staff-hire'] = el => {
     const c = (TL.Staff.market(G.S) || []).find(x => x.id === el.dataset.id);
@@ -2132,7 +2157,7 @@
     sheet(sheetHead(loan ? 'Llega cedido' : 'Presentación') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45"><b>${esc(p.name)}</b> ${loan ? 'llega cedido' : 'posa con la camiseta'} y dice unas palabras:</p></div>
       <p class="sign-quote">«${esc(q)}»</p>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">¡Bienvenido!</button></div></div>`);
-    playerSpeaks(S, p.id, '«' + q + '»', 450);
+    speakEl(document.querySelector('.sheet .sign-quote'), { pid: p.id, fem: S.gender === 'F' }, 450);
   }
   A.sign = el => {
     const S = G.S, p = S.players[+el.dataset.id], n = UI.nego;
