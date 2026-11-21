@@ -54,11 +54,13 @@
     if (reduced()) { draw(canvas, face, false); if (done) done(); return; }
     el.textContent = '';
     el.classList.add('saying');
+    const voice = TL.SFX && TL.SFX.babble && TL.SFX.on && TL.SFX.on() ? TL.SFX.babble.typer(text, 'me') : null;
     let i = 0, open = false;
     const tick = () => {
       if (!el.isConnected) return;
       i++;
       el.textContent = text.slice(0, i);
+      if (voice) voice(i - 1);
       const ch = text[i - 1] || '';
       open = /[aeiouáéíóúAEIOUÁÉÍÓÚ]/.test(ch) ? true : /[\s.,:;!?¡¿]/.test(ch) ? false : open;
       draw(canvas, face, open);
