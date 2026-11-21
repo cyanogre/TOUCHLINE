@@ -192,11 +192,27 @@
   A['close-sheet'] = () => closeSheet();
 
   // ------------------------------------------------------------ Música
-  // Banda sonora en assets/music: el tema del juego (tema-del-juego.mp3) y una carpeta por momento
+  // Banda sonora en assets/music: el tema del juego (carpeta tema/: cada vez que juegas suena uno distinto) y una carpeta por momento
   // de la carrera, con pistas numeradas 1.mp3, 2.mp3… Si la carpeta de un momento está vacía, sigue
   // sonando lo que suena, sin cortes ni reinicios.
   const MUSIC_DIR = 'assets/music/';
-  const THEME = MUSIC_DIR + 'tema-del-juego.mp3';
+  let THEME = MUSIC_DIR + 'tema/1.mp3';
+  /** El tema de esta sesión: uno de la carpeta tema/ distinto del de la última vez (se recuerda). */
+  let themeReady = null;
+  function chooseTheme() {
+    if (themeReady) return themeReady;
+    themeReady = Music.bank('tema').then(list => {
+      if (!list || !list.length) return THEME;
+      let last = null; try { last = localStorage.getItem('touchline.tema'); } catch (e) { /* nada */ }
+      const opts = list.length > 1 ? list.filter(u => u !== last) : list;
+      THEME = opts[Math.floor(Math.random() * opts.length)];
+      try { localStorage.setItem('touchline.tema', THEME); } catch (e) { /* nada */ }
+      const a = document.getElementById('bgm');
+      if (a && a.paused && Music.cur !== THEME && (Music.ctx === 'tema')) { a.src = THEME; Music.cur = THEME; }
+      return THEME;
+    });
+    return themeReady;
+  }
   const Music = {
     base: 0.32,
     cur: THEME,            // pista que suena ahora
@@ -208,6 +224,7 @@
     start() {
       const a = Music.el();
       if (!a || !Music.on()) return;
+      if (!themeReady || Music._themeWait) { if (!Music._themeWait) { Music._themeWait = true; chooseTheme().then(() => { Music._themeWait = false; Music.start(); }); } return; }
       if (!a._wired) {
         a._wired = true;
         // Al acabar una pista de un momento: otra del mismo momento (sin repetir) o el tema del juego

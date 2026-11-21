@@ -46,14 +46,13 @@
     const ES = ['color', 'normal', 'mascara', 'altura', 'porterias', 'nieve', 'luz-noche'].map(k => `assets/estadio/${k}-top.webp`);
     const voice = TL.Mentor && TL.Mentor.VOICE ? Object.keys(TL.Mentor.VOICE).map(k => `assets/mentor/voice/${k}.mp3`) : [];
     const sfx = TL.SFX && TL.SFX.VOL ? Object.keys(TL.SFX.VOL) : [];
-    const music = ['temporada', 'pretemporada', 'racha', 'peligro', 'recta-final', 'fin-de-temporada'];
+    const music = ['tema', 'temporada', 'pretemporada', 'racha', 'peligro', 'recta-final', 'fin-de-temporada'];
     const tasks = [
       ...ES.map(u => ({ step: 'Preparando el estadio…', w: u.includes('color') ? 8 : 1, run: () => get(u) })),
       { step: 'Inflando los balones…', w: 1, run: () => get('assets/balones.png') },
       ...voice.map(u => ({ step: 'Despertando al Profe…', w: 0.3, run: () => get(u) })),
       { step: 'Afinando las voces…', w: 10, run: async () => (await get('assets/mentor/voz-silabas.json')) + (await get('assets/mentor/voz-silabas.mp3')) },
       ...sfx.map(c => ({ step: 'Calentando a la grada…', w: 1.2, run: async () => { let n = 0; await folder(`assets/sfx/${c}`, 8, b => { n += b; }); return n; } })),
-      { step: 'Poniendo la música…', w: 8, run: () => get('assets/music/tema-del-juego.mp3') },
       ...music.map(m => ({ step: 'Poniendo la música…', w: 2, run: async () => { let n = 0; await folder(`assets/music/${m}`, 6, b => { n += b; }); return n; } }))
     ];
     const total = tasks.reduce((a, t) => a + t.w, 0);
