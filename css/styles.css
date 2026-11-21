@@ -1607,3 +1607,5 @@ body.shake-s { animation: shake-s .35s; }
 .ball-cell.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .ball-cell.locked span { filter: grayscale(1) brightness(.35); }
 .ball-cell.locked { position: relative; }
+
+.sign-quote { margin: 12px 4px 4px; font-size: 18px; font-weight: 600; line-height: 1.4; font-style: italic; color: var(--text); }

@@ -1079,7 +1079,7 @@
     UI.refresh();
   };
   A['loan-out'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.loanOut(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); closeSheet(); UI.refresh(); } };
-  A['loan-in'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.loanIn(S, p); toast(r.msg, !r.ok); if (r.ok) { TL.SFX && TL.SFX.coin(); G.save(); closeSheet(); UI.refresh(); } };
+  A['loan-in'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.loanIn(S, p); toast(r.msg, !r.ok); if (r.ok) { TL.SFX && TL.SFX.coin(); G.save(); closeSheet(); UI.refresh(); setTimeout(() => presentSigning(S, p, true), 700); } };
   A['loan-recall'] = el => { const S = G.S, p = S.players[+el.dataset.id]; const r = TL.Locker.recall(S, p); toast(r.msg, !r.ok); if (r.ok) { G.save(); openPlayer(p.id); UI.refresh(); } };
 
   VIEWS.squad = S => {
@@ -2081,12 +2081,43 @@
     openPlayer(p.id);
   };
   C['nego-years'] = el => { if (UI.nego) UI.nego.years = +el.value; };
+  /** Presentación de un fichaje: unas palabras del recién llegado, con su voz. */
+  function welcomeQuote(S, p, loan) {
+    const club = S.clubs[S.user].name, fem = S.gender === 'F', a = (m, f) => (fem ? f : m);
+    const young = p.age <= 21, vet = p.age >= 31, star = p.ovr >= S.clubs[S.user].rep + 4;
+    const pool = loan ? [
+      `Vengo a sumar y a crecer. Gracias al ${club} por la oportunidad.`,
+      'Es una cesión, pero la voy a vivir como si fuera para siempre.',
+      `Quiero minutos y demostrar lo que valgo. Aquí los voy a ganar.`,
+      'Me han hablado muy bien del vestuario. Tengo ganas de empezar.'
+    ] : [
+      `Es un orgullo vestir esta camiseta. Vengo a darlo todo por el ${club}.`,
+      '¡Por fin! Llevaba semanas esperando este momento. Vamos a por todas.',
+      'Hola a todos. No soy de hablar mucho: prefiero que hable el campo.',
+      `La afición va a estar ${a('contenta', 'contenta')} conmigo, se lo prometo.`,
+      '¿Dónde está el vestuario? Quiero conocer a mis compañeros ya.',
+      'He venido a ganar títulos, no a pasear.',
+      `Mi familia está loca de contenta. Gracias, míster, por confiar en mí.`
+    ];
+    if (!loan && young) pool.push(`Soy ${a('joven', 'joven')}, pero no tengo miedo a nada. Quiero aprender de los mayores.`, 'De pequeño soñaba con esto. Ahora toca cumplirlo.');
+    if (!loan && vet) pool.push('Me quedan años buenos y los quiero pasar aquí. Experiencia no me falta.', `Vengo a ayudar a los jóvenes y a ganar. Ese es el plan.`);
+    if (!loan && star) pool.push(`Sé lo que se espera de mí. Estoy ${a('listo', 'lista')} para esa presión.`, 'Elegí este proyecto entre varias ofertas. No me equivoqué.');
+    return pool[(p.id * 7 + S.season) % pool.length];
+  }
+  function presentSigning(S, p, loan) {
+    const q = welcomeQuote(S, p, loan);
+    sheet(sheetHead(loan ? 'Llega cedido' : 'Presentación') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45"><b>${esc(p.name)}</b> ${loan ? 'llega cedido' : 'posa con la camiseta'} y dice unas palabras:</p></div>
+      <p class="sign-quote">«${esc(q)}»</p>
+      <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">¡Bienvenido!</button></div></div>`);
+    playerSpeaks(S, p.id, '«' + q + '»', 450);
+  }
   A.sign = el => {
     const S = G.S, p = S.players[+el.dataset.id], n = UI.nego;
     const r = M.sign(S, p, n.fee, M.wageDemand(S, p, S.user), n.years);
     if (r.ok) {
       G.save(); closeSheet(); toast(`¡${p.short} es nuevo jugador del club!`); UI.refresh();
       TL.FX.confetti(); TL.SFX.signing();
+      setTimeout(() => presentSigning(S, p, false), 700);
     } else { n.msg = r.msg; n.ok = false; openPlayer(p.id); }
   };
   A.renew = el => {
