@@ -373,7 +373,8 @@
     const raw = typeof line.text === 'function' ? line.text(TL.Game.S) : line.text;
     const text = TL.t ? TL.t(raw) : raw; // traducido antes de escribirse
     cur.tk = tokens(text);
-    cur.n = 0;
+    cur.n = 0; cur.syl = null;
+    if (TL.SFX && TL.SFX.babble) TL.SFX.babble.load();
     cur.typing = true;
     cur.line = line;
     // Mientras suena la frase doblada, no hay pitidos encima
@@ -407,7 +408,14 @@
     r.querySelector('.vn-text').innerHTML = renderTokens(cur.tk, cur.n);
     keepEnd(r);
     cur.face.say(t.ch);
-    if (TL.SFX && TL.SFX.voice && !(cur.quietUntil > performance.now())) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
+    // Habla por sílabas (si ya cargó la voz); si no, los pitidos de siempre
+    const B = TL.SFX && TL.SFX.babble, quiet = cur.quietUntil > performance.now();
+    if (B && B.ready()) {
+      if (!cur.syl) { cur.syl = B.plan(cur.tk.map(x => x.ch)); cur.sylI = 0; }
+      while (cur.sylI < cur.syl.length && cur.syl[cur.sylI].at < cur.n - 1) cur.sylI++;
+      const sy = cur.syl[cur.sylI];
+      if (sy && sy.at === cur.n - 1) { cur.sylI++; if (!quiet) B.play(sy.k, { mood: cur.mood }); }
+    } else if (TL.SFX && TL.SFX.voice && !quiet) TL.SFX.voice(t.ch, { pitch: CHAR.voice.pitch, mood: cur.mood, rate: CHAR.voice.rate });
     let ms = 28;
     if ('.!?…'.includes(t.ch)) ms = 230;
     else if (',;:'.includes(t.ch)) ms = 120;

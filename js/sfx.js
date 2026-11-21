@@ -553,6 +553,70 @@
   const synthStop = S.stopCrowd;
   S.stopCrowd = () => { bedTok++; if (bedLoop) { try { bedLoop.stop(); } catch (e) { /* nada */ } bedLoop = null; } synthStop(); };
 
+  // ------------------------------------------------------------ Habla por sílabas (estilo «animalés»)
+  // assets/mentor/voz-silabas.mp3: todas las sílabas del español grabadas por la voz del Profe, una tras otra;
+  // voz-silabas.json: dónde empieza y cuánto dura cada una. El texto se pasa a sílabas «fonéticas» y cada sílaba
+  // suena muy corta y un poco más aguda mientras se escribe.
+  const BAB = { st: 'new', buf: null, idx: null, max: 5, src: null };
+  function babLoad() {
+    if (BAB.st !== 'new' || !window.fetch) return;
+    BAB.st = 'loading';
+    Promise.all([fetch('assets/mentor/voz-silabas.json').then(r => r.ok ? r.json() : null), fetch('assets/mentor/voz-silabas.mp3').then(r => r.ok ? r.arrayBuffer() : null)])
+      .then(([idx, ab]) => {
+        if (!idx || !ab) { BAB.st = 'none'; return; }
+        BAB.idx = idx;
+        const c = ac(); if (!c) { BAB.st = 'none'; return; }
+        c.decodeAudioData(ab, b => { BAB.buf = b; BAB.st = 'ready'; }, () => { BAB.st = 'none'; });
+      }).catch(() => { BAB.st = 'none'; });
+  }
+  /** Texto (lista de caracteres) → sílabas [{ at: índice del carácter donde empieza, k: clave }] */
+  function babPlan(chars) {
+    if (!BAB.idx) return [];
+    const out = [], src = [], ph = [];
+    const low = chars.map(c => (c || '').toLowerCase());
+    // Fonética sencilla del español: c/qu → k, v → b, h muda, g+e/i → j, gu+e/i → g, z+e/i → c, x → ks, y final → i, w → u
+    for (let i = 0; i < low.length; i++) {
+      let c = low[i].normalize('NFD').replace(/[̀-̇̉-ͯ]/g, '').normalize('NFC');
+      const n = (low[i + 1] || '').normalize('NFD').replace(/[̀-ͯ]/g, ''), n2 = (low[i + 2] || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (!/[a-zñü]/.test(c)) { ph.push(' '); src.push(i); continue; }
+      if (c === 'h' && low[i - 1] !== 'c') continue;
+      if (c === 'c' && n === 'h') { ph.push('c', 'h'); src.push(i, i); i++; continue; }
+      if (c === 'q' && n === 'u') { ph.push('k'); src.push(i); i++; continue; }
+      if (c === 'c') { ph.push('ei'.includes(n) ? 'c' : 'k'); src.push(i); continue; }
+      if (c === 'z') { ph.push('ei'.includes(n) ? 'c' : 'z'); src.push(i); continue; }
+      if (c === 'g' && 'ei'.includes(n)) { ph.push('j'); src.push(i); continue; }
+      if (c === 'g' && n === 'u' && 'ei'.includes(n2)) { ph.push('g', 'u'); src.push(i, i); i++; continue; }
+      if (c === 'v') c = 'b'; else if (c === 'w') c = 'u'; else if (c === 'k') c = 'k';
+      if (c === 'x') { ph.push('k', 's'); src.push(i, i); continue; }
+      if (c === 'y' && !/[a-zñ]/.test(n)) c = 'i';
+      ph.push(c); src.push(i);
+    }
+    const s = ph.join('');
+    for (let p = 0; p < s.length;) {
+      if (s[p] === ' ') { p++; continue; }
+      let hit = null;
+      for (let L = Math.min(BAB.max, s.length - p); L > 0 && !hit; L--) { const k = s.substr(p, L); if (BAB.idx[k]) hit = k; }
+      if (hit) { out.push({ at: src[p], k: hit }); p += hit.length; } else p++;   // consonante suelta: se la come
+    }
+    return out;
+  }
+  function babPlay(k, o) {
+    const c = ac(); if (!c || !on() || BAB.st !== 'ready' || !BAB.idx[k]) return false;
+    o = o || {};
+    const [t0, d] = BAB.idx[k], t = c.currentTime;
+    const rate = (o.rate || 1.32) * Math.pow(2, ((o.mood || 0) + (Math.random() - 0.5) * 1.2) / 12);
+    const len = Math.min(d, 0.2) / rate * 1.05;
+    if (BAB.src) { try { BAB.src.g.gain.setTargetAtTime(0, t, 0.012); BAB.src.s.stop(t + 0.05); } catch (e) { /* ya paró */ } }
+    const sn = c.createBufferSource(), g = c.createGain();
+    sn.buffer = BAB.buf; sn.playbackRate.value = rate;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(o.vol || 0.55, t + 0.008); g.gain.setTargetAtTime(0, t + len * 0.75, 0.02);
+    sn.connect(g); g.connect(master);
+    sn.start(t, t0 + 0.01, len + 0.06);
+    BAB.src = { s: sn, g };
+    return true;
+  }
+  S.babble = { load: babLoad, ready: () => BAB.st === 'ready', plan: babPlan, play: babPlay };
+
   // Cuando suena la grada (aplausos, pitos, ovación, cánticos, abucheos, lamentos), el campo lo sabe para que
   // los puntitos del público se muevan a la vez: TL.SFX.crowd = { kind, at }
   ['applause', 'whistles', 'ovation', 'chant', 'boo', 'groan', 'goal', 'chance', 'crowdSwell'].forEach(k => {
