@@ -650,7 +650,37 @@
     }
     return t - c.currentTime;
   }
-  S.babble = { load: babLoad, ready: () => BAB.st === 'ready', plan: babPlan, play: babPlay, speak: babSpeak, stop: babStop };
+  /**
+   * Voces de personaje (animalés): cada persona tiene su tono fijo según quién es.
+   * who: 'me' (tú: grave), { pid, fem } (jugador o jugadora), { seed, fem } (fisio, periodista…)
+   */
+  function voiceOf(who) {
+    if (who === 'me') return { rate: 1.02, vol: 0.5 };
+    const seed = (((who && (who.pid != null ? who.pid : who.seed)) || 7) * 0.6180339) % 1;
+    return who && who.fem ? { rate: 1.62 + seed * 0.2, vol: 0.5 } : { rate: 1.2 + seed * 0.16, vol: 0.52 };
+  }
+  /** Para hablar a la vez que se escribe: devuelve una función que se llama con cada carácter nuevo (índice). */
+  function babTyper(text, who) {
+    babLoad();
+    const v = voiceOf(who); let plan = null, k = 0;
+    return i => {
+      if (BAB.st !== 'ready') return;
+      if (!plan) plan = babPlan([...text]);
+      while (k < plan.length && plan[k].at < i) k++;
+      if (plan[k] && plan[k].at === i) { babPlay(plan[k].k, v); k++; }
+    };
+  }
+  /** Dice una frase entera (sin texto que se escriba): sílaba a sílaba a ritmo de animalés. */
+  function babTalk(text, who, delay) {
+    babLoad();
+    const go = () => {
+      if (BAB.st !== 'ready') return;
+      const v = voiceOf(who), plan = babPlan([...text]);
+      plan.slice(0, 40).forEach((p, j) => setTimeout(() => babPlay(p.k, v), j * 95 + (/[.,!?]/.test(text[p.at - 1] || '') ? 120 : 0)));
+    };
+    setTimeout(go, delay || 0);
+  }
+  S.babble = { load: babLoad, ready: () => BAB.st === 'ready', plan: babPlan, play: babPlay, speak: babSpeak, stop: babStop, voiceOf, typer: babTyper, talk: babTalk };
 
   // Cuando suena la grada (aplausos, pitos, ovación, cánticos, abucheos, lamentos), el campo lo sabe para que
   // los puntitos del público se muevan a la vez: TL.SFX.crowd = { kind, at }

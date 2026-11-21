@@ -541,6 +541,7 @@
       ${chips ? `<div class="ev-chips">${chips}</div>` : ''}
       <div class="col mt">${v.opts.map(o => `<button class="btn block office-opt ev-opt" data-act="ev-do" data-k="${o.k}"><b>${esc(o.l)}</b>${o.d ? `<small>${esc(o.d)}</small>` : ''}</button>`).join('')}</div>
     </div>`, { onClose: () => { if (UI.tab === 'home') render(false); } });
+    playerSpeaks(S, v.pid, v.body, 450);
   }
   UI.openEvent = openEvent;
   A['ev-open'] = () => openEvent(G.S);
@@ -1030,7 +1031,15 @@
       ${left ? '' : '<p class="note mo-full">Tu agenda de esta semana está llena. Si no caduca, podrás atenderlo la semana que viene.</p>'}
       <div class="col mt">${SO.options(S, m).map(o => `<button class="btn block office-opt mo-opt" data-act="mo-do" data-id="${m.id}" data-k="${o.key}" ${left ? '' : 'disabled'}><span class="mo-txt"><b>${esc(o.label)}</b>${o.desc ? `<small>${esc(o.desc)}</small>` : ''}</span>${o.mark ? `<span class="mo-mark ${o.mark === '✓' ? 'ok' : o.mark === '✗' ? 'ko' : ''}" title="${o.mark === '✓' ? 'Le va' : o.mark === '✗' ? 'No le va' : 'Ni fu ni fa'}">${o.mark}</span>` : ''}</button>`).join('')}</div>
       <p class="note mt">Agenda: ${left} de ${SO.agendaMax(S)} charlas libres esta semana.</p></div>`);
+    playerSpeaks(S, p.id, K.text(S, p, m.d), 350);
   };
+  /** Lo que dice un jugador (lo que va entre «…» en el texto), con su voz de animalés, tras una pausa. */
+  function playerSpeaks(S, pid, text, delay) {
+    if (!TL.SFX || !TL.SFX.babble || !TL.SFX.on || !TL.SFX.on() || pid == null) return;
+    const q = (String(text || '').match(/«([^»]+)»/g) || []).map(x => x.slice(1, -1)).join(' ');
+    if (q) TL.SFX.babble.talk(q, { pid, fem: S.gender === 'F' }, delay || 0);
+  }
+  UI.playerSpeaks = playerSpeaks;
   /** Tu cara diciendo tu frase (si te has hecho la cara). */
   const meSay = (S, line) => (S.face ? `<div class="office-me">${TL.Face.html(S.face, 'talking')}<div class="say"><small>Tú</small><span data-say>${esc(line)}</span></div></div>` : '');
   A['mo-do'] = el => {
@@ -1043,6 +1052,7 @@
     sheet(sheetHead('Despacho') + `<div class="office">${said ? meSay(S, '«' + said + '»') : ''}<div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45">${mdb(r.msg)}</p></div>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     TL.Face.mount(document.querySelector('.sheet'), S.face);
+    playerSpeaks(S, p.id, r.msg, said ? 300 + said.length * 40 : 200);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     render(false);
   };
@@ -1064,6 +1074,7 @@
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Volver a su ficha</button><button class="btn primary" data-act="close-sheet">Cerrar</button></div></div>`);
     mountFaces(document.querySelector('.sheet'));
     TL.Face.mount(document.querySelector('.sheet'), S.face);
+    playerSpeaks(S, p.id, r.msg, said ? 300 + said.length * 40 : 200);
     if (r.good) TL.SFX && TL.SFX.success(); else if (r.bad) TL.SFX && TL.SFX.error();
     UI.refresh();
   };
