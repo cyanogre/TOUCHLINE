@@ -1704,6 +1704,9 @@
       let [vx, vy] = this.world(i, U.rand(91, 97), Wd / 2 + U.rand(-9, 9));
       const [spx, spy] = this.world(i, L - 11, Wd / 2);
       const beats = [];
+      const shot = this._take(x => ((x.type === 'goal' && x.kind === 'pen') || x.type === 'penmiss') && x.team === i);
+      let cancel = null;
+      if (!shot) for (let v; (v = this._take(x => x.type === 'var' && x.team === i));) { if (cancel) this._reveal(cancel); cancel = v; }
       // Si el balón está lejos del área (p. ej. en el otro campo), primero se corta (cortinilla) a la jugada
       // en el área rival: un penalti siempre nace de una acción cerca de la portería, no a 60 m del balón
       if (victim != null && !this.instant && this.depth(i, this.ball.x) < 72) { this._cap = `Llega el ${this.clubName(i)} al área`; this._cutTo(i, 84, Wd / 2 + U.rand(-10, 10), victim); }
@@ -1735,7 +1738,7 @@
       beats.push(this._protestBeat(1 - i, 1.3));
       beats.push({ d: 2.4, start: () => {
         this._placeBall(spx, spy, 1.2, null, i);
-        const taker = (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] * 1.5 + this.P(c.pid).st[2] * 0.3) - (this.P(a.pid).st[1] * 1.5 + this.P(a.pid).st[2] * 0.3))[0] || {}).pid;
+        const taker = shot && this.A[shot.pid] ? shot.pid : (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] * 1.5 + this.P(c.pid).st[2] * 0.3) - (this.P(a.pid).st[1] * 1.5 + this.P(a.pid).st[2] * 0.3))[0] || {}).pid;
         this.penTaker = taker;
         const p = {};
         let k = 0;
@@ -1757,9 +1760,10 @@
         this.refOv = { x: spx - dir * 6, y: spy - 9, run: 0.6 };
         this._cut(0.92, `Penalti para el ${this.clubName(i)}`);
       } });
+      // Sin lanzamiento (el VAR lo anula): se avisa, se suelta a todos y saca el portero; nunca se queda todo parado
+      if (!shot) beats.push({ d: 2, start: () => { if (cancel) this._reveal(cancel); this._banner(cancel ? 'VAR: NO HAY PENALTI' : 'SIGUE EL JUEGO', '#5db8ff', 1.8, true); this.monitor = this.t + 1.6; },
+        end: () => { this.ov = null; this.refOv = null; const gk = this.gkOf(1 - i); if (gk) this._receive(gk.pid); } });
       this._seq(beats);
-      // Si el lanzamiento ya está en la cola, va justo detrás
-      const shot = this._take(x => (x.type === 'goal' && x.kind === 'pen') || x.type === 'penmiss');
       if (shot) this._penShot(shot, shot.type === 'goal');
     }
 
