@@ -986,6 +986,16 @@
       }
       const bt = this.beat;
       if (bt.waitHold && this.hold) return true;
+      // Vigilante: ninguna escena puede quedarse esperando para siempre (un jugador que no llega al balón,
+      // un balón que no acaba su vuelo…). Pasado su tiempo con margen, se da por hecha y el partido sigue.
+      bt.wd = (bt.wd || 0) + dt;
+      if (bt.wd > (bt.d || 0) + 9) {
+        this.fetch = null;
+        if (this.place) { const P = this.place, b = this.ball; b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; b.owner = P.to != null && this.A[P.to] ? P.to : null; this.place = null; }
+        if (this.ball.path) { const b = this.ball, pa = b.path; b.path = null; b.x = pa.tx; b.y = pa.ty; b.z = 0; if (pa.done) try { pa.done(); } catch (e) { /* nada */ } }
+        bt.t = Math.max(bt.t, bt.d || 0);
+        TL.WD = (TL.WD || 0) + 1;
+      }
       if (this.fetch) return true; // esperamos a que el jugador llegue al balón
       if (this.place) return true; // y a que el balón esté en su sitio para el balón parado
       bt.t += dt;
@@ -2029,7 +2039,9 @@
       this._sync();
       if (!this.beat && !this.script.length && this.queue.length && !this.fetch && !this.place) {
         const e = this.queue[0];
-        if (!this.brain.leading(e)) { this.queue.shift(); this._handle(e); }
+        // El cerebro puede retrasar un suceso para llevar la jugada hasta él, pero como mucho unos segundos
+        if (this._lead !== e) { this._lead = e; this._leadT = this.t; }
+        if (!this.brain.leading(e) || this.t - this._leadT > 8) { this.queue.shift(); this._handle(e); }
       }
       if (!this.beat && !this.script.length && !this.queue.length && this.handled.length) this._revealAll();
       this._runScript(dt);
