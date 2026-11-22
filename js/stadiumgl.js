@@ -236,10 +236,21 @@ void main(){
     return base;
   }
 
+  // Al volver al juego (otra app, sin internet, pantalla apagada…) algunos móviles vacían la memoria gráfica sin avisar:
+  // el contexto no figura como perdido pero pinta negro. Así que al volver se rehace todo desde cero.
+  function rebuild() {
+    if (S.state !== 'loaded') return;
+    try { const old = S.gl && S.gl.gl, ext = old && old.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e) { /* nada */ }
+    S.gl = null; S.warped = null; S.lost = false; S.retry = 0;
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) rebuild(); });
+  window.addEventListener('pageshow', rebuild);
+  window.addEventListener('online', rebuild);
+
   // Si el estadio dibujado está activo, se descarga en segundo plano nada más abrir el juego
   try {
     const q = new URLSearchParams(location.search).get('campo');
     if (q === 'arte' || (!q && localStorage.getItem('touchline.campo') === '1')) setTimeout(load, 1500);
   } catch (e) { /* nada */ }
-  TL.StadiumGL = { image: k => (S.state === 'loaded' ? S.imgs[{ mask: 'mask' }[k] || k] : null), render, goals: () => S.goalsCv || null, load, ready: () => S.state === 'loaded' || S.state === 'error' };
+  TL.StadiumGL = { image: k => (S.state === 'loaded' ? S.imgs[{ mask: 'mask' }[k] || k] : null), render, rebuild, goals: () => S.goalsCv || null, load, ready: () => S.state === 'loaded' || S.state === 'error' };
 })();
