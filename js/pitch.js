@@ -1384,7 +1384,7 @@
           const ty = Wd / 2 + side * U.rand(0.6, GW / 2 - 0.5);
           const tz = { header: U.rand(0.2, 1.4), chip: 1.6, long: U.rand(1.4, 2.2), power: U.rand(0.4, 1.8), volley: U.rand(0.5, 2), tapin: 0.2, placed: 0.25, fk: 2.05 }[type] || 0.8;
           if (gk) { gk.state = 'dive'; gk.dive = -side * dir; gk.until = this.t + 1.2; this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {}; this.ov.p[gk.pid] = { x: gx - dir * 1.2, y: Wd / 2 - side * 1.5, run: 1 }; }
-          this._kick(gx + dir * 1.3, ty, { fz, tz, h: type === 'chip' ? 3.6 : type === 'long' ? 1.2 : type === 'fk' ? 1.5 : 0.2, T, curve: type === 'fk' ? side * 2.4 : type === 'placed' ? side * 0.6 : 0, done: () => {
+          this._kick(gx + dir * 1.3, ty, { by: shooter, team: i, fz, tz, h: type === 'chip' ? 3.6 : type === 'long' ? 1.2 : type === 'fk' ? 1.5 : 0.2, T, curve: type === 'fk' ? side * 2.4 : type === 'placed' ? side * 0.6 : 0, done: () => {
             this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 }; this._goalT = this.t;
             if (e.type === 'goal') this._reveal(e);
           } });
@@ -1398,13 +1398,13 @@
             def.state = 'slide'; def.until = this.t + 0.8;
             this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {};
             this.ov.p[def.pid] = { x: gx - dir * 0.8, y: ty, run: 1 };
-            this._kick(gx - dir * 0.9, ty, { fz, tz: air ? 0.8 : 0.4, h: 0.3, T, done: () => {
+            this._kick(gx - dir * 0.9, ty, { by: shooter, team: i, fz, tz: air ? 0.8 : 0.4, h: 0.3, T, done: () => {
               this._kick(gx - dir * U.rand(4, 10), Math.random() < 0.5 ? -1 : Wd + 1, { free: true, h: 2.2, T: 0.8 });
               this._reveal(e);
             } });
           } else {
             const wy = Wd / 2 + side * U.rand(GW / 2 + 0.6, GW / 2 + 3);
-            this._kick(gx + dir * U.rand(4, 9), wy, { fz, tz: 0.3, h: 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
+            this._kick(gx + dir * U.rand(4, 9), wy, { by: shooter, team: i, fz, tz: 0.3, h: 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         } else if (outcome === 'save') {
           const ty = Wd / 2 + side * U.rand(0.5, GW / 2 - 0.4);
@@ -1413,24 +1413,24 @@
             this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {};
             this.ov.p[gk.pid] = { x: gx - dir * 1.0, y: ty, run: 1 };
           }
-          this._kick(gx - dir * 1.0, ty, { fz, tz: air ? 0.8 : 0.4, h: type === 'chip' ? 3 : 0.3, T, done: () => { this._reveal(e); } });
+          this._kick(gx - dir * 1.0, ty, { by: shooter, team: i, fz, tz: air ? 0.8 : 0.4, h: type === 'chip' ? 3 : 0.3, T, done: () => { this._reveal(e); } });
         } else {
           const mk = e.miss || (air ? 'header' : 'wide');
           if (mk === 'blocked') {
             const blk = this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), { x: lerp(this.ball.x, gx, 0.25), y: lerp(this.ball.y, Wd / 2, 0.25) });
             const [bx, by] = blk ? [blk.x, blk.y] : [lerp(this.ball.x, gx, 0.2), this.ball.y];
             if (blk) { blk.state = 'slide'; blk.until = this.t + 0.6; }
-            this._kick(bx, by, { fz, tz: 0.5, h: 0.2, T: 0.22, done: () => { this._reveal(e); } });
+            this._kick(bx, by, { by: shooter, team: i, fz, tz: 0.5, h: 0.2, T: 0.22, done: () => { this._reveal(e); } });
           } else if (mk === 'post') {
             const ty = Wd / 2 + side * GW / 2;
-            this._kick(gx, ty, { fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this.postShake = { x: gx, until: this.t + 0.45 }; this._reveal(e); } });
+            this._kick(gx, ty, { by: shooter, team: i, fz, tz: Math.random() < 0.4 ? 2.4 : 1, h: 0.3, T, done: () => { sfx && !this.instant && sfx.post && sfx.post(); this.postShake = { x: gx, until: this.t + 0.45 }; this._reveal(e); } });
           } else {
             // Fuera de verdad: por encima del larguero acaba en la grada de detrás de la portería; desviado, se
             // marcha rozando el palo hasta la zona de fuera del campo
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
             const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 3) : U.rand(GW / 2 + 1.2, GW / 2 + 9));
             const tx = gx + dir * (over ? U.rand(8, 14) : U.rand(4, 9));
-            this._kick(tx, ty, { fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
+            this._kick(tx, ty, { by: shooter, team: i, fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
           }
         }
         if (sp && this.ball.path) {
@@ -1791,9 +1791,9 @@
           const ty = Wd / 2 + side * U.rand(1.2, GW / 2 - 0.4);
           const dive = goal ? (Math.random() < 0.7 ? -side : side) : saved ? side : (Math.random() < 0.5 ? side : -side);
           if (gk) { gk.state = 'dive'; gk.dive = dive * dir; gk.until = this.t + 1.3; this.ov.p[gk.pid] = { x: gx - dir * 0.6, y: Wd / 2 + dive * 2.4, run: 1 }; }
-          if (goal) this._kick(gx + dir * 1.3, ty, { fz: 0, tz: U.rand(0.2, 2), h: 0.3, T: 0.42, done: () => { this.netShake = { x: gx, until: this.t + 0.7 }; this._reveal(e); } });
-          else if (saved) this._kick(gx - dir * 0.6, Wd / 2 + side * 2.4, { fz: 0, tz: 0.6, h: 0.2, T: 0.4, done: () => { this._reveal(e); } });
-          else this._kick(gx + dir * 2, Wd / 2 + side * U.rand(GW / 2 + 0.5, GW / 2 + 3), { fz: 0, tz: Math.random() < 0.5 ? 3 : 0.5, h: 0.4, T: 0.45, done: () => { this._reveal(e); } });
+          if (goal) this._kick(gx + dir * 1.3, ty, { by: taker, team: i, fz: 0, tz: U.rand(0.2, 2), h: 0.3, T: 0.42, done: () => { this.netShake = { x: gx, until: this.t + 0.7 }; this._reveal(e); } });
+          else if (saved) this._kick(gx - dir * 0.6, Wd / 2 + side * 2.4, { by: taker, team: i, fz: 0, tz: 0.6, h: 0.2, T: 0.4, done: () => { this._reveal(e); } });
+          else this._kick(gx + dir * 2, Wd / 2 + side * U.rand(GW / 2 + 0.5, GW / 2 + 3), { by: taker, team: i, fz: 0, tz: Math.random() < 0.5 ? 3 : 0.5, h: 0.4, T: 0.45, done: () => { this._reveal(e); } });
         } },
         ...(goal ? [
           { d: 0.1, start: () => { const mine = i === this.me; this._banner('¡GOOOL!', mine ? '#b8f53d' : '#ffffff', 2, true); if (!this.instant && TL.SFX) { TL.SFX.goal(mine); TL.SFX.net(); } if (mine && TL.FX) TL.FX.confetti(); this._sparkStand(i); } },
