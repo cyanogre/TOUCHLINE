@@ -738,8 +738,8 @@
       // Tarjetas
       const cr = Math.random();
       const booked = this.pl[fouler.id] && this.pl[fouler.id].y ? 0.5 : 1; // el árbitro perdona más la segunda
-      if (cr < M.redPerFoul * strict) this._red(i, fouler, true);
-      else if (cr < (M.redPerFoul + M.yellowPerFoul * late * booked) * strict) this._yellow(i, fouler);
+      if (cr < M.redPerFoul * strict) this._red(i, fouler, true, null, victim);
+      else if (cr < (M.redPerFoul + M.yellowPerFoul * late * booked) * strict) this._yellow(i, fouler, victim);
       else if (this.detail && !shown) this._ev('foul', i, fouler.id, victim.id, Math.random() < 0.12 ? say('foul', { p: fouler.short, v: victim.short }) : '', { hard: Math.random() < 0.3 });
       if (Math.random() < M.heatedPerFoul) this._heated();
     }
@@ -777,23 +777,23 @@
       }
     }
 
-    _yellow(i, p) {
+    _yellow(i, p, v) {
       const rec = this.pl[p.id];
       if (!rec || rec.off != null) return;
-      if (rec.y >= 1) { rec.y++; this._red(i, p, false); return; }
+      if (rec.y >= 1) { rec.y++; this._red(i, p, false, null, v); return; }
       rec.y++;
       this.stats.yel[i]++;
-      this._ev('yellow', i, p.id, null, this.detail ? say('yellow', { p: p.short }) : '');
+      this._ev('yellow', i, p.id, v ? v.id : null, this.detail ? say('yellow', { p: p.short }) : '');
     }
 
-    _red(i, p, straight, kind) {
+    _red(i, p, straight, kind, v) {
       const rec = this.pl[p.id];
       if (!rec || rec.off != null) return;
       rec.r = kind === 'refAssault' ? 12 : kind === 'confront' ? 4 : kind === 'fight' ? 3 : straight ? U.pick([1, 1, 2]) : 1;
       rec.rKind = kind || (straight ? 'straight' : 'second');
       this.stats.red[i]++;
       const txt = kind ? say(kind, { p: p.short }) : say(straight ? 'red' : 'red2', { p: p.short });
-      this._ev('red', i, p.id, null, txt);
+      this._ev('red', i, p.id, v ? v.id : null, txt);
       const t = this.teams[i];
       const was = t.onPitch.find(o => o.pid === p.id);
       this._remove(i, p.id);

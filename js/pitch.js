@@ -1047,7 +1047,6 @@
       for (const e of evs) {
         if (!KEY_EVENTS.includes(e.type)) continue;
         // Falta sin tarjeta ni texto: la comete quien llegue al choque en el juego (el reloj no se para)
-        if (e.type === 'foul' && !e.text && !instant) { this.handled.push(e); this._reveal(e); this.brain.foulLater(e); continue; }
         this.queue.push(e);
         // El motor ya los ha quitado del campo: siguen en pantalla hasta que se vea la jugada
         if (e.type === 'red' || e.type === 'inj') this.keep.add(e.pid);
@@ -1818,6 +1817,7 @@
       if (fouler == null && card !== 'red') return;
       const f = this.A[fouler];
       const victims = this.team(1 - i).filter(a => !this.isGK(a));
+      // Víctima: la del motor. Solo en sucesos sin víctima (roja por protestar, etc.) se usa la rival más cercana.
       const victim = e.pid2 != null && this.A[e.pid2] ? this.A[e.pid2] : f ? this.nearest(victims, f) : null;
       if (!f || !victim) return;
       if (card === 'red') { this.keep.add(fouler); f.red = true; }
@@ -1826,12 +1826,23 @@
       // Si no es penalti, la falta es fuera del área de quien la comete
       if (this.depth(1 - i, spot.x) > L - 17.5 && Math.abs(spot.y - Wd / 2) < 21) spot.x = this.world(1 - i, L - 18, 0)[0];
       const beats = [
-        { d: 0.65, start: () => {
+        // La víctima recibe el balón (pase de un compañero, o un mal pase del rival) y conduce; el infractor va
+        // a por ella. La falta no se pita hasta que los dos se encuentran de verdad: así siempre se ve quién es quién.
+        { d: 0.1, ball: true, start: () => {
           this.poss = 1 - i;
           if (this.ball.owner !== victim.pid) this._kick(victim.x, victim.y, { h: 0.05, to: victim.pid, sfx: false });
-          this.ov = { p: { [fouler]: { x: () => victim.x, y: () => victim.y, run: 1 }, [victim.pid]: { x: victim.x + this.dir[1 - i] * 4, y: victim.y, run: 0.6 } } };
+          this.ov = { p: { [fouler]: { x: () => victim.x, y: () => victim.y, run: 1 }, [victim.pid]: { x: victim.x + this.dir[1 - i] * 3, y: victim.y, run: 0.45 } } };
         } },
+        { d: 8, start: () => { if (this.ball.owner !== victim.pid && !this.ball.path) this._receive(victim.pid); },
+          tick: (dt, t) => {
+            const bt = this.beat, dd = Math.hypot(f.x - victim.x, f.y - victim.y);
+            // Si tarda, la víctima conduce hacia el infractor (busca el hueco por donde viene) y se encuentran antes
+            if (t > 1.6 && this.ov && this.ov.p) this.ov.p[victim.pid] = { x: () => lerp(victim.x, f.x, 0.5), y: () => lerp(victim.y, f.y, 0.5), run: 0.8 };
+            if (dd < 1.3 && t > 0.3) bt.t = bt.d;
+          } },
         { d: 0.1, start: () => {
+          spot.x = clamp(victim.x, 2, L - 2); spot.y = clamp(victim.y, 2, Wd - 2);
+          if (this.depth(1 - i, spot.x) > L - 17.5 && Math.abs(spot.y - Wd / 2) < 21) spot.x = this.world(1 - i, L - 18, 0)[0];
           this._foulT = this.t;
           if (!card) this._reveal(e);
           if (hard) { f.state = 'slide'; f.until = this.t + 0.7; }
