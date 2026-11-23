@@ -1103,7 +1103,7 @@
       if (ready || ag.T > ag.max) {
         this.ag = null;
         e.fromPlay = ready || this._agClose(ag);
-        if (!e.fromPlay) e.fromPlay = this._agCut(ag);
+        // Sin cortes que recoloquen a nadie: si la jugada no ha llegado, la escena parte de donde están todos
         if (e.fromPlay && ag.kind === 'foul') this._agFoulVictim(ag);
         return false;
       }
@@ -1118,7 +1118,7 @@
       const P = this.P;
       const team = kind === 'foul' ? 1 - e.team : e.team;    // quién tiene que tener el balón
       if (team == null || team < 0) return null;
-      const ag = { e, kind, team, T: 0, max: { shot: 6, corner: 5.5, foul: 4, box: 6, fk: 5, off: 4 }[kind] || 5, want: [] };
+      const ag = { e, kind, team, T: 0, max: { shot: 16, corner: 14, foul: 12, box: 16, fk: 14, off: 12 }[kind] || 14, want: [] };
       if (kind === 'shot') {
         ag.origin = e.origin || 'open';
         ag.spot = P._shotSpot(team, e.shotType || 'placed');
@@ -1128,7 +1128,6 @@
         ag.foulTeam = e.team;
         const f = P.A[e.pid];
         const named = e.pid2 != null && P.A[e.pid2] && e.text && e.text.indexOf(P.P(e.pid2).short) >= 0;
-        if (!named && f) { const v = P.nearest(P.team(team).filter(a => !P.isGK(a)), f); if (v) e.pid2 = v.pid; }
         if (e.pid2 != null && P.A[e.pid2]) ag.want = [e.pid2];
       }
       if (kind === 'box') ag.want = [e.pid].filter(x => x != null && P.A[x]);
