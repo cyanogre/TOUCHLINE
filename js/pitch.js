@@ -643,7 +643,8 @@
       o = o || {};
       const b = this.ball;
       // Un balón parado no sale disparado solo: antes llega alguien a golpearlo
-      if (!o.free && !b.path && !this._atBall()) {
+      const byA = o.by != null ? this.A[o.by] : null;
+      if (!o.free && !b.path && !this._atBall() && !(byA && Math.hypot(byA.x - b.x, byA.y - b.y) < 3)) {
         const team = o.team != null ? o.team : this.poss;
         const cand = this.team(team);
         const k = (o.by != null && this.A[o.by]) || this.nearest(cand.length ? cand : Object.values(this.A), b);
@@ -817,7 +818,7 @@
         b.owner = P.to != null && this.A[P.to] ? P.to : null;
         this.place = null;
       };
-      if (this.instant || this.t - P.t0 > 12) { done(); return; }   // saltos de tiempo, o seguro para no atascarse
+      if (this.instant) { done(); return; }   // saltos de tiempo, o seguro para no atascarse
       if (P.phase === 'land') {
         if (b.path) return;
         P.phase = 'fetch';
@@ -916,7 +917,6 @@
 
     _placeKickoff(i, teleport) {
       const b = this.ball;
-      b.x = L / 2; b.y = Wd / 2; b.z = 0; b.path = null; b.roll = null; b.owner = null;
       this.poss = i;
       const p = {};
       const taker = this._kickTaker(i);
@@ -927,6 +927,8 @@
         p[id] = { x, y, run: 0.55 };
         if (teleport) { a.x = x; a.y = y; }
       }
+      if (teleport) { b.x = L / 2; b.y = Wd / 2; b.z = 0; b.path = null; b.roll = null; b.owner = null; }
+      else this._placeBall(L / 2, Wd / 2, 2, taker, i);
       return { p, taker };
     }
 
@@ -943,12 +945,9 @@
     _cut(k, cap) {
       this._targets();
       this._officials();
-      const mv = a => { a.x = lerp(a.x, a.tx, k); a.y = lerp(a.y, a.ty, k); a.vx = a.vy = 0; };
-      for (const id in this.A) mv(this.A[id]);
-      mv(this.ref); this.ars.forEach(mv);
-      this._recCut = true; this.ball.trail = []; this._bpL = null; this._bl = null;
-      // En vez del destello: cortinilla de tele y un rótulo que explica a qué jugada vamos
-      if (this.instant) this.cutAt = this.t; else { this.cutAt = null; this.wipe(cap); }
+      // Nadie se teletransporta: todos van a su sitio por su pie y la escena espera a que lleguen
+      if (this.beat) this.beat.arrive = true;
+      if (cap && !this.instant) this.lowerCap = { t: cap, at: performance.now() };
     }
     clubName(i) { const c = this.S.clubs[this.m.teams[i].club]; return c ? c.name : ''; }
     pName(pid) { const p = pid != null && this.S.players[pid]; return p ? p.short : ''; }
@@ -988,26 +987,32 @@
       if (bt.waitHold && this.hold) return true;
       // Vigilante: ninguna escena puede quedarse esperando para siempre (un jugador que no llega al balón,
       // un balón que no acaba su vuelo…). Pasado su tiempo con margen, se da por hecha y el partido sigue.
-      bt.wd = (bt.wd || 0) + dt;
-      if (bt.wd > (bt.d || 0) + 9) {
+      bt.wd = (bt.wd || 0) + dt; this._wdF = this.fetch; this._wdP = this.place; this._wdB = this.ball.path;
+      if (bt.wd > (bt.d || 0) + (this.place || this.fetch ? 18 : 9)) {
         this.fetch = null;
-        if (this.place) { const P = this.place, b = this.ball; b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; b.owner = P.to != null && this.A[P.to] ? P.to : null; this.place = null; }
-        if (this.ball.path) { const b = this.ball, pa = b.path; b.path = null; b.x = pa.tx; b.y = pa.ty; b.z = 0; if (pa.done) try { pa.done(); } catch (e) { /* nada */ } }
+        this.place = null;   // sin recolocar nada: el balón sigue donde está y el juego continúa desde ahí
         bt.t = Math.max(bt.t, bt.d || 0);
-        TL.WD = (TL.WD || 0) + 1;
+        TL.WD = (TL.WD || 0) + 1; (TL.WDlog || (TL.WDlog = [])).push({ d: bt.d, fetch: !!this._wdF, place: !!this._wdP, path: !!this._wdB, sc: this.script.length, q: this.queue.map(x => x.type).join(','), src: (bt.start ? bt.start.toString().slice(0, 90) : '') });
       }
       if (this.fetch) return true; // esperamos a que el jugador llegue al balón
       if (this.place) return true; // y a que el balón esté en su sitio para el balón parado
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
-      const waitBall = bt.ball && this.ball.path;
-      if (!waitBall && bt.t >= (bt.d || 0)) {
+      const waitBall = bt.ball && this.ball.path && !(bt.wd > (bt.d || 0) + 9);
+      const waitArr = bt.arrive && bt.wd < (bt.d || 0) + 5 && !this._arrived();
+      if (!waitBall && !waitArr && bt.t >= (bt.d || 0)) {
         if (bt.end) bt.end();
         if (bt.slow) this.slowT = 1;
         this.beat = null;
         if (!this.script.length) this._afterScript();
       }
       return true;
+    }
+    /** ¿Han llegado (casi) todos a donde tienen que ir? */
+    _arrived() {
+      let n = 0, ok = 0;
+      for (const id in this.A) { const a = this.A[id]; if (a.tx == null) continue; n++; if (Math.hypot(a.x - a.tx, a.y - a.ty) < 2.5) ok++; }
+      return !n || ok / n > 0.85;
     }
     /** Acaba una escena: lo que quedara por contar se cuenta y el juego sigue desde donde quedó. */
     _afterScript() {
@@ -1375,7 +1380,7 @@
       beats.push({ d: 0.05, ball: true, slow: epic ? 0.45 : 1, start: () => {
         if (sp) { this.superFx = { id: sp.id, fx: sp.fx, c: sp.c, c2: sp.c2, until: this.t + 3, t0: this.t, x0: this.ball.x, y0: this.ball.y }; this.shock = { x: this.ball.x, y: this.ball.y, t: this.t, c: sp.c }; }
         const b = this.ball;
-        if (air) { b.z = type === 'header' ? 1.9 : 0.8; const a = this.A[shooter]; if (a) { a.jump = this.t; a.x = lerp(a.x, b.x, 0.85); a.y = lerp(a.y, b.y, 0.85); } }
+        if (air) { b.z = type === 'header' ? 1.9 : 0.8; const a = this.A[shooter]; if (a) { a.jump = this.t; } }
         else if (this.A[shooter]) this._receive(shooter);
         b.owner = null;
         const fz = b.z;
@@ -1718,7 +1723,7 @@
       if (!shot) for (let v; (v = this._take(x => x.type === 'var' && x.team === i));) { if (cancel) this._reveal(cancel); cancel = v; }
       // Si el balón está lejos del área (p. ej. en el otro campo), primero se corta (cortinilla) a la jugada
       // en el área rival: un penalti siempre nace de una acción cerca de la portería, no a 60 m del balón
-      if (victim != null && !this.instant && this.depth(i, this.ball.x) < 72) { this._cap = `Llega el ${this.clubName(i)} al área`; this._cutTo(i, 84, Wd / 2 + U.rand(-10, 10), victim); }
+      if (false) { this._cap = `Llega el ${this.clubName(i)} al área`; this._cutTo(i, 84, Wd / 2 + U.rand(-10, 10), victim); }
       const carrying = victim != null && this.ball.owner === victim && !this.ball.path;
       if (carrying) {
         const v = this.A[victim];
@@ -1838,7 +1843,7 @@
             const bt = this.beat, dd = Math.hypot(f.x - victim.x, f.y - victim.y);
             // Si tarda, la víctima conduce hacia el infractor (busca el hueco por donde viene) y se encuentran antes
             if (t > 1.6 && this.ov && this.ov.p) this.ov.p[victim.pid] = { x: () => lerp(victim.x, f.x, 0.5), y: () => lerp(victim.y, f.y, 0.5), run: 0.8 };
-            if (dd < 1.3 && t > 0.3) bt.t = bt.d;
+            if (dd < 1 && t > 0.3) bt.t = bt.d;
           } },
         { d: 0.1, start: () => {
           spot.x = clamp(victim.x, 2, L - 2); spot.y = clamp(victim.y, 2, Wd - 2);
@@ -1962,11 +1967,17 @@
           const carrier = own && own.team === i && own !== runner ? own : this.nearest(this.team(i).filter(a => a !== runner && !this.isGK(a)), { x: tx - dir * 22, y: ty });
           if (carrier && this.ball.owner !== carrier.pid) this._receive(carrier.pid);
         } },
-        { d: 0.5, ball: true, start: () => {
-          // Al salir el pase tiene que estar adelantado de verdad (la repetición lo va a enseñar con líneas)
+        // El pase sale cuando el delantero ya está adelantado de verdad (la repetición lo enseña con líneas):
+        // se espera a que llegue corriendo, nadie se recoloca
+        { d: 4.5, ball: true, tick: (dt, t) => {
+          const bt = this.beat;
+          if (bt.kicked) return;
+          const own = this.ball.owner != null ? this.A[this.ball.owner] : null;
+          if (!own || own.team !== i || this.ball.path) { if (t < 4) return; }
           const ln = this.team(1 - i).map(a => this.depth(i, a.x)).sort((a, b) => b - a)[1];
-          if (ln != null && this.depth(i, runner.x) < ln + 0.3) runner.x = this.world(i, Math.min(ln + U.rand(0.4, 1.6), L - 1), 0)[0];
-          this._offT = this.t; this._kick(tx, ty, { h: 0.1, to: e.pid });
+          if (ln != null && this.depth(i, runner.x) < ln + 0.4 && t < 4) return;
+          bt.kicked = true; this._offT = this.t; this._kick(tx, ty, { h: 0.1, to: e.pid });
+          bt.t = bt.d;
         } },
         { d: 1.3, start: () => {
           ar.flag = this.t + 1.6;
@@ -2035,8 +2046,9 @@
       this.slow += (this.slowT - this.slow) * Math.min(1, real * 6);
       const dt = real * this.rate();
       this.t += dt;
-      this._update(dt, real);
-      this._record(dt);
+      // Durante la repetición el partido en directo se congela: al volver, todos siguen exactamente donde estaban
+      if (this.replay) this._runScript(dt);
+      else { this._update(dt, real); this._record(dt); }
       if (this.replay) this._drawReplay(dt, real);
       else this._draw(real);
       this._weather(real);
@@ -2052,7 +2064,7 @@
         const e = this.queue[0];
         // El cerebro puede retrasar un suceso para llevar la jugada hasta él, pero como mucho unos segundos
         if (this._lead !== e) { this._lead = e; this._leadT = this.t; }
-        if (!this.brain.leading(e) || this.t - this._leadT > 8) { this.queue.shift(); this._handle(e); }
+        if (!this.brain.leading(e) || this.t - this._leadT > 20) { this.queue.shift(); this._handle(e); }
       }
       if (!this.beat && !this.script.length && !this.queue.length && this.handled.length) this._revealAll();
       this._runScript(dt);
@@ -3067,7 +3079,7 @@
         if (frames.length < 10) return;
         this.wipe();
         setTimeout(() => { this.replay = { frames, t: frames[0].t, slow: SLOW, end: frames[frames.length - 1].t, mark, freeze: FRZ, an: o.an || null }; }, 140);
-      }, end: () => { if (this.replay) { this.wipe(); setTimeout(() => { this.replay = null; this._snapAll(); }, 140); } } };
+      }, end: () => { if (this.replay) { this.wipe(); setTimeout(() => { this.replay = null; }, 140); } } };
     }
     /** Análisis encima de la repetición (con los jugadores ya colocados en el fotograma). */
     _replayAnalysis(R, frozen) {
