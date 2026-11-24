@@ -642,9 +642,10 @@
       // Modo fantasía: a veces el rematador saca su supertiro (más acierto y una escena a lo grande)
       const sp0 = TL.Special && TL.Special.of(this.S, shooter), sp = sp0 && Math.random() < U.clamp(0.05 + (shooter.st[1] - 74) * 0.006, 0.04, 0.12) ? sp0 : null;
       if (sp) pGoal = Math.min(0.62, pGoal * 1.6);
-      const goal = Math.random() < pGoal;
+      const u = Math.random(), goal = u < pGoal;
       const shotType = this._shotType(origin, goal, line);
       const sx = { origin, shotType };
+      const re = { u, u2: Math.random(), u3: Math.random(), sp: !!sp, talk: Math.random() < 0.4 };
       if (sp) sx.special = sp.id;
       if (goal) {
         let assister = null;
@@ -676,6 +677,7 @@
           return;
         }
         this._scoreGoal(i, shooter, assister, 'open', sx);
+        this.events[this.events.length - 1].re = re;
       } else {
         const onTarget = Math.random() < 0.42;
         if (onTarget) {
@@ -687,15 +689,68 @@
           const talk = Math.random() < 0.4;
           if (onTarget && gk) {
             const k = shotType === 'header' ? 's_header' : shotType === 'long' ? 's_long' : origin === 'counter' ? 's_1v1' : 'save';
-            this._ev('save', i, shooter.id, gk.id, talk || origin === 'counter' ? say(k, { p: shooter.short, k: gk.short }) : '', Object.assign({ big: origin === 'counter' || shotType === 'tapin' }, sx));
+            this._ev('save', i, shooter.id, gk.id, talk || origin === 'counter' ? say(k, { p: shooter.short, k: gk.short }) : '', Object.assign({ big: origin === 'counter' || shotType === 'tapin', re }, sx));
           } else {
             const r2 = Math.random();
             const miss = r2 < 0.1 ? 'post' : r2 < 0.28 && shotType !== 'header' ? 'blocked' : shotType === 'header' ? 'header' : shotType === 'long' ? 'long' : 'wide';
             const k = miss === 'post' ? 'm_post' : miss === 'blocked' ? 'm_blocked' : miss === 'header' ? 'm_header' : miss === 'long' ? 'm_long' : 'miss';
-            this._ev('miss', i, shooter.id, null, talk || miss === 'post' ? say(k, { p: shooter.short }) : '', Object.assign({ miss }, sx));
+            this._ev('miss', i, shooter.id, null, talk || miss === 'post' ? say(k, { p: shooter.short }) : '', Object.assign({ miss, re }, sx));
           }
         }
       }
+    }
+
+    /**
+     * Motor bidireccional: el campo 2D ha jugado la ocasión con naturalidad y dice quién remata de verdad, quién
+     * dio el pase y en qué situación (distancia, rivales encima). El motor vuelve a resolver la ocasión con esos
+     * datos y la misma tirada de dados (así la estadística global no cambia) y corrige el suceso antes de contarlo.
+     * ctx: { d: metros a la portería, press: rivales a menos de 3 m, angle: 0-1 (1 = de frente) }
+     */
+    recast(e, sPid, aPid, ctx) {
+      if (!e || !e.re || e._recast || !['goal', 'save', 'miss'].includes(e.type)) return false;
+      const i = e.team, t = this.teams[i];
+      const shooter = this.P(sPid);
+      if (!shooter || !t.onPitch.some(o => o.pid === sPid) || !this.pl[sPid]) return false;
+      const ass = aPid != null && aPid !== sPid && t.onPitch.some(o => o.pid === aPid) ? this.P(aPid) : null;
+      e._recast = true;
+      // Deshacer lo que el motor había apuntado
+      if (e.type === 'goal') { this.score[i]--; this.stats.onT[i]--; this.pl[e.pid].g--; if (e.pid2 != null && this.pl[e.pid2]) this.pl[e.pid2].a--; }
+      if (e.type === 'save') { this.stats.onT[i]--; if (e.pid2 != null && this.pl[e.pid2]) this.pl[e.pid2].sv--; }
+      // Probabilidad con quien remata de verdad y la situación real
+      const gk = this._gk(1 - i), gkv = gk ? eff(gk, 'GK') : 30;
+      const tfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
+      const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
+      let p = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
+      if (e.re.sp) p = Math.min(0.62, p * 1.6);
+      const c = ctx || {};
+      const q = U.clamp((c.d != null ? 1.45 - c.d / 30 : 1) * (1 - Math.min(2, c.press || 0) * 0.12) * (c.angle != null ? 0.8 + c.angle * 0.3 : 1), 0.6, 1.4);
+      p = U.clamp(p * q, 0.02, 0.7);
+      const goal = e.re.u < p;
+      e.pid = shooter.id; e.pid2 = null;
+      if (e.special) { const s2 = TL.Special && TL.Special.of(this.S, shooter); if (s2) e.special = s2.id; else delete e.special; }
+      const sx = e;
+      if (goal) {
+        e.type = 'goal'; e.kind = 'open';
+        this.score[i]++; this.stats.onT[i]++; this.pl[shooter.id].g++;
+        if (ass) { this.pl[ass.id].a++; e.pid2 = ass.id; }
+        if (this.detail) {
+          const k = TXT['g_' + sx.shotType] ? 'g_' + sx.shotType : 'goal';
+          e.text = say(k, { p: shooter.short });
+          if (ass) e.text += ' ' + say(sx.origin === 'cross' || sx.origin === 'corner' || sx.shotType === 'header' ? 'assistX' : 'assist', { a: ass.short });
+        }
+        e.late = this.min >= 88;
+      } else if (e.re.u2 < 0.42 && gk) {
+        e.type = 'save'; e.pid2 = gk.id; this.stats.onT[i]++; this.pl[gk.id].sv++;
+        const k = sx.shotType === 'header' ? 's_header' : sx.shotType === 'long' ? 's_long' : sx.origin === 'counter' ? 's_1v1' : 'save';
+        e.text = this.detail && (e.re.talk || sx.origin === 'counter') ? say(k, { p: shooter.short, k: gk.short }) : '';
+      } else {
+        e.type = 'miss';
+        const r2 = e.re.u3, miss = r2 < 0.1 ? 'post' : r2 < 0.28 && sx.shotType !== 'header' ? 'blocked' : sx.shotType === 'header' ? 'header' : sx.shotType === 'long' ? 'long' : 'wide';
+        e.miss = miss;
+        const k = miss === 'post' ? 'm_post' : miss === 'blocked' ? 'm_blocked' : miss === 'header' ? 'm_header' : miss === 'long' ? 'm_long' : 'miss';
+        e.text = this.detail && (e.re.talk || miss === 'post') ? say(k, { p: shooter.short }) : '';
+      }
+      return true;
     }
 
     /** Falta cometida por el equipo i. */

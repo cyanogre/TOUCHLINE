@@ -1122,7 +1122,7 @@
       if (kind === 'shot') {
         ag.origin = e.origin || 'open';
         ag.spot = P._shotSpot(team, e.shotType || 'placed');
-        ag.want = [e.pid2, e.pid].filter(x => x != null && P.A[x]);
+        ag.want = [];   // nadie en concreto: remata quien esté en situación (el motor se adapta)
       }
       if (kind === 'foul') {
         ag.foulTeam = e.team;

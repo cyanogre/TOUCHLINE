@@ -652,6 +652,7 @@
       }
       const kicker = b.owner != null ? this.A[b.owner] : this._atBall(2);
       if (kicker) { this.brain.kickTeam = kicker.team; this.brain.lastTouch = kicker.team; }
+      if (kicker) this._lastKick = { pid: kicker.pid, team: kicker.team, t: this.t };
       const dist = Math.hypot(tx - b.x, ty - b.y);
       const T = o.T || (o.h > 1.5 ? 0.6 + dist / 26 : 0.12 + dist / 17);
       const nx = -(ty - b.y) / Math.max(0.1, dist), ny = (tx - b.x) / Math.max(0.1, dist);
@@ -1291,6 +1292,7 @@
     }
 
     _shotSeq(e, origin) {
+      this._natural(e, origin);
       if (e.fromPlay && origin !== 'corner') { const bs = this._shotFromPlay(e, origin); if (bs) { this._seq(bs); return; } }
       const i = e.team, dir = this.dir[i];
       const shooter = this.A[e.pid] ? e.pid : (this.team(i).find(a => F.LINE[this.slotOf(a)] === 3) || {}).pid;
@@ -1352,6 +1354,46 @@
       }
       beats.push(...this._finish(e, shooter, type, outcome, epic));
       this._seq(beats);
+    }
+
+    /**
+     * Motor bidireccional: antes de escenificar una ocasión, se mira el campo. Remata quien de verdad está en
+     * situación (quien lleva el balón cerca del área, o la compañera mejor colocada) y el motor resuelve la ocasión
+     * con esa jugadora y esa situación. Así nadie tiene que ir a buscar el balón a la otra punta.
+     */
+    _natural(e, origin) {
+      if (!this.m || !this.m.recast || !e.re || e._recast || this.instant) return;
+      const i = e.team, b = this.ball, gx = this.goalX(i);
+      const car = b.owner != null ? this.A[b.owner] : null;
+      const field = this.team(i).filter(a => !this.isGK(a) && a.state !== 'down');
+      if (!field.length) return;
+      let shooter = null, ass = null;
+      const dG = a => Math.hypot(a.x - gx, a.y - Wd / 2);
+      if (origin === 'corner' || origin === 'cross') {
+        // Al remate va quien está en el área
+        const [sx, sy] = this._shotSpot(i, e.shotType || 'header');
+        shooter = field.filter(a => !car || a !== car).sort((p, q) => Math.hypot(p.x - sx, p.y - sy) - Math.hypot(q.x - sx, q.y - sy))[0];
+        ass = car && car.team === i && car !== shooter ? car : null;
+      } else if (car && car.team === i && !this.isGK(car) && dG(car) < 30) {
+        shooter = car;
+        const lk = this._lastKick;
+        ass = lk && lk.team === i && lk.pid !== car.pid && this.t - lk.t < 6 && this.A[lk.pid] ? this.A[lk.pid] : null;
+      } else {
+        // La más adelantada y mejor situada; el pase se lo da quien lleva el balón
+        shooter = field.filter(a => a !== car).sort((p, q) => dG(p) - dG(q))[0] || car;
+        ass = car && car.team === i && car !== shooter ? car : null;
+      }
+      if (!shooter) return;
+      // La situación del remate: si ya está rematando (con el balón cerca del área), la suya; si no, la del punto
+      // al que va a llegar la jugada
+      const now = shooter === car && dG(car) < 30;
+      const [px, py] = now ? [shooter.x, shooter.y] : this._shotSpot(i, e.shotType || 'placed');
+      let press = 0;
+      for (const a of this.team(1 - i)) if (!this.isGK(a) && Math.hypot(a.x - px, a.y - py) < 3) press++;
+      const d = Math.hypot(px - gx, py - Wd / 2), angle = clamp(1 - Math.abs(py - Wd / 2) / Math.max(1, d), 0, 1);
+      // Con el balón en los pies no se remata de cabeza
+      if (shooter === car && ['header', 'volley', 'tapin'].includes(e.shotType)) e.shotType = d > 22 ? 'long' : 'placed';
+      this.m.recast(e, shooter.pid, ass ? ass.pid : null, { d, press, angle });
     }
 
     /** El remate y lo que pasa después (gol, parada, fuera, palo, bloqueo). */
