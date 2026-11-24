@@ -14,7 +14,7 @@
   const EV_ICON = {
     goal: '⚽', tired: '🔋', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
     foul: '⚠️', pen: '🎯', penmiss: '❌', fk: '🎯', var: '📺', disallowed: '🚫', refmiss: '😡', controversy: '⚖️',
-    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥'
+    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥', added: '⏱️', ifk: '🧤', retake: '🔁', fair: '🤝'
   };
   const PAUSE_LABEL = { goal: 'Goles', red: 'Expulsiones', inj: 'Lesiones (tuyas)', pen: 'Penaltis', var: 'VAR y polémicas', crowd: 'Incidentes en la grada', ht: 'Descanso (charla)' };
 
@@ -101,7 +101,7 @@
     const hot = e.controversy || ['red', 'refmiss', 'heated', 'crowd', 'disallowed'].includes(e.type);
     d.className = `ev ${e.type === 'goal' ? 'goal' : ''} ${hot ? 'hot' : ''} ${big ? 'big' : ''} side-${e.team === MV.me ? 0 : 1}`;
     const club = e.team >= 0 ? G.S.clubs[MV.m.teams[e.team].club] : null;
-    d.innerHTML = `<span class="m">${e.min ? e.min + "'" : ''}</span><span class="i">${EV_ICON[e.type] || '•'}</span>
+    d.innerHTML = `<span class="m">${e.min ? mm(e) + "'" : ''}</span><span class="i">${evIcon(e)}</span>
       <span class="x grow">${club ? `<b>${esc(club.code)}</b> · ` : ''}${e.text}</span>`;
     feed.prepend(d);
     trimFeed(feed);
@@ -156,7 +156,7 @@
     const club = G.S.clubs[MV.m.teams[q.team].club];
     d.className = `ev play side-${q.team === MV.me ? 0 : 1}`;
     d.dataset.play = q.id;
-    d.innerHTML = `<span class="m">${q.min ? q.min + "'" : ''}</span><span class="i">📻</span><span class="x grow"><b>${esc(club.code || '')}</b> · <span class="pt"></span></span>`;
+    d.innerHTML = `<span class="m">${q.min ? mm(q) + "'" : ''}</span><span class="i">📻</span><span class="x grow"><b>${esc(club.code || '')}</b> · <span class="pt"></span></span>`;
     d.querySelector('.pt').textContent = q.text;
     return d;
   }
@@ -199,7 +199,7 @@
     if (!t || !e.text) return;
     const club = e.team >= 0 ? G.S.clubs[MV.m.teams[e.team].club] : null;
     t.innerHTML = e.text;
-    k.textContent = `${e.min ? e.min + "' · " : ''}${EV_ICON[e.type] || '📻'} ${club ? club.name : 'En directo'}`;
+    k.textContent = `${e.min ? mm(e) + "' · " : ''}${EV_ICON[e.type] || '📻'} ${club ? club.name : 'En directo'}`;
     if (MV.live || el('mv-live')) { MV.live = MV.live || { t: 0, prio: 0 }; showLive(t.textContent, e.team, 3); }
     const box = el('mv-call');
     box.className = `narr-call ${e.type === 'goal' ? 'goal' : ''} side-${e.team === MV.me ? 0 : e.team < 0 ? 'n' : 1}`;
@@ -231,7 +231,7 @@
     const t = el('mv-call-t'), k = el('mv-call-k'), box = el('mv-call');
     if (!t) return;
     const club = e ? G.S.clubs[MV.m.teams[e.team].club] : null;
-    k.textContent = `${MV.m.min}' · ⚡ ${club ? club.name : ''}`;
+    k.textContent = `${mm({ min: MV.m.min, add: MV.m.extra })}' · ⚡ ${club ? club.name : ''}`;
     t.textContent = U.pick(club ? [`¡Atención, que llega ${club.name}!`, `¡Cuidado con ${club.name}…!`, `¡Se mete en el área ${club.name}!`] : ['¡Atención!']);
     box.className = `narr-call tense side-${e && e.team === MV.me ? 0 : 1} in`;
   }
@@ -255,11 +255,21 @@
     if (on) requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
 
+  /** Icono del suceso: los del reglamento (tipo de falta, propia puerta, descuento…) tienen el suyo. */
+  function evIcon(e) {
+    const FI = TL.FoulIcons;
+    const k = e.og ? 'og' : e.type === 'dedic' ? e.kind : e.type === 'added' ? 'added' : e.type === 'retake' ? 'retake' : e.type === 'fair' ? 'fair' : e.type === 'ifk' ? e.kind : (e.type === 'foul' && e.adv) ? 'adv' : e.type === 'foul' ? e.kind : null;
+    if (FI && k && FI.F[k]) return FI.svg(k, 18);
+    return EV_ICON[e.type] || '•';
+  }
+  /** Minuto con descuento: 45+2, 90+4. */
+  const mm = e => (e.add ? `${e.min}+${e.add}` : `${e.min}`);
   function updateHead() {
     const m = MV.m;
     el('mv-score').textContent = `${MV.shown[0]}-${MV.shown[1]}`;
-    el('mv-min').textContent = m.done ? 'Final' : (m.min ? m.min + "'" : "0'");
+    el('mv-min').textContent = m.done ? 'Final' : (m.min ? mm({ min: m.min, add: m.extra }) + "'" : "0'");
     el('mv-prog').style.width = Math.min(100, m.min / 90 * 100) + '%';
+    el('mv-min').classList.toggle('added', !!m.extra);
   }
 
   /** La grada canta: más cuando su equipo gana o tras un gol; la afición visitante, menos y desde un lado. */
@@ -323,7 +333,7 @@
   /** Descanso, final, saltos y pausas automáticas después de cada minuto. */
   function finishStep(evs) {
     const m = MV.m;
-    if (m.min === 45 && !MV.htDone) {
+    if (m.htDone && !MV.htDone) {
       MV.htDone = true;
       const sk = MV.skip;
       MV.skip = null;
@@ -527,8 +537,8 @@
     const goals = m.events.filter(e => e.type === 'goal');
     if (!goals.length) return '';
     return `<div class="card mt">${goals.map(e =>
-      `<div class="sc-row"><span class="num faint">${e.min}'</span><span>${e.kind === 'pen' ? '🎯' : '⚽'}</span>
-       <b>${esc(S.players[e.pid].short)}</b><span class="note">${esc(S.clubs[m.teams[e.team].club].code)}${e.kind === 'pen' ? ' · penalti' : e.kind === 'fk' ? ' · falta directa' : ''}${e.pid2 != null ? ' · asist. ' + esc(S.players[e.pid2].short) : ''}</span></div>`).join('')}</div>`;
+      `<div class="sc-row"><span class="num faint">${mm(e)}'</span><span>${e.kind === 'pen' ? '🎯' : e.og ? '↩️' : '⚽'}</span>
+       <b>${esc(S.players[e.pid].short)}</b>${e.og ? ' <span class="note">(p.p.)</span>' : ''}<span class="note">${esc(S.clubs[m.teams[e.team].club].code)}${e.kind === 'pen' ? ' · penalti' : e.kind === 'fk' ? ' · falta directa' : ''}${e.pid2 != null ? ' · asist. ' + esc(S.players[e.pid2].short) : ''}</span></div>`).join('')}</div>`;
   }
 
   A['mv-tab'] = b => {
@@ -685,7 +695,7 @@
       while (!m.done) {
         const evs = m.step();
         stepEvents(evs, true);
-        if (m.min === 45 && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
+        if (m.htDone && !MV.htDone) { MV.htDone = true; m.teamTalk(MV.me, 'calm'); }
       }
       MV.htDone = true;
       onFinal();

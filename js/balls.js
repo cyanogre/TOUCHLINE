@@ -95,7 +95,7 @@
       const o = st(); const c = o.c || (o.c = { pj: 0, w: 0, gf: 0, ga: 0, cs: 0, racha: 0, inv: 0 });
       const gf = m.score[me], ga = m.score[1 - me], win = gf > ga;
       const goals = (m.events || []).filter(e => e.type === 'goal');
-      const mine = goals.filter(e => e.team === me);
+      const mine = goals.filter(e => e.team === me && !e.og);
       const per = {}; mine.forEach(e => { per[e.pid] = (per[e.pid] || 0) + 1; });
       // Marcador a lo largo del partido: ¿ibas perdiendo?, ¿gol de la victoria tardío?
       let a = 0, b = 0, behind = false, behind2 = false, late = false;
