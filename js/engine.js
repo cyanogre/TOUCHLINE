@@ -865,6 +865,17 @@
       }
     }
 
+    /** Falta sin tarjeta escenificada: la comete el rival que de verdad estaba encima de la víctima (bidireccional). */
+    recastFoul(e, pid) {
+      if (!e || e.type !== 'foul' || e.pid === pid || !this.pl[pid] || !this.teams[e.team].onPitch.some(o => o.pid === pid)) return false;
+      if (this.pl[e.pid]) this.pl[e.pid].f--;
+      this.pl[pid].f++;
+      const old = this.P(e.pid), now = this.P(pid);
+      if (e.text && old && now) e.text = e.text.split(old.short).join(now.short);
+      e.pid = pid;
+      return true;
+    }
+
     /** Autogol escenificado: lo mete el defensa que de verdad estaba en la trayectoria (bidireccional). */
     recastOG(e, defPid) {
       if (!e || !e.og || e.pid === defPid) return false;

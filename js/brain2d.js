@@ -1127,7 +1127,7 @@
       const P = this.P;
       const team = kind === 'foul' ? 1 - e.team : e.team;    // quién tiene que tener el balón
       if (team == null || team < 0) return null;
-      const ag = { e, kind, team, T: 0, max: { shot: 16, corner: 14, foul: 12, box: 16, fk: 14, off: 12 }[kind] || 14, want: [] };
+      const ag = { e, kind, team, T: 0, max: { shot: 4, corner: 3.5, foul: 3, box: 4, fk: 3.5, off: 3 }[kind] || 3.5, want: [] };
       if (kind === 'shot') {
         ag.origin = e.origin || 'open';
         ag.spot = P._shotSpot(team, e.shotType || 'placed');

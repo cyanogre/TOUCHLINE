@@ -407,7 +407,12 @@
       for (const a of list) { if (skip && skip(a)) continue; const d = d2(a, pt); if (d < bd) { bd = d; best = a; } }
       return best;
     }
-    rate() { return Math.pow(this.speed, 0.62) * this.slow; }
+    rate() {
+      // Con el balón parado (alguien va a por él, se colocan para un saque) el tiempo pasa más deprisa, como
+      // cuando la tele acelera los tiempos muertos: todo se sigue viendo, sin saltos, pero sin esperas eternas
+      const dead = (this.place || this.fetch || (this.beat && this.beat.arrive)) && !this.replay && this.slowT >= 1;
+      return Math.pow(this.speed, 0.62) * this.slow * (dead ? 2.4 : 1);
+    }
 
     _spawn(i, pid, x, y) {
       const p = this.P(pid);
@@ -815,6 +820,11 @@
     _placeStep() {
       const P = this.place, b = this.ball;
       const done = () => {
+        // Si quien tenía que sacar está lejos, saca quien ha llevado el balón (saque rápido, como en la realidad)
+        if (P.to != null && P.rid != null && P.rid !== P.to && this.A[P.rid] && (!this.A[P.to] || Math.hypot(this.A[P.to].x - P.x, this.A[P.to].y - P.y) > 6)) {
+          if (this.cornerTaker === P.to) this.cornerTaker = P.rid;
+          P.to = P.rid;
+        }
         b.path = null; b.roll = null; b.x = P.x; b.y = P.y; b.z = 0; b.trail = []; this._recCut = true;
         b.owner = P.to != null && this.A[P.to] ? P.to : null;
         this.place = null;
@@ -832,11 +842,12 @@
           const tk = P.to != null ? this.A[P.to] : null;
           const cands = this.team(P.team).filter(a => !this.isGK(a) || a.pid === P.to);
           const near = cands.sort((p, q) => d2(p, b) - d2(q, b))[0];
-          P.rid = tk && Math.sqrt(d2(tk, b)) < 15 ? tk.pid : near ? near.pid : null;
+          P.rid = tk && Math.sqrt(d2(tk, b)) < Math.max(8, near ? Math.sqrt(d2(near, b)) + 4 : 8) ? tk.pid : near ? near.pid : null;
           if (P.rid == null) { done(); return; }
         }
         const r = this.A[P.rid];
         r.tx = b.x; r.ty = b.y; r.run = 1;
+        if (Math.hypot(P.x - b.x, P.y - b.y) < 1.5 && !b.path && Math.hypot(r.x - b.x, r.y - b.y) < 1.6) { P.rid = r.pid; done(); return; }
         if (Math.hypot(r.x - b.x, r.y - b.y) < 1.1) {
           b.owner = r.pid; b.z = 0;
           const far = Math.hypot(P.x - b.x, P.y - b.y) > 14;
@@ -863,7 +874,7 @@
         const r = this.A[P.rid];
         if (!r) { done(); return; }
         b.owner = r.pid;
-        r.tx = P.x - this.dir[r.team] * 0.4; r.ty = P.y; r.run = 0.8;
+        r.tx = P.x - this.dir[r.team] * 0.4; r.ty = P.y; r.run = 1;
         if (Math.hypot(r.x - P.x, r.y - P.y) < 1.2) {
           // la deja en el punto; si no es ella quien saca, se aparta
           if (P.to != null && P.to !== r.pid && this.A[P.to]) { r.tx = r.x - this.dir[r.team] * 4; }
@@ -925,7 +936,7 @@
         const a = this.A[id];
         let [x, y] = this._home(a, true);
         if (+id === taker) { x = L / 2 - this.dir[i] * 0.6; y = Wd / 2; }
-        p[id] = { x, y, run: 0.55 };
+        p[id] = { x, y, run: 0.8 };
         if (teleport) { a.x = x; a.y = y; }
       }
       if (teleport) { b.x = L / 2; b.y = Wd / 2; b.z = 0; b.path = null; b.roll = null; b.owner = null; }
@@ -1001,7 +1012,7 @@
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
       const waitBall = bt.ball && this.ball.path && !(bt.wd > (bt.d || 0) + 9);
-      const waitArr = bt.arrive && (bt.wd || 0) < (bt.d || 0) + 5 && !this._arrived();
+      const waitArr = bt.arrive && (bt.wd || 0) < (bt.d || 0) + 2 && !this._arrived();
       if (!waitBall && !waitArr && bt.t >= (bt.d || 0)) {
         if (bt.end) bt.end();
         if (bt.slow) this.slowT = 1;
@@ -1014,7 +1025,7 @@
     _arrived() {
       let n = 0, ok = 0;
       for (const id in this.A) { const a = this.A[id]; if (a.tx == null) continue; n++; if (Math.hypot(a.x - a.tx, a.y - a.ty) < 2.5) ok++; }
-      return !n || ok / n > 0.85;
+      return !n || ok / n > 0.75;
     }
     /** Acaba una escena: lo que quedara por contar se cuenta y el juego sigue desde donde quedó. */
     _afterScript() {
@@ -1912,6 +1923,14 @@
     // ------------------------------------------------------------ Faltas, tarjetas, tanganas
     _tackleSeq(e, card) {
       const i = e.team; // equipo que comete la falta
+      // Bidireccional: si quien la comete según el motor está lejos de la víctima, la hace quien de verdad está encima
+      if (!card && e.pid2 != null && this.A[e.pid2] && this.m && this.m.recastFoul) {
+        const v0 = this.A[e.pid2], f0 = this.A[e.pid];
+        if (!f0 || Math.hypot(f0.x - v0.x, f0.y - v0.y) > 10) {
+          const near = this.nearest(this.team(i).filter(a => !this.isGK(a) && a.state !== 'down'), v0);
+          if (near && Math.hypot(near.x - v0.x, near.y - v0.y) < (f0 ? Math.hypot(f0.x - v0.x, f0.y - v0.y) : 99)) this.m.recastFoul(e, near.pid);
+        }
+      }
       const fouler = this.A[e.pid] ? e.pid : null;
       if (fouler == null && card !== 'red') return;
       const f = this.A[fouler];
@@ -1934,11 +1953,11 @@
           if (this.ball.owner !== victim.pid) this._kick(victim.x, victim.y, { h: 0.05, to: victim.pid, sfx: false });
           this.ov = { p: { [fouler]: { x: () => victim.x, y: () => victim.y, run: 1 }, [victim.pid]: { x: victim.x + this.dir[1 - i] * 3, y: victim.y, run: 0.45 } } };
         } },
-        { d: 8, start: () => { if (this.ball.owner !== victim.pid && !this.ball.path) this._receive(victim.pid); },
+        { d: 5, start: () => { if (this.ball.owner !== victim.pid && !this.ball.path) this._receive(victim.pid); },
           tick: (dt, t) => {
             const bt = this.beat, dd = Math.hypot(f.x - victim.x, f.y - victim.y);
             // Si tarda, la víctima conduce hacia el infractor (busca el hueco por donde viene) y se encuentran antes
-            if (t > 1.6 && this.ov && this.ov.p) this.ov.p[victim.pid] = { x: () => lerp(victim.x, f.x, 0.5), y: () => lerp(victim.y, f.y, 0.5), run: 0.8 };
+            if (t > 0.9 && this.ov && this.ov.p) this.ov.p[victim.pid] = { x: () => lerp(victim.x, f.x, 0.5), y: () => lerp(victim.y, f.y, 0.5), run: 0.8 };
             if (dd < 1 && t > 0.3) bt.t = bt.d;
           } },
         ...(kind === 'hold' ? [{ d: 0.8, start: () => { this.ov.p[fouler] = { x: () => victim.x - this.dir[1 - i] * 0.7, y: () => victim.y, run: 1 }; if (this.ov.p[victim.pid]) this.ov.p[victim.pid].run = 0.35; } }] : []),
@@ -2284,7 +2303,7 @@
         const e = this.queue[0];
         // El cerebro puede retrasar un suceso para llevar la jugada hasta él, pero como mucho unos segundos
         if (this._lead !== e) { this._lead = e; this._leadT = this.t; }
-        if (!this.brain.leading(e) || this.t - this._leadT > 20) { this.queue.shift(); this._handle(e); }
+        if (!this.brain.leading(e) || this.t - this._leadT > 4.5) { this.queue.shift(); this._handle(e); }
       }
       if (!this.beat && !this.script.length && !this.queue.length && this.handled.length) this._revealAll();
       this._runScript(dt);
