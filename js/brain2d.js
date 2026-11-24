@@ -338,6 +338,15 @@
         }
         d += r.role === 'GK' || r.role === 'CB' ? 0 : push * 0.4;
         if (r.role !== 'GK') d = Math.min(d, cap);
+        // Escalonados, como en un partido de verdad: aunque la defensa rival se meta en su área, no se amontonan
+        // todos en la portería. Solo el punta pisa el área chica; los extremos abiertos o al segundo palo, la
+        // mediapunta en la frontal, los interiores fuera del área para el rechace y los laterales por fuera.
+        if (!cross) {
+          const MAXD = { ST: 95, W: 90, WM: 87, AM: 84, CM: 80, DM: 70, FB: 84, WB: 86 }[r.role];
+          if (MAXD != null) d = Math.min(d, MAXD);
+          // Si el balón ya está dentro del área, el resto da línea de pase hacia atrás en vez de meterse
+          if (bd > 86 && r.role !== 'ST' && a.pid !== (P.ball.owner)) d = Math.min(d, r.role === 'W' || r.role === 'WM' ? 88 : 83);
+        }
         base[a.pid] = P.world(i, clamp(d, 1, L - 1), clamp(l, 1.5, Wd - 1.5));
       }
     }
