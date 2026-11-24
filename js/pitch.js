@@ -1648,18 +1648,22 @@
         const inBox = atts.filter(a => a !== taker).sort((a, c) => (F.LINE[this.slotOf(c)] === 1 || F.LINE[this.slotOf(c)] === 3 ? 1 : 0) - (F.LINE[this.slotOf(a)] === 1 || F.LINE[this.slotOf(a)] === 3 ? 1 : 0));
         const desp = this.m.teams[i].desperate;
         const nBox = desp ? 7 : 5;
+        if (!desp) { const cbs = inBox.filter(a => F.LINE[this.slotOf(a)] === 1); if (cbs.length > 1) { const stay = cbs[0]; inBox.splice(inBox.indexOf(stay), 1); inBox.push(stay); } }
         const spots = [[96, 30], [98, 36], [94, 40], [100, 33], [92, 34], [97, 27], [95, 43]];
         inBox.slice(0, nBox).forEach((a, k) => { const [x, y] = this.world(i, spots[k][0], top ? spots[k][1] : Wd - spots[k][1]); p[a.pid] = { x, y, run: 0.7, jit: 0.6 }; });
-        inBox.slice(nBox).forEach((a, k) => { const [x, y] = this.world(i, k === 0 ? 84 : 58, Wd / 2 + (k % 2 ? -12 : 12)); p[a.pid] = { x, y, run: 0.5 }; });
+        inBox.slice(nBox).forEach((a, k) => { const [x, y] = this.world(i, k === 0 ? 82 : k === 1 ? 74 : 56, Wd / 2 + (k === 1 ? -20 : k % 2 ? -10 : 10)); p[a.pid] = { x, y, run: 0.5 }; });
         // Con el partido en el aire, el portero sube a rematar
         if (desp && this.m.min >= 88) { const g = this.gkOf(i); if (g) { const [x, y] = this.world(i, 95, Wd / 2); p[g.pid] = { x, y, run: 1, jit: 0.5 }; this._banner('¡SUBE EL PORTERO!', '#ff9a3d', 1.6, true); } }
-        // Defensa: marcas al hombre y uno en cada palo
+        // Defensa: como en un partido de verdad no se mete todo el mundo en el área. Los delanteros se quedan
+        // arriba para la contra; el resto marca al hombre, uno al primer palo y uno o dos en zona.
         const marked = inBox.slice(0, nBox);
-        defs.forEach((d, k) => {
+        const fwd = defs.filter(d => F.LINE[this.slotOf(d)] === 3).slice(0, this.m.teams[1 - i].desperate ? 0 : desp ? 1 : 2);
+        fwd.forEach((d, k) => { const [x, y] = this.world(1 - i, k ? 44 : 50, Wd / 2 + (k ? -14 : 8)); p[d.pid] = { x, y, run: 0.5 }; });
+        defs.filter(d => !fwd.includes(d)).sort((a, c) => (F.LINE[this.slotOf(a)] || 2) - (F.LINE[this.slotOf(c)] || 2)).forEach((d, k) => {
           if (k < marked.length) { const m = marked[k]; p[d.pid] = { x: () => (this.A[m.pid] ? this.A[m.pid].x : d.x) - dir * 0.9, y: () => (this.A[m.pid] ? this.A[m.pid].y : d.y) + 0.4, run: 0.8, jit: 0.5 }; }
-          else if (k === marked.length) { const [x, y] = this.world(1 - i, 1.2, Wd / 2 - 3.2); p[d.pid] = { x, y, run: 0.7 }; }
-          else if (k === marked.length + 1) { const [x, y] = this.world(1 - i, 1.2, Wd / 2 + 3.2); p[d.pid] = { x, y, run: 0.7 }; }
-          else { const [x, y] = this.world(1 - i, 16 + (k % 2) * 4, Wd / 2 + (k % 3 - 1) * 10); p[d.pid] = { x, y, run: 0.6 }; }
+          else if (k === marked.length) { const [x, y] = this.world(1 - i, 1.4, Wd / 2 + (top ? -3.2 : 3.2)); p[d.pid] = { x, y, run: 0.7 }; }
+          else if (k === marked.length + 1) { const [x, y] = this.world(1 - i, 7, Wd / 2 + (top ? -4 : 4)); p[d.pid] = { x, y, run: 0.7 }; }
+          else { const [x, y] = this.world(1 - i, 19 + (k % 2) * 3, Wd / 2 + (k % 3 - 1) * 12); p[d.pid] = { x, y, run: 0.6 }; }
         });
         const g = this.gkOf(1 - i);
         if (g) { const [x, y] = this.world(1 - i, 0.9, Wd / 2 + (top ? -1 : 1)); p[g.pid] = { x, y, run: 0.6 }; }
