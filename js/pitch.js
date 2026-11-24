@@ -988,8 +988,9 @@
       if (bt.waitHold && this.hold) return true;
       // Vigilante: ninguna escena puede quedarse esperando para siempre (un jugador que no llega al balón,
       // un balón que no acaba su vuelo…). Pasado su tiempo con margen, se da por hecha y el partido sigue.
-      bt.wd = (bt.wd || 0) + dt; this._wdF = this.fetch; this._wdP = this.place; this._wdB = this.ball.path;
-      if (bt.wd > (bt.d || 0) + (this.place || this.fetch ? 18 : 9)) {
+      // (lo que se espera a que alguien llegue al balón o lo coloque cuenta aparte, con más margen)
+      if (this.place || this.fetch) bt.wp = (bt.wp || 0) + dt; else bt.wd = (bt.wd || 0) + dt; this._wdF = this.fetch; this._wdP = this.place; this._wdB = this.ball.path;
+      if ((bt.wd || 0) > (bt.d || 0) + 9 || (bt.wp || 0) > 30) {
         this.fetch = null;
         this.place = null;   // sin recolocar nada: el balón sigue donde está y el juego continúa desde ahí
         bt.t = Math.max(bt.t, bt.d || 0);
@@ -1000,7 +1001,7 @@
       bt.t += dt;
       if (bt.tick) bt.tick(dt, bt.t);
       const waitBall = bt.ball && this.ball.path && !(bt.wd > (bt.d || 0) + 9);
-      const waitArr = bt.arrive && bt.wd < (bt.d || 0) + 5 && !this._arrived();
+      const waitArr = bt.arrive && (bt.wd || 0) < (bt.d || 0) + 5 && !this._arrived();
       if (!waitBall && !waitArr && bt.t >= (bt.d || 0)) {
         if (bt.end) bt.end();
         if (bt.slow) this.slowT = 1;
