@@ -260,6 +260,41 @@
     crowd_invader: ['Un aficionado salta al césped y corre hacia los jugadores. Los de seguridad lo sacan.'],
     inj: ['{p} se duele y pide el cambio.', '{p} cae lesionado. Entran las asistencias.'],
     sub: ['Cambio: entra {p}, sale {a}.'],
+    // Tipos de falta (reglamento, regla 12)
+    f_trip: ['Zancadilla de {p} a {v}.', '{p} le pone la pierna a {v}, que se va al suelo.'],
+    f_hold: ['Agarrón de {p}: le tira de la camiseta a {v}.', '{p} agarra a {v} para frenarlo.'],
+    f_push: ['Empujón de {p} a {v} por la espalda.', '{p} empuja a {v} con las dos manos.'],
+    f_late: ['Entrada a destiempo de {p}: llega tarde y se lleva a {v}.', '{p} va al suelo tarde y se lleva por delante a {v}.'],
+    f_high: ['¡Plancha de {p}! Los tacos por delante a la altura de la rodilla de {v}.', 'Pie altísimo de {p} sobre {v}: juego peligroso.'],
+    f_elbow: ['¡Codazo de {p} a {v} en el salto!', '{p} saca el codo y golpea a {v} en la cara.'],
+    f_hand: ['Mano de {p}: corta el pase con el brazo.', '¡Mano de {p}! El brazo, separado del cuerpo.'],
+    adv: ['Falta de {p} sobre {v}, pero el árbitro da ventaja.', 'El árbitro deja seguir: ley de la ventaja tras la falta de {p}.'],
+    penHand: ['¡Mano de {p} dentro del área! Penalti.', '¡Penalti por mano! {p} toca el balón con el brazo en el área.'],
+    varHand: ['El VAR revisa... ¡mano previa de {p}! Gol anulado.'],
+    dogso: ['¡Roja directa para {p}! Era el último hombre y {v} se iba solo hacia la portería.', '¡Expulsado {p}! Derriba a {v} cuando encaraba al portero: ocasión manifiesta de gol.'],
+    y_dissent: ['Amarilla a {p} por protestar.', '{p} se queja demasiado al árbitro y ve la amarilla.'],
+    y_waste: ['Amarilla a {p} por perder tiempo.', '{p} se toma su tiempo para sacar... y el árbitro le saca la amarilla.'],
+    y_dive: ['¡Piscinazo de {p}! Se tira sin contacto y ve la amarilla por simular.', '{p} se deja caer en el área. El árbitro no lo compra: amarilla por simulación.'],
+    y_distance: ['Amarilla a {p} por no respetar la distancia en la falta.', '{p} se adelanta en la barrera y ve la amarilla.'],
+    y_shirt: ['¡{p} se quita la camiseta para celebrarlo! Amarilla, como manda el reglamento.', 'La celebración le cuesta cara: {p} se quita la camiseta y ve la amarilla.'],
+    y_high: ['Amarilla a {p} por la plancha.'],
+    y_late: ['Amarilla a {p} por la entrada a destiempo.'],
+    y_hold: ['Amarilla a {p} por el agarrón: cortaba un contraataque.'],
+    y_hand: ['Amarilla a {p} por la mano: cortaba una ocasión.'],
+    y_elbow: ['Amarilla a {p} por el codazo.'],
+    r_high: ['¡Roja directa para {p}! La plancha pone en peligro la integridad del rival.'],
+    r_elbow: ['¡Roja directa para {p} por el codazo! Conducta violenta.'],
+    r_late: ['¡Roja directa para {p}! Entrada con fuerza excesiva.'],
+    backpass: ['¡Cesión! {k} coge con la mano un pase de un compañero: libre indirecto dentro del área.'],
+    hold6: ['{k} retiene el balón demasiado tiempo: libre indirecto.'],
+    retake: ['¡El portero se había adelantado! Se repite el penalti.'],
+    og: ['¡Gol en propia puerta de {p}! Mete el balón en su portería.', '¡Autogol de {p}! Desvía el balón al fondo de su red.'],
+    ded_cradle: ['¡{p} celebra haciendo la cuna! El gol es para su bebé recién nacido.'],
+    ded_ill: ['{p} se levanta la camiseta: debajo, un mensaje para su {w}, que sigue en el hospital. Todo el estadio aplaude.', '{p} besa el escudo y señala a la grada: este gol es para su {w}, que está en el hospital.'],
+    ded_sky: ['{p} mira al cielo y señala hacia arriba: el gol es para su {w}. Emoción en el estadio.'],
+    added1: ['El cuarto árbitro levanta el cartel: {n} minuto(s) de descuento en la primera parte.'],
+    added2: ['Se añaden {n} minutos. ¡Última oportunidad!', 'El cartel marca +{n}. Queda el descuento.'],
+    fair: ['El equipo echa el balón fuera para que atiendan a {p}. Deportividad.', 'Balón a tierra tras la atención a {p}: se le devuelve al rival.'],
     talk: ['Charla en el vestuario: {t}.'],
     formation: ['Cambio táctico: el equipo pasa a {t}.']
   };
@@ -269,6 +304,11 @@
     return t;
   }
 
+  // Faltas (regla 12): frecuencia y cuánto pesan para la amarilla y para la roja
+  const FOUL_KINDS = ['trip', 'hold', 'push', 'late', 'high', 'elbow', 'hand'];
+  const FOUL_P = { trip: 0.3, hold: 0.2, push: 0.14, late: 0.2, high: 0.06, elbow: 0.03, hand: 0.07 };
+  const FOUL_CARD = { trip: 0.85, hold: 1.05, push: 0.6, late: 1.45, high: 2.4, elbow: 2.6, hand: 0.9 };
+  const FOUL_RED = { trip: 0.2, hold: 0.15, push: 0.15, late: 0.9, high: 3, elbow: 4.5, hand: 0.1 };
   const SHOOT_W = { ST: 6, RW: 3.5, LW: 3.5, CAM: 3, RM: 2, LM: 2, CM: 1.4, CDM: 0.7, CB: 0.5, RB: 0.6, LB: 0.6, GK: 0 };
   const ASSIST_W = { CAM: 4, CM: 3, RW: 3, LW: 3, RM: 3, LM: 3, ST: 2, RB: 1.5, LB: 1.5, CDM: 1.5, CB: 0.4, GK: 0.05 };
   const FOUL_W = { CB: 3, CDM: 3.2, RB: 2.2, LB: 2.2, CM: 2, LM: 1.3, RM: 1.3, CAM: 1, ST: 1.1, RW: 0.8, LW: 0.8, GK: 0.15 };
@@ -341,7 +381,7 @@
     constructor(S, homeId, awayId, opts) {
       opts = opts || {};
       this.S = S;
-      this.min = 0;
+      this.min = 0; this.extra = 0; this.addedNow = 0;
       this.done = false;
       this.detail = !!opts.detail;
       this.events = [];
@@ -503,6 +543,7 @@
 
     _ev(type, team, pid, pid2, text, extra) {
       const e = { min: this.min, type, team, pid, pid2, text };
+      if (this.extra) e.add = this.extra;
       if (extra) Object.assign(e, extra);
       this.events.push(e);
       return e;
@@ -526,13 +567,22 @@
     step() {
       if (this.done) return [];
       const start = this.events.length;
-      this.min++;
+      // Descuento: al llegar al 45 y al 90 se juegan los minutos añadidos (45+1, 45+2…) antes del descanso o el final
+      const stop = (this.min === 45 && !this.htDone) || this.min === 90;
+      if (stop && this.extra < (this.addedNow || 0)) this.extra++;
+      else {
+        this.extra = 0; this.min++;
+        if (this.min === 45 || this.min === 90) {
+          this.addedNow = this._added(this.min === 45 ? 1 : 2);
+          if (this.detail) this._ev('added', -1, null, null, say(this.min === 45 ? 'added1' : 'added2', { n: this.addedNow }), { n: this.addedNow });
+        }
+      }
       const m = this.min;
       const M = TL.EventsData.MATCH;
       const poss = this.possession();
       this.stats.possSum[0] += poss; this.stats.possSum[1] += 1 - poss;
 
-      for (const ev of this.plan) if (ev.min === m) this._planned(ev);
+      if (!this.extra) for (const ev of this.plan) if (ev.min === m) this._planned(ev);
 
       for (const i of [0, 1]) {
         const t = this.teams[i];
@@ -567,6 +617,7 @@
           t.lateCall = true;
           this._ev('late', i, null, null, say('late', { t: this.S.clubs[t.club].name }));
         }
+        this._conduct(i, m, diff);
         this._tire(i, possI);
         if (Math.random() < 0.22 / 90 * this.bonus[i].injury * this.wfx.injury * this._tiredRisk(i)) this._injury(i);
         // Rayo: rarísimo, solo con temporal (?rayo=1 lo fuerza en las pruebas)
@@ -575,12 +626,12 @@
       }
       if (m % 5 === 0) this._str = null; // el cansancio va pesando
       if (t0reorg(this, m)) this._str = null;
-      if (m === 45) {
+      if (m === 45 && !this.htDone && this.extra >= (this.addedNow || 0)) {
         this.htDone = true;
         this._halfTime();
         if (this.detail) this._ev('ht', -1, null, null, `Descanso. ${this.score[0]}-${this.score[1]}.`);
       }
-      if (m >= 90) this._end();
+      if (m >= 90 && this.extra >= (this.addedNow || 0)) this._end();
       return this.events.slice(start);
     }
 
@@ -613,6 +664,23 @@
         }
       }
       this._ev('goal', i, shooter.id, assister && assister.id, txt, Object.assign({ kind, late: this.min >= 88 }, sx || {}));
+      // Celebración dedicada: solo si el jugador lleva algo dentro (un hijo recién nacido, un familiar enfermo,
+      // un luto) y le toca: se lo dedica. Quitarse la camiseta para enseñar el mensaje cuesta la amarilla (regla 12).
+      const ded = this.S.dedic && this.S.dedic[shooter.id];
+      if (ded && kind !== 'og' && Math.random() < 0.45) {
+        delete this.S.dedic[shooter.id];
+        const who = ded.who || '';
+        if (this.detail) this._ev('dedic', i, shooter.id, null, say('ded_' + ded.k, { p: shooter.short, w: who }), { kind: ded.k });
+        if (ded.k === 'ill' && Math.random() < 0.7) this._yellow(i, shooter, null, 'shirt');
+      }
+    }
+
+    /** Gol en propia puerta: cuenta para el equipo i; lo mete un rival (no suma como gol suyo). */
+    _ownGoal(i, def, sx) {
+      this.score[i]++;
+      this.stats.onT[i]++;
+      if (this.pl[def.id]) this.pl[def.id].og = (this.pl[def.id].og || 0) + 1;
+      this._ev('goal', i, def.id, null, this.detail ? say('og', { p: def.short }) : '', Object.assign({ kind: 'og', og: true, late: this.min >= 88 }, sx || {}));
     }
 
     _shot(i) {
@@ -661,8 +729,10 @@
         const err = this.ref.err;
         if (r < M.varOffsideGoal) {
           this.stats.offsides[i]++;
+          const hand = Math.random() < 0.3;
+          if (hand) this.stats.offsides[i]--;
           if (this.detail) { this._ev('var', i, shooter.id, null, say('var', {})); }
-          this._ev('disallowed', i, shooter.id, null, this.detail ? say('varOff', { p: shooter.short }) : '', sx);
+          this._ev('disallowed', i, shooter.id, null, this.detail ? say(hand ? 'varHand' : 'varOff', { p: shooter.short }) : '', Object.assign({ hand }, sx));
           return;
         }
         if (r < M.varOffsideGoal + err * 0.12) {
@@ -675,6 +745,11 @@
           this._scoreGoal(i, shooter, assister, 'open', sx);
           if (this.detail) this._ev('controversy', 1 - i, null, null, say('offStand', {}), { controversy: true });
           return;
+        }
+        // Gol en propia puerta: el balón lo mete en su portería un defensa rival
+        if (Math.random() < 0.045) {
+          const defs = this.teams[1 - i].onPitch.filter(x => x.slot !== 'GK');
+          if (defs.length) { this._ownGoal(i, this.P(U.weighted(defs, x => (F.LINE[x.slot] === 1 ? 4 : F.LINE[x.slot] === 2 ? 1.5 : 0.5)).pid), sx); return; }
         }
         this._scoreGoal(i, shooter, assister, 'open', sx);
         this.events[this.events.length - 1].re = re;
@@ -753,6 +828,55 @@
       return true;
     }
 
+    /** Minutos de descuento de una parte: cambios, goles, lesiones, VAR y tarjetas paran el reloj. */
+    _added(half) {
+      const from = half === 1 ? 0 : 46, to = half === 1 ? 45 : 90;
+      const ev = this.events.filter(e => e.min >= from && e.min <= to);
+      const n = k => ev.filter(e => e.type === k).length;
+      const raw = (half === 1 ? 0.6 : 1.6) + n('sub') * 0.35 + n('goal') * 0.45 + n('inj') * 1 + n('var') * 0.9 + (n('yellow') + n('red')) * 0.2 + (n('pen') + n('penmiss')) * 0.4 + Math.random();
+      return U.clamp(Math.round(raw), half === 1 ? 0 : 1, half === 1 ? 5 : 9);
+    }
+
+    /**
+     * Conducta (regla 12): protestas, perder tiempo, simulación; y los porteros (cesión cogida con la mano,
+     * retener el balón demasiado). Probabilidades por partido y equipo, repartidas por minuto.
+     */
+    _conduct(i, m, diff) {
+      const t = this.teams[i], strict = this.ref.strict * this.bonus[i].cards;
+      const field = t.onPitch.filter(o => o.slot !== 'GK');
+      if (!field.length) return;
+      const pick = w => this.P(U.weighted(field, w).pid);
+      if (Math.random() < 0.2 / 90 * strict * (diff < 0 ? 1.4 : 1)) this._yellow(i, pick(o => (this.P(o.pid).mor != null && this.P(o.pid).mor < 45 ? 2 : 1)), null, 'dissent');
+      if (diff > 0 && m >= 70 && Math.random() < 0.9 / 20 * 0.35 * strict) {
+        const gk = this._gk(i);
+        this._yellow(i, gk && Math.random() < 0.5 ? gk : pick(() => 1), null, 'waste');
+      }
+      if (Math.random() < 0.06 / 90 * strict) {
+        const ot = this.teams[1 - i].onPitch.filter(o => F.LINE[o.slot] === 1);
+        const diver = pick(o => (F.LINE[o.slot] === 3 ? 4 : F.LINE[o.slot] === 2 ? 1.5 : 0.2));
+        this._yellow(i, diver, ot.length ? this.P(U.pick(ot).pid) : null, 'dive');
+      }
+      // Porteros (el libre indirecto es para el rival)
+      const gk = this._gk(i);
+      if (gk && this.detail) {
+        const r = Math.random();
+        if (r < 0.035 / 90) this._ev('ifk', 1 - i, gk.id, null, say('backpass', { k: gk.short }), { kind: 'backpass' });
+        else if (r < 0.05 / 90) this._ev('ifk', 1 - i, gk.id, null, say('hold6', { k: gk.short }), { kind: 'hold6' });
+      }
+    }
+
+    /** Autogol escenificado: lo mete el defensa que de verdad estaba en la trayectoria (bidireccional). */
+    recastOG(e, defPid) {
+      if (!e || !e.og || e.pid === defPid) return false;
+      const t = this.teams[1 - e.team];
+      if (!t.onPitch.some(o => o.pid === defPid) || !this.pl[defPid]) return false;
+      if (this.pl[e.pid] && this.pl[e.pid].og) this.pl[e.pid].og--;
+      this.pl[defPid].og = (this.pl[defPid].og || 0) + 1;
+      e.pid = defPid;
+      if (this.detail) e.text = say('og', { p: this.P(defPid).short });
+      return true;
+    }
+
     /** Falta cometida por el equipo i. */
     _foul(i) {
       const M = TL.EventsData.MATCH;
@@ -768,21 +892,24 @@
       this.pl[fouler.id].f++;
       const strict = this.ref.strict * this.bonus[i].cards * (lfx(fouler.id).card || 1);
       const late = this.min > 75 ? 1.2 : 1;
+      // Tipo de falta (regla 12) y lo que pesa para la tarjeta
+      const kind = U.weighted(FOUL_KINDS, k => FOUL_P[k]), kfx = FOUL_CARD[kind];
       const r = Math.random();
       let shown = false;
       if (r < M.penaltyPerFoul) {
+        const hand = Math.random() < 0.25;
+        const ptxt = hand ? say('penHand', { p: fouler.short }) : say('pen', { p: fouler.short, v: victim.short });
         // Penalti: puede que el árbitro no lo vea; el VAR corrige la mayoría
         if (Math.random() < this.ref.err) {
           if (this.ref.var && Math.random() < 0.65) {
-            if (this.detail) { this._ev('var', opp, null, null, say('var', {})); this._ev('pen', opp, victim.id, fouler.id, say('varPen', {})); }
+            if (this.detail) { this._ev('var', opp, null, null, say('var', {})); this._ev('pen', opp, victim.id, fouler.id, say('varPen', {}), { kind: hand ? 'hand' : kind }); }
             this._penalty(opp, victim, fouler);
           } else {
             this._ev('refmiss', opp, victim.id, null, this.detail ? say('refMiss', { v: victim.short }) : '', { controversy: true });
             this.incidents.push({ type: 'penaltyDenied', team: opp, pid: victim.id, min: this.min });
           }
         } else {
-          if (this.detail) this._ev('pen', opp, victim.id, fouler.id, say('pen', { p: fouler.short, v: victim.short }));
-          else this._ev('pen', opp, victim.id, fouler.id, '');
+          this._ev('pen', opp, victim.id, fouler.id, this.detail ? ptxt : '', { kind: hand ? 'hand' : kind });
           this._penalty(opp, victim, fouler);
         }
         shown = true;
@@ -793,9 +920,17 @@
       // Tarjetas
       const cr = Math.random();
       const booked = this.pl[fouler.id] && this.pl[fouler.id].y ? 0.5 : 1; // el árbitro perdona más la segunda
-      if (cr < M.redPerFoul * strict) this._red(i, fouler, true, null, victim);
-      else if (cr < (M.redPerFoul + M.yellowPerFoul * late * booked) * strict) this._yellow(i, fouler, victim);
-      else if (this.detail && !shown) this._ev('foul', i, fouler.id, victim.id, Math.random() < 0.12 ? say('foul', { p: fouler.short, v: victim.short }) : '', { hard: Math.random() < 0.3 });
+      // Ocasión manifiesta de gol: el último defensor derriba al delantero que se iba solo (fuera del área: roja)
+      const dogso = !shown && F.LINE[fo.slot] === 1 && F.LINE[vo.slot] === 3 && Math.random() < 0.012;
+      if (dogso) this._red(i, fouler, true, 'dogso', victim);
+      else if (cr < M.redPerFoul * strict * FOUL_RED[kind]) this._red(i, fouler, true, null, victim, kind);
+      else if (cr < (M.redPerFoul * FOUL_RED[kind] + M.yellowPerFoul * late * booked * kfx) * strict) this._yellow(i, fouler, victim, kind);
+      else if (this.detail && !shown) {
+        // A veces el árbitro deja seguir (ventaja) si el equipo que la recibe conserva el balón
+        const adv = kind !== 'hand' && Math.random() < 0.12;
+        const txt = adv ? say('adv', { p: fouler.short, v: victim.short }) : Math.random() < 0.22 ? say('f_' + kind, { p: fouler.short, v: victim.short }) : '';
+        this._ev('foul', i, fouler.id, victim.id, txt, { hard: kind === 'late' || kind === 'high' || Math.random() < 0.2, kind, adv });
+      }
       if (Math.random() < M.heatedPerFoul) this._heated();
     }
 
@@ -810,11 +945,15 @@
       const p = U.clamp(M.penaltyConv * Math.pow(taker.st[1] / 80, 0.35) * Math.pow(76 / Math.max(30, gkv), 0.35), 0.55, 0.92);
       this.stats.shots[i]++;
       this.stats.xg[i] += 0.76;
-      if (Math.random() < p) this._scoreGoal(i, taker, null, 'pen');
+      // El portero se adelanta antes del disparo: se repite (lo que cuenta es el segundo)
+      const retake = Math.random() < 0.05;
+      if (retake && this.detail) this._ev('retake', i, taker.id, gk && gk.id, say('retake', {}));
+      const rx = retake ? { retake: true } : null;
+      if (Math.random() < p) this._scoreGoal(i, taker, null, 'pen', rx);
       else {
         this.pl[taker.id].pm++;
         if (gk && Math.random() < 0.7) { this.pl[gk.id].ps++; this.stats.onT[i]++; }
-        this._ev('penmiss', i, taker.id, gk && gk.id, this.detail ? say('penMiss', { p: taker.short, k: gk ? gk.short : 'el portero' }) : '');
+        this._ev('penmiss', i, taker.id, gk && gk.id, this.detail ? say('penMiss', { p: taker.short, k: gk ? gk.short : 'el portero' }) : '', rx);
       }
     }
 
@@ -824,6 +963,8 @@
       if (!taker) return;
       this.stats.shots[i]++;
       const p = M.fkGoal * Math.pow((taker.st[1] + taker.st[2]) / 160, 2);
+      // Alguien de la barrera no respeta los 9,15 m
+      if (Math.random() < 0.05) { const ot = this.teams[1 - i].onPitch.filter(o => o.slot !== 'GK'); if (ot.length) this._yellow(1 - i, this.P(U.pick(ot).pid), null, 'distance'); }
       if (Math.random() < p) {
         if (this.detail) this._ev('fk', i, null, null, say('fk', { t: this.S.clubs[this.teams[i].club].name }));
         this._scoreGoal(i, taker, null, 'fk');
@@ -832,23 +973,24 @@
       }
     }
 
-    _yellow(i, p, v) {
+    _yellow(i, p, v, why) {
       const rec = this.pl[p.id];
       if (!rec || rec.off != null) return;
-      if (rec.y >= 1) { rec.y++; this._red(i, p, false, null, v); return; }
+      if (rec.y >= 1) { rec.y++; this._red(i, p, false, null, v, why); return; }
       rec.y++;
       this.stats.yel[i]++;
-      this._ev('yellow', i, p.id, v ? v.id : null, this.detail ? say('yellow', { p: p.short }) : '');
+      const k = why && TXT['y_' + why] ? 'y_' + why : 'yellow';
+      this._ev('yellow', i, p.id, v ? v.id : null, this.detail ? say(k, { p: p.short }) : '', why ? { kind: why } : null);
     }
 
-    _red(i, p, straight, kind, v) {
+    _red(i, p, straight, kind, v, why) {
       const rec = this.pl[p.id];
       if (!rec || rec.off != null) return;
-      rec.r = kind === 'refAssault' ? 12 : kind === 'confront' ? 4 : kind === 'fight' ? 3 : straight ? U.pick([1, 1, 2]) : 1;
+      rec.r = kind === 'refAssault' ? 12 : kind === 'confront' ? 4 : kind === 'fight' ? 3 : kind === 'dogso' ? 1 : straight ? U.pick([1, 1, 2]) : 1;
       rec.rKind = kind || (straight ? 'straight' : 'second');
       this.stats.red[i]++;
-      const txt = kind ? say(kind, { p: p.short }) : say(straight ? 'red' : 'red2', { p: p.short });
-      this._ev('red', i, p.id, v ? v.id : null, txt);
+      const txt = kind ? say(kind, { p: p.short, v: v ? v.short : '' }) : straight && why && TXT['r_' + why] ? say('r_' + why, { p: p.short }) : say(straight ? 'red' : 'red2', { p: p.short });
+      this._ev('red', i, p.id, v ? v.id : null, txt, { kind: kind || why || null, second: !straight });
       const t = this.teams[i];
       const was = t.onPitch.find(o => o.pid === p.id);
       this._remove(i, p.id);
@@ -953,6 +1095,7 @@
       const weeks = U.weighted([1, 2, 3, 4, 6, 8, 12], w => ({ 1: 30, 2: 25, 3: 15, 4: 12, 6: 9, 8: 6, 12: 3 })[w]);
       rec.inj = Math.max(1, Math.round(weeks * this.bonus[i].injDur));
       this._ev('inj', i, p.id, null, this.detail ? say('inj', { p: p.short }) : '');
+      if (this.detail && Math.random() < 0.55) this._ev('fair', 1 - i, p.id, null, say('fair', { p: p.short }));
       if (t.subs < t.maxSubs && (t.autoSubs || !t.isUser)) {
         if (!this._bestSub(i, o)) o.hurt = true;
       } else o.hurt = true;
@@ -1184,6 +1327,8 @@
 
     /** Aplica el resultado al estado del juego (estadísticas, forma física, sanciones). */
     finish() {
+      // Las dedicatorias pendientes caducan partido a partido
+      if (this.S.dedic) for (const id in this.pl) { const d = this.S.dedic[id]; if (d && --d.left <= 0) delete this.S.dedic[id]; }
       if (!this.done) this.simulate();
       const S = this.S;
       // Repaso a posteriori (antes de aplicar cansancio y bajas) y lo que verán los ojeadores rivales

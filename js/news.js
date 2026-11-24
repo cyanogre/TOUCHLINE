@@ -21,6 +21,8 @@
 
   const g = (S, m, f) => (S.gender === 'F' ? f : m);
   const clampMor = p => { p.mor = U.clamp(Math.round(p.mor == null ? 70 : p.mor), 5, 100); };
+  /** Algo que el jugador lleva dentro: si marca en los próximos partidos, puede dedicárselo (y celebrarlo a su manera). */
+  function dedic(S, p, k, who, matches) { (S.dedic || (S.dedic = {}))[p.id] = { k, who: who || null, left: matches || 6 }; }
   function mor(p, d) { p.mor = (p.mor == null ? 70 : p.mor) + d; clampMor(p); }
   // Club protagonista del evento en curso: los efectos sobre afición y directiva
   // solo se aplican si es el club del usuario.
@@ -273,7 +275,21 @@
       pick: (S, p) => (p.age >= 24 ? 2 : 0.3),
       title: (S, p) => `${p.short} ${g(S, 'se convierte en padre', 'se convierte en madre')}`,
       body: (S, p) => `${g(S, 'El jugador', 'La jugadora')} anuncia en redes el nacimiento de su primer hijo.`,
-      now: (S, p) => mor(p, 10),
+      now: (S, p) => { mor(p, 10); dedic(S, p, 'cradle', null, 6); },
+      opts: null
+    },
+    familyIllness: {
+      pick: () => 1,
+      title: (S, p) => { const w = U.pick(['madre', 'padre', 'abuela']); p._fw = w; return `Preocupación en torno a ${p.short}: su ${w}, ingresad${w === 'padre' ? 'o' : 'a'}`; },
+      body: (S, p) => `${p.name} pide unos días de comprensión: su ${p._fw} está en el hospital. El vestuario le arropa.`,
+      now: (S, p) => { mor(p, -6); dedic(S, p, 'ill', p._fw, 8); delete p._fw; },
+      opts: null
+    },
+    bereavement: {
+      pick: () => 1,
+      title: (S, p) => { const w = U.pick(['abuelo', 'abuela', 'padre', 'madre']); p._fw = w; return `Luto en el club: fallece ${/a$/.test(w) ? 'la' : 'el'} ${w} de ${p.short}`; },
+      body: (S, p) => `El club guarda un minuto de silencio. ${p.name} quiere jugar el próximo partido en su honor.`,
+      now: (S, p) => { mor(p, -10); dedic(S, p, 'sky', p._fw, 6); delete p._fw; },
       opts: null
     },
     milestone: {
@@ -333,7 +349,7 @@
     taxFraud: 'Investigación fiscal', betting: 'Apuestas deportivas', doping: 'Positivo por dopaje', recreationalDrugs: 'Drogas recreativas',
     domesticViolence: 'Violencia de género', sexualMisconduct: 'Acusación de agresión sexual', streetFight: 'Detención por pelea',
     clubFineStadium: 'Cierre parcial del estadio', refereeComplaint: 'Queja formal por el arbitraje',
-    charity: 'Acción solidaria', newParent: 'Paternidad/maternidad', milestone: 'Hito personal', fanFavourite: 'Favorito de la afición'
+    charity: 'Acción solidaria', newParent: 'Paternidad/maternidad', familyIllness: 'Familiar enfermo', bereavement: 'Luto', milestone: 'Hito personal', fanFavourite: 'Favorito de la afición'
   };
 
   // ------------------------------------------------------------ Semana

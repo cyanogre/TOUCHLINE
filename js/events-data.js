@@ -17,7 +17,7 @@
   const MATCH = {
     // Ritmo de juego (por equipo y partido)
     foulsPerTeam: 11.8,         // ~24 faltas por partido (LaLiga ≈ 24–26, Premier ≈ 21)
-    yellowPerFoul: 0.16,        // ≈ 4 amarillas por partido con árbitro medio (LaLiga ≈ 4,5–5)
+    yellowPerFoul: 0.11,        // + amarillas por conducta (protestas, tiempo, simulación…) ≈ 4,5 por partido (LaLiga ≈ 4,5–5)
     redPerFoul: 0.0035,         // + dobles amarillas ≈ 0,15–0,25 rojas por partido
     penaltyPerFoul: 0.011,      // ≈ 0,3 penaltis por partido (incluye VAR)
     dangerousFkPerFoul: 0.13,   // faltas en zona de tiro
@@ -72,6 +72,8 @@
     // Positivas
     { id: 'charity', p: 0.30, tone: 'pos', cat: 'positivo' },
     { id: 'newParent', p: 0.25, tone: 'pos', cat: 'positivo' },
+    { id: 'familyIllness', p: 0.10, tone: 'neu', cat: 'personal' },      // un familiar enfermo: el jugador juega con eso en la cabeza
+    { id: 'bereavement', p: 0.05, tone: 'neg', cat: 'personal' },        // fallece un familiar cercano
     { id: 'milestone', p: 0.35, tone: 'pos', cat: 'positivo' },
     { id: 'fanFavourite', p: 0.20, tone: 'pos', cat: 'positivo' }
   ];
