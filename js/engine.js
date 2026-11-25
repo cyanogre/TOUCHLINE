@@ -1471,7 +1471,7 @@
       if (this.detail) this._ev('ft', -1, null, null, `¡Final del partido! ${this.score[0]}-${this.score[1]}.`);
     }
 
-    simulate() { while (!this.done) this.step(); return this; }
+    simulate() { this.live = false; this.livePoss = null; while (!this.done) this.step(); return this; }
 
     /** Valoración (rating) de cada jugador que participó. */
     ratings() {
