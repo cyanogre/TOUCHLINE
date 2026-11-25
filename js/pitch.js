@@ -949,7 +949,7 @@
       return [
         { d: 1.6, start: () => { const k = this._placeKickoff(i, false); taker = k.taker; this.ov = { p: k.p }; this.refOv = { x: L / 2 - 6, y: Wd / 2 + 10, run: 0.5 }; this._clearStates(); this._cut(0.85, `Saque de centro · ${this.clubName(i)}`); } },
         { d: 0.05, waitHold: true },
-        { d: 0.4, start: () => { this.ov = null; this.refOv = null; TL.SFX && !this.instant && TL.SFX.whistle(false); if (taker != null && this.A[taker]) this._receive(taker); } }
+        { d: 0.4, start: () => { this.ov = null; this.refOv = null; this.clockStop = false; if (this.m.htDone) this.m.h2 = true; TL.SFX && !this.instant && TL.SFX.whistle(false); if (taker != null && this.A[taker]) this._receive(taker); } }
       ];
     }
 
@@ -1161,7 +1161,7 @@
         case 'fk': this._freeKickSeq(e); break;
         case 'foul': this._tackleSeq(e, null); break;
         case 'yellow': case 'red':
-          if (['dissent', 'waste', 'dive', 'distance', 'shirt'].includes(e.kind)) this._bookingSeq(e, e.type);
+          if (['dissent', 'waste', 'dive', 'distance', 'shirt'].includes(e.kind) || e.afterPen) this._bookingSeq(e, e.type);
           else this._tackleSeq(e, e.type);
           break;
         case 'ifk': this._ifkSeq(e); break;
@@ -1456,7 +1456,7 @@
           const ty = Wd / 2 + side * U.rand(0.6, GW / 2 - 0.5);
           const tz = { header: U.rand(0.2, 1.4), chip: 1.6, long: U.rand(1.4, 2.2), power: U.rand(0.4, 1.8), volley: U.rand(0.5, 2), tapin: 0.2, placed: 0.25, fk: 2.05 }[type] || 0.8;
           if (gk) { gk.state = 'dive'; gk.dive = -side * dir; gk.until = this.t + 1.2; this.ov = this.ov || { p: {} }; this.ov.p = this.ov.p || {}; this.ov.p[gk.pid] = { x: gx - dir * 1.2, y: Wd / 2 - side * 1.5, run: 1 }; }
-          const net = () => { this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 }; this._goalT = this.t; if (e.type === 'goal') this._reveal(e); };
+          const net = () => { this.ball.roll = null; this.netShake = { x: gx, until: this.t + 0.7 }; this._goalT = this.t; if (e.type === 'goal') { this._reveal(e); if (this.live) this.clockStop = true; } };
           if (e.ogDef) {
             // Autogol: el disparo va hacia la portería, toca en el defensa que está en medio y se cuela
             const b0 = this.ball, sx0 = b0.x, sy0 = b0.y, ex = gx, ey = ty;
@@ -1513,6 +1513,7 @@
             // Fuera de verdad: por encima del larguero acaba en la grada de detrás de la portería; desviado, se
             // marcha rozando el palo hasta la zona de fuera del campo
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
+            if (this.live && !over && Math.random() < 0.45) this._cornerTouch = 1 - i;   // lo roza un defensa
             const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 3) : U.rand(GW / 2 + 1.2, GW / 2 + 9));
             const tx = gx + dir * (over ? U.rand(8, 14) : U.rand(4, 9));
             this._kick(tx, ty, { by: shooter, team: i, fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
@@ -1553,12 +1554,14 @@
           if (big) this._banner('¡PARADÓN!', '#5db8ff', 1.3, true);
           if (!this.instant && TL.SFX) { TL.SFX.chance(); if (big) TL.SFX.save(); }
           if (this._gkFar) { this._gkFar = false; return; }   // ya lo resolvió el defensa o se fue fuera
-          const catchIt = Math.random() < 0.5;
+          const catchIt = Math.random() < (this.live ? 0.4 : 0.5);
           if (gk && catchIt) { this._receive(gk.pid); this.ball.z = 0.5; }
           else {
             // Rechace: a córner o a la frontal
-            const [rx, ry] = Math.random() < 0.5 ? [gx - dir * 0.5, Math.random() < 0.5 ? -1 : Wd + 1] : this.world(i, U.rand(82, 90), U.rand(14, Wd - 14));
-            this._kick(rx, ry, { free: true, h: 1.4, T: 0.7, done: () => this._contest() });
+            const toCorner = Math.random() < (this.live ? 0.6 : 0.5);
+            const [rx, ry] = toCorner ? [gx + dir * 1.5, Wd / 2 + (Math.random() < 0.5 ? -1 : 1) * U.rand(6, 15)] : this.world(i, U.rand(82, 90), U.rand(14, Wd - 14));
+            this._kick(rx, ry, { free: true, h: 1.4, T: 0.7, done: () => { this.brain.lastTouch = 1 - i; this._contest(); } });
+            this.brain.lastTouch = 1 - i;
           }
         }, end: () => { this._unfocus(); } });
         beats.push({ d: 0.8, start: () => { if (this.ov) this.ov = null; if (gk && this.ball.owner === gk.pid) { const [tx, ty] = this.world(1 - i, U.rand(30, 45), U.rand(8, Wd - 8)); this._kick(tx, ty, { h: 7, T: 1.4, done: () => this._contest() }); } } });
@@ -1571,13 +1574,29 @@
             if (!this.instant && TL.SFX) TL.SFX.groan();
             const [rx, ry] = this.world(i, U.rand(86, 94), U.rand(18, Wd - 18));
             this._kick(rx, ry, { free: true, h: 1.2, T: 0.6, done: () => this._contest() });
+          } else if (mk === 'blocked' && this.live && Math.random() < 0.5) {
+            // Bloqueado y a córner: el rechace sale por la línea de fondo
+            this._kick(gx + dir * 1.6, Wd / 2 + (Math.random() < 0.5 ? -1 : 1) * U.rand(8, 20), { free: true, h: 1.2, T: 0.6, done: () => { this.brain.lastTouch = 1 - i; this._contest(); } });
+            this.brain.lastTouch = 1 - i;
           } else if (mk === 'blocked') {
             const [rx, ry] = this.world(i, U.rand(70, 82), U.rand(10, Wd - 10));
-            this._kick(rx, ry, { free: true, h: 1.6, T: 0.6, done: () => this._contest() });
+            this._kick(rx, ry, { free: true, h: 1.6, T: 0.6, done: () => { this.brain.lastTouch = 1 - i; this._contest(); } });
+            this.brain.lastTouch = 1 - i;
           } else if (!this.instant && TL.SFX) TL.SFX.groan();
           if (gk) gk.state = null;
         }, end: () => { this._unfocus(); this.ov = null; } });
-        if (mk !== 'post' && mk !== 'blocked') beats.push(...this._goalKick(1 - i));
+        if (mk !== 'post' && mk !== 'blocked') {
+          // Si lo ha rozado un defensa, córner; si no, saque de puerta
+          beats.push({ d: 0.05, start: () => {
+            if (this._cornerTouch === 1 - i) {
+              this._cornerTouch = null;
+              this.cornerTop = this.ball.y < Wd / 2;
+              if (this.m.liveCorner) { const ce = this.m.liveCorner(i); if (ce) this._reveal(ce); }
+              this.brain._restart(i, 'corner');
+              this._seq(this._cornerSetup(i, null).concat(this._cornerPlay(i)));
+            } else this._seq(this._goalKick(1 - i));
+          } });
+        }
       }
       return beats;
     }
@@ -1614,7 +1633,7 @@
     _disallow(e) {
       const i = e.team;
       return [
-        { d: e.viaVar ? 2.2 : 0.3, start: () => { if (e.viaVar) { this._banner('Revisión VAR', '#5db8ff', 2); this.refOv = { x: L / 2 + 2, y: Wd + 1.2, run: 0.9 }; this.monitor = this.t + 2.2; } } },
+        { d: e.viaVar ? 2.2 : 0.3, start: () => { if (e.varEv) this._reveal(e.varEv); if (e.viaVar) { this._banner('Revisión VAR', '#5db8ff', 2); this.refOv = { x: L / 2 + 2, y: Wd + 1.2, run: 0.9 }; this.monitor = this.t + 2.2; } } },
         { d: 1.8, start: () => {
           this.refOv = null;
           this._reveal(e);
@@ -1697,6 +1716,11 @@
         { d: 0.4, start: () => {
           this.ov = null;
           const b = this.ball;
+          if (this.live) {
+            const lw = this._liveCornerWin(i);
+            if (lw && lw.team === i) { this._cornerLive = true; if (this.liveHeaderAt(lw, 'near')) return; this._cornerLive = false; }
+            if (lw && lw.team === i) { this._receive(lw.pid, true); return; }
+          }
           const g = this.gkOf(1 - i);
           const w = g && Math.hypot(g.x - b.x, g.y - b.y) < 5 && Math.random() < 0.5 ? g : this.nearest(this.team(1 - i).filter(a => !this.isGK(a)), b);
           if (!w) return;
@@ -1737,14 +1761,14 @@
       const taker = goalEv ? goalEv.pid : e.pid != null ? e.pid : (this.team(i).filter(a => !this.isGK(a)).sort((a, c) => (this.P(c.pid).st[1] + this.P(c.pid).st[2]) - (this.P(a.pid).st[1] + this.P(a.pid).st[2]))[0] || {}).pid;
       if (taker == null) return;
       const dir = this.dir[i], gx = this.goalX(i);
-      let [bx, by] = this.world(i, U.rand(79, 85), Wd / 2 + U.rand(-9, 9));
+      let [bx, by] = e.spot ? [e.spot.x, e.spot.y] : this.world(i, U.rand(79, 85), Wd / 2 + U.rand(-9, 9));
       const car = this.ball.owner != null ? this.A[this.ball.owner] : null;
       const live = !fromGoal && e.fromPlay && car && car.team === i && !this.ball.path;
       if (live) [bx, by] = this.world(i, clamp(this.depth(i, car.x), 72, 85), clamp(this.lat(i, car.y), Wd / 2 - 17, Wd / 2 + 17));
       const beats = [];
       if (live) beats.push(this._foulBeat(car, i));
       beats.push({ d: 2.6, start: () => {
-        if (goalEv || fromGoal) this._reveal(e);
+        if ((goalEv || fromGoal) && !e.live) this._reveal(e);
         this._banner('Falta peligrosa', '#ffffff', 1.2);
         if (!this.instant && TL.SFX) TL.SFX.whistle(false);
         this._placeBall(bx, by, 1.4, null, i);
@@ -1771,17 +1795,19 @@
       beats.push({ d: 0.6, slow: goalEv ? 0.5 : 1, start: () => { if (this.A[taker]) { this.ov.p[taker] = { x: bx, y: by, run: 0.7 }; } if (goalEv) this._focus(lerp(bx, gx, 0.5), Wd / 2, 1.45); } });
       if (goalEv) beats.push(...this._finish(goalEv, taker, 'fk', 'goal', true));
       else {
-        const intoWall = Math.random() < 0.5;
+        const intoWall = e.live ? e.miss === 'blocked' : Math.random() < 0.5;
+        const gkSave = e.live && e.type === 'save' && this.gkOf(1 - i);
         beats.push({ d: 0.05, ball: true, start: () => {
           if (this.A[taker]) this._receive(taker);
-          if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { h: 0.8, tz: 1.5, T: 0.3, done: () => { this._reveal(e); } }); }
+          if (gkSave) { const g = this.gkOf(1 - i); const ty = Wd / 2 + U.rand(-2.5, 2.5); if (g) { g.state = 'dive'; g.dive = (ty > Wd / 2 ? 1 : -1) * dir; g.until = this.t + 1; this.ov.p[g.pid] = { x: gx - dir * 0.8, y: ty, run: 1 }; } this._kick(gx - dir * 0.9, ty, { h: 1.6, tz: 1.2, T: 0.8, curve: 1.6, done: () => { this._reveal(e); if (g) { this._receive(g.pid, true); g.held = true; } } }); }
+          else if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { h: 0.8, tz: 1.5, T: 0.3, done: () => { this._reveal(e); } }); }
           else this._kick(gx + dir * 2, Wd / 2 + U.rand(-5, 5), { h: 2.2, tz: 3.2, T: 0.85, curve: 2, done: () => { this._reveal(e); } });
         } });
         beats.push({ d: 0.8, start: () => {
           if (!this.instant && TL.SFX) TL.SFX.groan();
           if (intoWall) { const [rx, ry] = this.world(i, U.rand(66, 76), U.rand(14, Wd - 14)); this._kick(rx, ry, { free: true, h: 2, T: 0.7, done: () => this._contest() }); }
         }, end: () => { this.ov = null; this._unfocus(); } });
-        if (!intoWall) beats.push(...this._goalKick(1 - i));
+        if (!intoWall && !gkSave) beats.push(...this._goalKick(1 - i));
       }
       this._seq(beats);
     }
@@ -1817,7 +1843,16 @@
         const v = this.A[victim];
         [vx, vy] = this.world(i, clamp(this.depth(i, v.x) + 7, 89, 99), clamp(this.lat(i, v.y) + (Wd / 2 - this.lat(i, v.y)) * 0.3, Wd / 2 - 16, Wd / 2 + 16));
       }
-      if (victim != null) {
+      if (e.live) {
+        beats.push({ d: 0.9, start: () => {
+          const v = this.A[e.pid], f = e.pid2 != null ? this.A[e.pid2] : null;
+          if (e.kind === 'hand') { if (f) this._icon(f.pid, 'hand', 1.2); }
+          else { if (v) { v.state = 'down'; v.until = this.t + 1.8; v.fall = Math.random() * 6; } if (f && e.kind !== 'dive') { f.state = 'slide'; f.until = this.t + 0.6; } }
+          if (!this.instant && TL.SFX) TL.SFX.whistle(false);
+          this.ball.owner = null; this.ball.roll = { vx: dir * 2, vy: 0 };
+          this.ov = { all: 'stay', p: {} };
+        } });
+      } else if (victim != null) {
         if (carrying) beats.push({ d: 0.8, start: () => { this.poss = i; this.ov = { p: { [victim]: { x: vx, y: vy, run: 1 } } }; if (fouler != null) this.ov.p[fouler] = { x: () => this.A[victim].x, y: () => this.A[victim].y, run: 1 }; } });
         else {
           beats.push({ d: 0.1, ball: true, start: () => { this.poss = i; this.ov = { p: { [victim]: { x: vx, y: vy, run: 1 } } }; if (fouler != null) this.ov.p[fouler] = { x: () => this.A[victim].x, y: () => this.A[victim].y, run: 1 }; this._kick(vx, vy, { h: 0.05, to: victim }); } });
@@ -2006,8 +2041,9 @@
       }
       if (adv) { beats.push({ d: 0.8, start: () => { this.ov = null; } }); this._seq(beats); return; }
       beats.push({ d: 0.8, start: () => {
-        // Se saca la falta en corto
+        // Se saca la falta en corto (o, en vivo y en zona de tiro, directa a portería)
         this.refOv = null;
+        if (e.live && this._liveFkSpot && this._liveFkSpot(1 - i, spot)) { this.ov = null; return; }
         const taker = this.nearest(this.team(1 - i).filter(a => a !== victim && !this.isGK(a)), spot);
         this._placeBall(spot.x, spot.y, 0.6, taker ? taker.pid : null, 1 - i);
         this.ov = null;
@@ -2237,6 +2273,7 @@
 
     _halfTime() {
       this.htPending = true;
+      if (this.live) this.clockStop = true;
       this._seq([
         { d: 2.6, start: () => {
           this._banner('DESCANSO', '#ffffff', 1.8, true);
@@ -2324,6 +2361,7 @@
       this._boysStep(dt);
       this._ballUpdate(dt);
       this._openPlay(dt);
+      if (this.liveTick) this.liveTick(dt);
       // Cámara
       const c = this.cam;
       let tz = c.tz, tx = c.tx != null ? c.tx : (VIEW.x0 + VIEW.x1) / 2, ty = c.ty != null ? c.ty : (VIEW.y0 + VIEW.y1) / 2;
