@@ -49,7 +49,7 @@
   function hash01(v) { let h = 2166136261; for (const ch of String(v)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return (h % 10007) / 10007; }
 
   // Ajustes del partido en vivo (js/live.js los define; aquí, por si se carga sin él)
-  const LV = new Proxy({}, { get: (o, k) => (TL.LIVE && TL.LIVE[k] != null ? TL.LIVE[k] : { CARRY_FWD: 0.06, PASS_FWD: 0.12, DRIBBLE: 0.05 }[k]) });
+  const LV = new Proxy({}, { get: (o, k) => (TL.LIVE && TL.LIVE[k] != null ? TL.LIVE[k] : { CARRY_FWD: 0.06, PASS_FWD: 0.12, DRIBBLE: 0.05, TACKLE: 1.6, PASS_ERR: 2.2 }[k]) });
   const ROLE = { GK: 'GK', CB: 'CB', RB: 'FB', LB: 'FB', CDM: 'DM', CM: 'CM', CAM: 'AM', RM: 'WM', LM: 'WM', RW: 'W', LW: 'W', ST: 'ST' };
   const ATT_ROLES = { ST: 4, W: 3, AM: 2.5, WM: 2, WB: 1.6, CM: 1.3, FB: 0.8, DM: 0.5, CB: 0.15, GK: 0 };
 
@@ -339,7 +339,7 @@
           }
         }
         d += r.role === 'GK' || r.role === 'CB' ? 0 : push * 0.4;
-        if (r.role !== 'GK') d = Math.min(d, cap);
+        if (r.role !== 'GK') d = Math.min(d, cap + (P.live && (r.role === 'ST' || r.role === 'W') ? 1.2 : 0));
         // Escalonados, como en un partido de verdad: aunque la defensa rival se meta en su área, no se amontonan
         // todos en la portería. Solo el punta pisa el área chica; los extremos abiertos o al segundo palo, la
         // mediapunta en la frontal, los interiores fuera del área para el rechace y los laterales por fuera.
@@ -503,6 +503,9 @@
       if (bdD < 34) {
         const threats = P.team(att).filter(a => a !== car && !P.isGK(a) && P.depth(def, a.x) < 30 && Math.abs(a.y - CY) < 26)
           .sort((p, q) => P.depth(def, p.x) - P.depth(def, q.x));
+        // En vivo el marcaje no es perfecto: las más peligrosas, y a un par de metros (se puede ganar la posición)
+        const gapM = P.live ? 2.3 : 1.3;
+        if (P.live) threats.length = Math.min(threats.length, 3);
         for (const th of threats) {
           let best = null, bd = 14;
           for (const a of field) {
@@ -512,7 +515,7 @@
           }
           if (!best) continue;
           const gx = og - th.x, gy = CY - th.y, gl = hyp(gx, gy) || 1;
-          best.tx = th.x + gx / gl * 1.3; best.ty = th.y + gy / gl * 1.3; best.run = 0.8; best.role = 'mark';
+          best.tx = th.x + gx / gl * gapM; best.ty = th.y + gy / gl * gapM; best.run = 0.8; best.role = 'mark';
           used.add(best.pid);
         }
       }
@@ -603,7 +606,7 @@
       if (pr > 3.2 && off < 93 && cd < off - 5 && Math.random() < (ph === 'counter' ? 0.65 : 0.3)) {
         const cand = mates.filter(a => {
           const r = this.role(a).role, d = P.depth(att, a.x);
-          return ATT_ROLES[r] >= 1.3 && d <= off + 0.1 + (P.live && Math.random() < 0.12 ? 1.4 : 0) && d > off - 7;
+          return ATT_ROLES[r] >= 1.3 && d <= off + 0.1 + (P.live && Math.random() < 0.4 ? 1.8 : 0) && d > off - 7;
         }).sort((p, q) => ATT_ROLES[this.role(q).role] * (q.pace || 1) - ATT_ROLES[this.role(p).role] * (p.pace || 1));
         const a = cand[0];
         if (a) { const al = P.lat(att, a.y); start(a, 'behind', off + U.rand(8, 15), al + (CY - al) * 0.3 + U.rand(-4, 4), 2.6); return; }
@@ -747,7 +750,7 @@
       if (P.isGK(c) && c.held) return false;
       const T = this.teamInfo(1 - i);
       const box = P.depth(i, c.x) > 84 && Math.abs(c.y - CY) < 22 && !(this.ag && this.ag.team === i);
-      const rate = (0.8 + T.press * 0.9) * (this.phase[1 - i] === 'counterpress' ? 1.5 : 1) * (box ? 1.6 : 1);
+      const rate = (0.8 + T.press * 0.9) * (this.phase[1 - i] === 'counterpress' ? 1.5 : 1) * (box ? 1.6 : 1) * (P.live ? LV.TACKLE : 1);
       if (Math.random() > rate * dt) return false;
       if (P.live && this._liveFoulRoll(c, o, box, false)) return true;
       const sc = this.st(c), so = this.st(o);
@@ -847,7 +850,7 @@
       for (const r of mates) {
         if (this.offside(i, r) && !(this.runs[r.pid] && this.runs[r.pid].k === 'behind' && P.depth(i, r.x) <= this.offD(i) + 0.25)) {
           const mOff = P.depth(i, r.x) - this.offD(i);
-          if (!(P.live && mOff < 2.2 && Math.random() < 0.3 * (1.25 - pas / 100))) continue;
+          if (!(P.live && mOff < 3 && Math.random() < 0.8 * (1.3 - pas / 100))) continue;
         }
         const o = this._passOpt(c, r, { pas, pr, lossAt, cd, cl, T, i, opp, gk });
         if (o) opts.push(o);
@@ -974,7 +977,7 @@
       let tO = 9, duel = null;
       for (const o of k.opp) { const t = this.reach(o, tx, ty, 0.25); if (t < tO) { tO = t; duel = o; } }
       const pRec = sig((tO - Math.max(Tt, tR) + gb) / 0.3 + (lofted ? 0 : 0.5));
-      const pAcc = clamp(0.99 - dist * 0.0028 * (1.25 - k.pas / 99) - (lofted ? 0.05 : 0) - (k.pr < 1.8 ? 0.06 : 0), 0.55, 0.995);
+      const pAcc = clamp(0.99 - dist * 0.0028 * (1.25 - k.pas / 99) * (P.live ? LV.PASS_ERR : 1) - (lofted ? 0.05 : 0) - (k.pr < 1.8 ? 0.06 : 0), 0.55, 0.995);
       let pOk = (1 - pInt) * pRec * pAcc;
       const ag = this.ag;
       if (ag && ag.team === i) pOk = 1 - (1 - pOk) * 0.15;
@@ -1082,7 +1085,7 @@
       this.carry = null; this.next = P.t + 99;
       if (kind === 'back') P._kick(tx, ty, { h: 0.05, to: win ? win.pid : null, done: win ? (P.live && win.team === i ? () => { if (!P.liveHeaderAt(win, 'back')) P._receive(win.pid); } : null) : () => this._landed() });
       // En vivo, un centro que despeja una defensa cerca de su portería a veces se va a córner
-      if (P.live && win && win.team === opp && !P.isGK(win) && kind !== 'back' && Math.random() < 0.3) {
+      if (P.live && win && win.team === opp && !P.isGK(win) && kind !== 'back' && Math.random() < 0.45) {
         P._kick(tx, ty, { h: 4.2, T: 1.0, to: win.pid, done: () => { win.jump = P.t; const gx = P.goalX(i); this.lastTouch = opp; P._kick(gx + P.dir[i] * 1.6, CY + (ty < CY ? -1 : 1) * U.rand(10, 22), { free: true, h: 2, T: 0.7, done: () => { this.lastTouch = opp; P._contest(); } }); this.lastTouch = opp; } });
         this.say('pass', { team: i, p: c.pid, q: win.pid, type: 'cross' });
         return;
@@ -1107,6 +1110,13 @@
       this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.carry = null; this.next = P.t + 99;
       const dist = hyp(tx - c.x, ty - c.y);
+      // En vivo, un despeje apurado dentro del área propia a veces sale rebotado por la línea de fondo: córner
+      if (P.live && !gk && P.depth(i, c.x) < 18 && this.pressOn(c) < 2.2 && Math.random() < 0.3) {
+        const ox = P.ownX(i), sgn = c.y < CY ? -1 : 1;
+        P._kick(ox - P.dir[i] * 1.6, clamp(c.y + sgn * U.rand(4, 12), 2, Wd - 2), { h: 1.5, T: 0.6, done: () => { this.lastTouch = i; P._contest(); } });
+        this.lastTouch = i;
+        return;
+      }
       P._kick(tx, ty, { h: clamp(dist * 0.18, 4, 11), done: () => this._landed(true) });
       this.say('pass', { team: i, p: c.pid, q: null, type: gk ? 'gklong' : header ? 'head' : 'clear' });
     }

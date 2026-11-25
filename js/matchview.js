@@ -355,6 +355,7 @@
       // Si saltabas al descanso, o la pausa del descanso está activada, el partido se para aquí: los cambios son gratis
       if (settings().pause.ht || (sk && (sk.type === 'event' || sk.min <= 45))) { pause('ht', null); return; }
       m.teamTalk(MV.me, 'calm');
+      MV.skip = sk;   // si el salto iba más allá del descanso, sigue
     }
     if (m.done) { onFinal(); return; }
     // Saltos: hasta el siguiente evento, el descanso, un minuto o el final

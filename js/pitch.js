@@ -1513,6 +1513,7 @@
             // Fuera de verdad: por encima del larguero acaba en la grada de detrás de la portería; desviado, se
             // marcha rozando el palo hasta la zona de fuera del campo
             const over = mk === 'header' || mk === 'long' || Math.random() < 0.4;
+            if (this.live && !over && Math.random() < 0.45) this._cornerTouch = 1 - i;   // lo roza un defensa
             const ty = Wd / 2 + side * (over ? U.rand(0, GW / 2 + 3) : U.rand(GW / 2 + 1.2, GW / 2 + 9));
             const tx = gx + dir * (over ? U.rand(8, 14) : U.rand(4, 9));
             this._kick(tx, ty, { by: shooter, team: i, fz, tz: over ? 0.6 : 0.3, h: over ? 4.6 : 0.6, T: T * 1.35, done: () => { this._reveal(e); } });
@@ -1553,11 +1554,11 @@
           if (big) this._banner('¡PARADÓN!', '#5db8ff', 1.3, true);
           if (!this.instant && TL.SFX) { TL.SFX.chance(); if (big) TL.SFX.save(); }
           if (this._gkFar) { this._gkFar = false; return; }   // ya lo resolvió el defensa o se fue fuera
-          const catchIt = Math.random() < 0.5;
+          const catchIt = Math.random() < (this.live ? 0.4 : 0.5);
           if (gk && catchIt) { this._receive(gk.pid); this.ball.z = 0.5; }
           else {
             // Rechace: a córner o a la frontal
-            const toCorner = Math.random() < 0.5;
+            const toCorner = Math.random() < (this.live ? 0.6 : 0.5);
             const [rx, ry] = toCorner ? [gx + dir * 1.5, Wd / 2 + (Math.random() < 0.5 ? -1 : 1) * U.rand(6, 15)] : this.world(i, U.rand(82, 90), U.rand(14, Wd - 14));
             this._kick(rx, ry, { free: true, h: 1.4, T: 0.7, done: () => { this.brain.lastTouch = 1 - i; this._contest(); } });
             this.brain.lastTouch = 1 - i;
@@ -1573,7 +1574,7 @@
             if (!this.instant && TL.SFX) TL.SFX.groan();
             const [rx, ry] = this.world(i, U.rand(86, 94), U.rand(18, Wd - 18));
             this._kick(rx, ry, { free: true, h: 1.2, T: 0.6, done: () => this._contest() });
-          } else if (mk === 'blocked' && this.live && Math.random() < 0.35) {
+          } else if (mk === 'blocked' && this.live && Math.random() < 0.5) {
             // Bloqueado y a córner: el rechace sale por la línea de fondo
             this._kick(gx + dir * 1.6, Wd / 2 + (Math.random() < 0.5 ? -1 : 1) * U.rand(8, 20), { free: true, h: 1.2, T: 0.6, done: () => { this.brain.lastTouch = 1 - i; this._contest(); } });
             this.brain.lastTouch = 1 - i;
@@ -1584,7 +1585,18 @@
           } else if (!this.instant && TL.SFX) TL.SFX.groan();
           if (gk) gk.state = null;
         }, end: () => { this._unfocus(); this.ov = null; } });
-        if (mk !== 'post' && mk !== 'blocked') beats.push(...this._goalKick(1 - i));
+        if (mk !== 'post' && mk !== 'blocked') {
+          // Si lo ha rozado un defensa, córner; si no, saque de puerta
+          beats.push({ d: 0.05, start: () => {
+            if (this._cornerTouch === 1 - i) {
+              this._cornerTouch = null;
+              this.cornerTop = this.ball.y < Wd / 2;
+              if (this.m.liveCorner) { const ce = this.m.liveCorner(i); if (ce) this._reveal(ce); }
+              this.brain._restart(i, 'corner');
+              this._seq(this._cornerSetup(i, null).concat(this._cornerPlay(i)));
+            } else this._seq(this._goalKick(1 - i));
+          } });
+        }
       }
       return beats;
     }
@@ -1835,7 +1847,7 @@
         beats.push({ d: 0.9, start: () => {
           const v = this.A[e.pid], f = e.pid2 != null ? this.A[e.pid2] : null;
           if (e.kind === 'hand') { if (f) this._icon(f.pid, 'hand', 1.2); }
-          else { if (v) { v.state = 'down'; v.until = this.t + 1.8; v.fall = Math.random() * 6; } if (f) { f.state = 'slide'; f.until = this.t + 0.6; } }
+          else { if (v) { v.state = 'down'; v.until = this.t + 1.8; v.fall = Math.random() * 6; } if (f && e.kind !== 'dive') { f.state = 'slide'; f.until = this.t + 0.6; } }
           if (!this.instant && TL.SFX) TL.SFX.whistle(false);
           this.ball.owner = null; this.ball.roll = { vx: dir * 2, vy: 0 };
           this.ov = { all: 'stay', p: {} };

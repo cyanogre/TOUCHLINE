@@ -542,7 +542,7 @@
     }
 
     _ev(type, team, pid, pid2, text, extra) {
-      const e = { min: this.min, type, team, pid, pid2, text };
+      const e = { min: Math.max(this.min, this.live ? 1 : 0), type, team, pid, pid2, text };
       if (this.extra) e.add = this.extra;
       if (extra) Object.assign(e, extra);
       this.events.push(e);
@@ -944,7 +944,7 @@
       if (Math.random() < (ctx.blockP || 0)) {
         return this._ev('miss', i, sPid, null, this.detail && Math.random() < 0.5 ? say('m_blocked', { p: shooter.short }) : '', Object.assign({ miss: 'blocked' }, sx));
       }
-      const onT = U.clamp(0.42 + (skill - 65) / 150 + (ctx.d != null ? (16 - ctx.d) / 55 : 0) - (head ? 0.06 : 0), 0.2, 0.8);
+      const onT = U.clamp(0.3 + (skill - 65) / 160 + (ctx.d != null ? (14 - ctx.d) / 60 : 0) - (head ? 0.06 : 0), 0.15, 0.7);
       if (gk && Math.random() < onT) {
         this.stats.onT[i]++;
         this.pl[gk.id].sv++;
@@ -996,7 +996,7 @@
         const cr = Math.random(), booked = this.pl[fid].y ? 0.5 : 1, CK = L.CARD || 1;
         const n0 = this.events.length;
         if (ctx.dogso && !pen) { this._red(i, fouler, true, 'dogso', victim); card = 'red'; }
-        else if (cr < M.redPerFoul * strict * (FOUL_RED[kind] || 1) * CK) { this._red(i, fouler, true, null, victim, kind); card = 'red'; }
+        else if (cr < M.redPerFoul * strict * (FOUL_RED[kind] || 1) * 0.8) { this._red(i, fouler, true, null, victim, kind); card = 'red'; }
         else if (cr < (M.redPerFoul * (FOUL_RED[kind] || 1) + M.yellowPerFoul * late * booked * kfx) * strict * CK || (ctx.dogso && pen)) { this._yellow(i, fouler, victim, kind); card = this.pl[fid].r ? 'red' : 'yellow'; }
         for (let k = n0; k < this.events.length; k++) { const e = this.events[k]; if (e.type === 'yellow' || e.type === 'red') { e.live = true; if (pen) e.afterPen = true; } }
         if (!pen && !card && this.detail) {
@@ -1006,6 +1006,27 @@
         if (Math.random() < M.heatedPerFoul * (card ? 3 : 1)) this._heated();
       }
       return { evs: this.events.slice(start), pen, card, missed };
+    }
+
+    /**
+     * Piscinazo en el área (lo ha hecho de verdad pid, del equipo i, junto a did). El árbitro casi siempre lo ve
+     * y la amonesta; a veces se lo traga y pita penalti (y el VAR puede corregirlo).
+     */
+    liveDive(i, pid, did) {
+      if (this.min === 45 && this.htDone && !this.h2) return null;
+      if (this.done || !this.pl[pid]) return null;
+      const diver = this.P(pid), def = did != null ? this.P(did) : null, start = this.events.length;
+      let pen = false, overturned = false;
+      if (Math.random() < 0.22 + this.ref.err * 0.6) {
+        this._ev('pen', i, pid, did, this.detail ? say('phantom', { v: diver.short }) : '', { controversy: true, kind: 'dive', live: true });
+        if (this.ref.var && Math.random() < 0.6) {
+          if (this.detail) { this._ev('var', i, null, null, say('var', {})); this._ev('var', i, null, null, say('phantomOff', {})); }
+          overturned = true;
+        } else { this.incidents.push({ type: 'phantomPenalty', team: 1 - i, pid, min: this.min }); this._penalty(i, diver, def); pen = true; }
+      } else this._yellow(i, diver, def, 'dive');
+      const evs = this.events.slice(start);
+      for (const e of evs) e.live = true;
+      return { evs, pen, overturned };
     }
 
     /** Fuera de juego señalado en el campo. */
