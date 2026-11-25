@@ -714,6 +714,9 @@
     UI.closeSheet();
     if (k === 'end') {
       clearTimeout(MV.timer);
+      // Lo que queda se juega con el motor por minutos (sin campo): si se quedara en «en vivo», nadie tiraría
+      m.live = false; m.livePoss = null;
+      if (MV.pitch) MV.pitch.live = false;
       while (!m.done) {
         const evs = m.step();
         stepEvents(evs, true);
