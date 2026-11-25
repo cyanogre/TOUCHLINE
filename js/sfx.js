@@ -274,9 +274,6 @@
     'limit-break': 1, evento: 0.75, alma: 0.8, cortinilla: 0.6, 'cortinilla-voz': 0.8
   };
   // Lo que puede sonar en la portada y los menús va primero
-  // Carpetas con archivos reservados: la cortinilla del partido usa solo la voz 1 y 2; la 3 y la 4 son para anuncios
-  // (se piden con { only: [3, 4] })
-  const ONLY = { 'cortinilla-voz': [1, 2] };
   const FIRST = ['aplausos', 'boton', 'seleccion', 'atras', 'exito', 'error', 'dinero', 'fichaje', 'nivel', 'evento', 'alma'];
   const banks = {};
   let samplesStarted = false;
@@ -298,24 +295,24 @@
     B.st = 'probe';
     return (B.probing = getFile(B.cat, 1).then(ab => {
       if (!ab) { B.st = 'empty'; settle(B); return; }
-      B.st = 'files'; B.raw.push({ ab, n: 1 }); decode(B);
+      B.st = 'files'; B.raw.push(ab); decode(B);
     }));
   }
   /** Las demás variantes (2.mp3, 3.mp3…), con calma. */
   async function more(B) {
     if (B.st !== 'files' || B.more) return;
     B.more = true;
-    for (let k = 2; k <= MAXV; k++) { const ab = await getFile(B.cat, k); if (!ab) break; B.raw.push({ ab, n: k }); decode(B); }
+    for (let k = 2; k <= MAXV; k++) { const ab = await getFile(B.cat, k); if (!ab) break; B.raw.push(ab); decode(B); }
   }
   /** Decodifica lo descargado (hace falta el contexto de audio, que se crea con el primer toque). */
   function decode(B) {
     if (!ctx) return;
     while (B.raw.length) {
-      const { ab, n } = B.raw.shift();
+      const ab = B.raw.shift();
       B.busy++;
       const done = b => {
         B.busy--;
-        if (b) { const v = rms(b); B.list.push({ b, n, gain: v ? Math.max(0.3, Math.min(5, 0.16 / v)) : 1 }); }
+        if (b) { const v = rms(b); B.list.push({ b, gain: v ? Math.max(0.3, Math.min(5, 0.16 / v)) : 1 }); }
         else if (!B.list.length && !B.raw.length && !B.busy) B.st = 'empty';   // ninguno se pudo leer
         settle(B);
       };
@@ -330,7 +327,7 @@
     const now = Date.now(), w = B.wait.splice(0);
     for (const x of w) {
       if (now - x.t > x.max || !on()) continue;      // ha llegado tarde: mejor no sonar que sonar a destiempo
-      if (pool(B, x.o).length) playNow(B, x.o); else if (x.synth) x.synth();
+      if (B.list.length) playNow(B, x.o); else if (x.synth) x.synth();
     }
   }
   /** Descarga todas las carpetas: primero mira cuáles tienen archivos (de 6 en 6) y luego las variantes. */
@@ -342,18 +339,12 @@
     const worker = async () => { while (i < cats.length) await probe(bank(cats[i++])); };
     Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]).then(async () => { for (const k of cats) await more(bank(k)); });
   }
-  /** Las grabaciones que valen para esta llamada (todas, o solo los números de `o.only` / los de ONLY). */
-  function pool(B, o) {
-    const only = o.only || ONLY[B.cat];
-    return only ? B.list.filter(x => only.includes(x.n)) : B.list;
-  }
   function playNow(B, o) {
-    const c = ctx, L = pool(B, o);
-    if (!L.length) return 0;
-    let k = Math.floor(Math.random() * L.length);
-    if (L.length > 1 && L[k] === B.last) k = (k + 1) % L.length;
-    B.last = L[k];
-    const it = L[k], src = c.createBufferSource(), g = c.createGain(), t = c.currentTime + (o.delay || 0);
+    const c = ctx;
+    let k = Math.floor(Math.random() * B.list.length);
+    if (B.list.length > 1 && k === B.last) k = (k + 1) % B.list.length;
+    B.last = k;
+    const it = B.list[k], src = c.createBufferSource(), g = c.createGain(), t = c.currentTime + (o.delay || 0);
     src.buffer = it.b;
     src.playbackRate.value = o.rate || (0.97 + Math.random() * 0.06);   // que ni el mismo archivo suene idéntico
     g.gain.value = it.gain * (VOL[B.cat] || 0.6) * (o.vol == null ? 1 : o.vol);
@@ -377,7 +368,7 @@
     o = o || {};
     const B = bank(cat);
     decode(B);
-    if (pool(B, o).length) return playNow(B, o);
+    if (B.list.length) return playNow(B, o);
     if (B.st === 'empty') return 0;
     preloadSamples();
     probe(B);

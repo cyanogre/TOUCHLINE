@@ -57,7 +57,7 @@ Para `canticos`, prueba varias melodías: «la la la la», «oh oh oh», palmas 
 | `evento` | Se para el calendario por un evento (el «¡bum!») | <1 s | Short dramatic comic impact hit, punchy boom with a quick whoosh |
 | `alma` | Equipas o consigues un alma (modo fantasía) | 1-2 s | Mystical ethereal chime, magical soul energy swirling, soft choir pad |
 | `cortinilla` | Cortinilla de tele en los cortes y repeticiones (falta, córner, fuera de juego…) | 0,6-1 s | Fast TV sports broadcast transition whoosh, swoosh sweep with a short bright digital sting at the end |
-| `cortinilla-voz` | La voz «¡TOUCHLINE!» cuando sale el logo de la cortinilla (siempre en repeticiones, saques de centro y penaltis; a veces en el resto). **Solo `1.mp3` y `2.mp3`**: `3.mp3` y `4.mp3` (en japonés) están reservadas para anuncios | 0,6-1 s | Voz (Text to Speech o Voice Design): un locutor deportivo enérgico gritando «Touchline!» |
+| `cortinilla-voz` | La voz «¡TOUCHLINE!» cuando sale el logo de la cortinilla (siempre en repeticiones, saques de centro y penaltis; a veces en el resto) | 0,6-1 s | Voz (Text to Speech o Voice Design): un locutor deportivo enérgico gritando «Touchline!» |
 
 Para el **limit break** basta con un archivo: `assets/sfx/limit-break/1.mp3`. El estallido de la cinemática llega a los 1,6 s: si el audio tiene el golpe fuerte más o menos ahí, irán sincronizados.
 
