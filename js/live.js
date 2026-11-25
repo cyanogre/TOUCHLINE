@@ -25,10 +25,10 @@
   const LIVE = TL.LIVE = {
     MIN_S: 2.9,       // segundos de juego en el campo por minuto de partido
     DEAD: 0.3,        // durante saques y escenas el reloj corre más despacio (no cuentan celebraciones ni repeticiones)
-    CONV: 3.3,        // el partido se ve condensado: las ocasiones que se ven valen algo más que en 90 minutos reales
+    CONV: 3.5,        // el partido se ve condensado: las ocasiones que se ven valen algo más que en 90 minutos reales
     SHOOT_V: 5.5,     // cuánto pesa un buen tiro frente a seguir la jugada
-    SHOOT_MIN: 0.04,  // por debajo de este xG no se tira
-    SHOOT_K: 10,      // pendiente: con xG 0,10 tira ~la mitad de las veces que puede; con 0,18, casi siempre
+    SHOOT_MIN: 0.035, // por debajo de este xG no se tira
+    SHOOT_K: 14,      // pendiente: con xG 0,10 tira ~la mitad de las veces que puede; con 0,18, casi siempre
     FOUL: 0.25,       // probabilidad base de falta en una entrada
     W_FIN: 0.45, W_MID: 1.15, W_OWN: 1.3,   // cuánto reloj gasta cada segundo según dónde está el balón
     CARD: 1.8,

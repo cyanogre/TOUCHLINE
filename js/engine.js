@@ -919,8 +919,10 @@
       if (sp) p *= 1.6;
       p = U.clamp(p, 0.01, sp ? 0.8 : 0.9);
       this.stats.shots[i]++;
-      this.stats.xg[i] += ctx.xg;
-      const sx = { origin: ctx.origin || 'open', shotType: ctx.type || 'placed', live: true, xgv: +ctx.xg.toFixed(2) };
+      // xG del partido condensado: lo que vale la ocasión en este partido (cuadra con los goles que salen)
+      const xgm = Math.min(0.95, ctx.xg * (L.CONV || 1.9));
+      this.stats.xg[i] += xgm;
+      const sx = { origin: ctx.origin || 'open', shotType: ctx.type || 'placed', live: true, xgv: +xgm.toFixed(2) };
       if (sp) sx.special = sp.id;
       const ass = aPid != null && aPid !== sPid && t.onPitch.some(o => o.pid === aPid) ? this.P(aPid) : null;
       if (Math.random() < p) {
