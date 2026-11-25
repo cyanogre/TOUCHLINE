@@ -424,6 +424,7 @@
       const on = new Set();
       this.m.teams.forEach((t, i) => t.onPitch.forEach(o => {
         on.add(o.pid);
+        if (this.A[o.pid]) this.A[o.pid].hurt = !!o.hurt;   // lesionado que sigue: cojea
         if (!this.A[o.pid]) {
           // Entra desde la banda, junto al cuarto árbitro
           const a = this._spawn(i, o.pid, L / 2 + (i === 0 ? -1.5 : 1.5), -0.6);
@@ -551,7 +552,7 @@
       if (a.until && a.until < this.t && a.state !== 'walk') a.state = null;
       const e = a.kind === 'pl' ? this.energy(a) : 1;
       // Punta de velocidad real (fútbol femenino: unos 7 m/s las más rápidas), menos con el cansancio
-      const top = a.kind === 'pl' ? 6.2 * a.pace * (0.6 + 0.4 * e) : a.kind === 'ref' ? 6 : a.kind === 'ar' ? 5.5 : 4.5;
+      const top = a.kind === 'pl' ? 6.2 * a.pace * (0.6 + 0.4 * e) * (a.hurt ? 0.65 : 1) : a.kind === 'ref' ? 6 : a.kind === 'ar' ? 5.5 : 4.5;
       const speed = a.state === 'walk' || a.state === 'sad' ? Math.min(a.leave ? 2.6 : 1.6, top) : top * (a.run || 0.5);
       // Cada jugadora tiene su físico: reacción, arrancada, frenada y giro (datos de tracking reales, escalados)
       if (a.react == null) {
