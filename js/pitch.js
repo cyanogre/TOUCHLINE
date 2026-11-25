@@ -407,12 +407,8 @@
       for (const a of list) { if (skip && skip(a)) continue; const d = d2(a, pt); if (d < bd) { bd = d; best = a; } }
       return best;
     }
-    rate() {
-      // Con el balón parado (alguien va a por él, se colocan para un saque) el tiempo pasa más deprisa, como
-      // cuando la tele acelera los tiempos muertos: todo se sigue viendo, sin saltos, pero sin esperas eternas
-      const dead = (this.place || this.fetch || (this.beat && this.beat.arrive)) && !this.replay && this.slowT >= 1;
-      return Math.pow(this.speed, 0.62) * this.slow * (dead ? 2.4 : 1);
-    }
+    /** Velocidad del campo: la elegida (x1–x16) y la cámara lenta de las jugadas grandes. Nunca cambia de golpe. */
+    rate() { return Math.pow(this.speed, 0.62) * this.slow; }
 
     _spawn(i, pid, x, y) {
       const p = this.P(pid);
@@ -1665,13 +1661,16 @@
         this.cornerTop = null;
         const cy = top ? 0.4 : Wd - 0.4;
         const b = this.ball;
-        this._placeBall(gx - dir * 0.4, cy, 1.4, null, i);
-        this.poss = i;
         const atts = this.team(i).filter(a => !this.isGK(a));
         const defs = this.team(1 - i).filter(a => !this.isGK(a));
-        // Lanzador: el mejor pasador
-        const taker = atts.slice().sort((a, c) => (this.P(c.pid).st[2] || 0) - (this.P(a.pid).st[2] || 0)).find(a => a.pid !== shooter) || atts[0];
+        // Lanzador: de los mejores pasadores, el que esté más cerca del banderín (nadie cruza el campo para sacar);
+        // es él quien va a por el balón
+        const flag = { x: gx - dir * 0.4, y: cy };
+        const good = atts.filter(a => a.pid !== shooter).sort((a, c) => (this.P(c.pid).st[2] || 0) - (this.P(a.pid).st[2] || 0)).slice(0, 4);
+        const taker = good.sort((a, c) => Math.hypot(a.x - flag.x, a.y - flag.y) - Math.hypot(c.x - flag.x, c.y - flag.y))[0] || atts[0];
         this.cornerTaker = taker ? taker.pid : null;
+        this._placeBall(flag.x, flag.y, 1.4, taker ? taker.pid : null, i);
+        this.poss = i;
         const p = {};
         if (taker) p[taker.pid] = { x: gx - dir * 0.9, y: top ? -0.3 : Wd + 0.3, run: 0.8 };
         // Rematadores: los más altos/peligrosos (centrales y delanteros) al área
@@ -2319,7 +2318,7 @@
       const real = Math.min(0.05, (now - this._last) / 1000);
       this._last = now;
       if (this.loading()) { this._drawLoading(); this.raf = requestAnimationFrame(this._loop); return; }
-      this.slow += (this.slowT - this.slow) * Math.min(1, real * 6);
+      this.slow += (this.slowT - this.slow) * Math.min(1, real * (this.slowT > this.slow ? 2.2 : 6));   // frena rápido, recupera despacio
       const dt = real * this.rate();
       this.t += dt;
       // Durante la repetición el partido en directo se congela: al volver, todos siguen exactamente donde estaban
