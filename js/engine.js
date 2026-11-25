@@ -579,10 +579,11 @@
       }
       const m = this.min;
       const M = TL.EventsData.MATCH;
-      const poss = this.possession();
+      // En vivo (partido completo en el campo) la posesión es la que se ha visto
+      const poss = this.live && this.livePoss != null ? this.livePoss : this.possession();
       this.stats.possSum[0] += poss; this.stats.possSum[1] += 1 - poss;
 
-      if (!this.extra) for (const ev of this.plan) if (ev.min === m) this._planned(ev);
+      if (!this.extra) for (const ev of this.plan) if (ev.min === m && !(this.live && ev.type === 'phantom')) this._planned(ev);
 
       for (const i of [0, 1]) {
         const t = this.teams[i];
@@ -598,11 +599,13 @@
           }
           t.desperate = diff < 0 && diff >= -2 && m >= 84 && t.mentality === 2;
         }
+        const possI = i === 0 ? poss : 1 - poss;
+        // En vivo, tiros, faltas y fueras de juego nacen en el campo (liveShot, liveFoul, liveOffside…)
+        if (!this.live) {
         const xg = this.xg(i);
         this.stats.xg[i] += xg / 90;
         if (Math.random() < Math.min(0.6, xg / 90 / 0.105)) this._shot(i);
         // Faltas: las comete sobre todo el equipo sin balón
-        const possI = i === 0 ? poss : 1 - poss;
         const fr = M.foulsPerTeam / 90 * (0.55 + 0.9 * (1 - possI)) * MENT_FOULS[t.mentality] * (m > 75 ? 1.12 : 1);
         if (Math.random() < fr) this._foul(i);
         if (Math.random() < M.offsidePerTeam / 90) {
@@ -612,6 +615,7 @@
             const o = fw.length ? U.pick(fw) : null;
             if (o) this._ev('offside', i, o.pid, null, Math.random() < 0.3 ? say('offside', { p: this.P(o.pid).short }) : '');
           }
+        }
         }
         if (this.detail && t.desperate && !t.lateCall) {
           t.lateCall = true;
@@ -851,14 +855,14 @@
         const gk = this._gk(i);
         this._yellow(i, gk && Math.random() < 0.5 ? gk : pick(() => 1), null, 'waste');
       }
-      if (Math.random() < 0.06 / 90 * strict) {
+      if (!this.live && Math.random() < 0.06 / 90 * strict) {
         const ot = this.teams[1 - i].onPitch.filter(o => F.LINE[o.slot] === 1);
         const diver = pick(o => (F.LINE[o.slot] === 3 ? 4 : F.LINE[o.slot] === 2 ? 1.5 : 0.2));
         this._yellow(i, diver, ot.length ? this.P(U.pick(ot).pid) : null, 'dive');
       }
       // Porteros (el libre indirecto es para el rival)
       const gk = this._gk(i);
-      if (gk && this.detail) {
+      if (gk && this.detail && !this.live) {
         const r = Math.random();
         if (r < 0.035 / 90) this._ev('ifk', 1 - i, gk.id, null, say('backpass', { k: gk.short }), { kind: 'backpass' });
         else if (r < 0.05 / 90) this._ev('ifk', 1 - i, gk.id, null, say('hold6', { k: gk.short }), { kind: 'hold6' });
@@ -886,6 +890,137 @@
       e.pid = defPid;
       if (this.detail) e.text = say('og', { p: this.P(defPid).short });
       return true;
+    }
+
+    // ================================================================ Motor en vivo
+    // El partido completo se juega en el campo: el cerebro táctico decide quién pasa, regatea, entra o dispara,
+    // y en ese instante el motor resuelve lo que pasa con los atributos y la situación real. Aquí se apunta
+    // (marcador, estadísticas, narración, tarjetas). La simulación por minutos solo se usa cuando el partido
+    // no se ve (resto de la jornada, resultado rápido, saltos).
+
+    /**
+     * Un remate en el campo. ctx: { xg (situación: distancia, ángulo, presión, bloqueos, portero),
+     * d, type, origin, blockP, ogPid (defensa en la trayectoria), offMiss (fuera de juego no señalado), kind: 'fk' }.
+     */
+    liveShot(i, sPid, aPid, ctx) {
+      if (this.min === 45 && this.htDone && !this.h2) return null;
+      if (this.done || !this.pl[sPid]) return null;
+      const t = this.teams[i];
+      if (!t.onPitch.some(o => o.pid === sPid)) return null;
+      const shooter = this.P(sPid), L = TL.LIVE || {};
+      const tfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
+      const gk = this._gk(1 - i), gkv = gk ? eff(gk, 'GK') : 30;
+      const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
+      const head = ctx.type === 'header';
+      const skill = head ? (shooter.st[1] * 0.5 + shooter.st[5] * 0.5) : sho;
+      const sp0 = TL.Special && !head && ctx.kind !== 'fk' && TL.Special.of(this.S, shooter);
+      const sp = sp0 && Math.random() < U.clamp(0.05 + (shooter.st[1] - 74) * 0.006, 0.04, 0.12) ? sp0 : null;
+      let p = ctx.xg * (L.CONV || 1.9) * Math.pow(skill / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(sPid).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1);
+      if (sp) p *= 1.6;
+      p = U.clamp(p, 0.01, sp ? 0.8 : 0.9);
+      this.stats.shots[i]++;
+      this.stats.xg[i] += ctx.xg;
+      const sx = { origin: ctx.origin || 'open', shotType: ctx.type || 'placed', live: true, xgv: +ctx.xg.toFixed(2) };
+      if (sp) sx.special = sp.id;
+      const ass = aPid != null && aPid !== sPid && t.onPitch.some(o => o.pid === aPid) ? this.P(aPid) : null;
+      if (Math.random() < p) {
+        // Fuera de juego que el linier no vio: el VAR lo anula (si hay VAR)
+        if (ctx.offMiss && this.ref.var) {
+          const ve = this.detail ? this._ev('var', i, sPid, null, say('var', {})) : null;
+          const d = this._ev('disallowed', i, sPid, null, this.detail ? say('varOff', { p: shooter.short }) : '', Object.assign({ viaVar: true, varEv: ve }, sx));
+          return d;
+        }
+        // Desvío en un defensa que estaba en la trayectoria: a veces acaba siendo gol en propia puerta
+        if (ctx.ogPid != null && this.pl[ctx.ogPid] && Math.random() < 0.18) {
+          this._ownGoal(i, this.P(ctx.ogPid), sx);
+          const e = this.events[this.events.length - 1];
+          e.ogDef = true;
+          return e;
+        }
+        const n0 = this.events.length;
+        this._scoreGoal(i, shooter, ass, ctx.kind === 'fk' ? 'fk' : 'open', sx);
+        return this.events[n0];
+      }
+      if (Math.random() < (ctx.blockP || 0)) {
+        return this._ev('miss', i, sPid, null, this.detail && Math.random() < 0.5 ? say('m_blocked', { p: shooter.short }) : '', Object.assign({ miss: 'blocked' }, sx));
+      }
+      const onT = U.clamp(0.42 + (skill - 65) / 150 + (ctx.d != null ? (16 - ctx.d) / 55 : 0) - (head ? 0.06 : 0), 0.2, 0.8);
+      if (gk && Math.random() < onT) {
+        this.stats.onT[i]++;
+        this.pl[gk.id].sv++;
+        const big = ctx.xg > 0.28 || ctx.origin === 'counter';
+        const k = head ? 's_header' : ctx.type === 'long' ? 's_long' : ctx.origin === 'counter' ? 's_1v1' : 'save';
+        return this._ev('save', i, sPid, gk.id, this.detail && (big || Math.random() < 0.45) ? say(k, { p: shooter.short, k: gk.short }) : '', Object.assign({ big }, sx));
+      }
+      const r2 = Math.random();
+      const miss = r2 < 0.09 ? 'post' : head ? 'header' : ctx.type === 'long' ? 'long' : 'wide';
+      const k = miss === 'post' ? 'm_post' : miss === 'header' ? 'm_header' : miss === 'long' ? 'm_long' : 'miss';
+      return this._ev('miss', i, sPid, null, this.detail && (miss === 'post' || Math.random() < 0.4) ? say(k, { p: shooter.short }) : '', Object.assign({ miss }, sx));
+    }
+
+    /**
+     * Una falta en el campo (la ha cometido de verdad fid sobre vid). ctx: { kind, inBox, dogso, adv }.
+     * Devuelve { evs, pen, card, missed }: los sucesos (falta o tarjeta, penalti y su lanzamiento, VAR).
+     */
+    liveFoul(i, fid, vid, ctx) {
+      if (this.min === 45 && this.htDone && !this.h2) return null;
+      if (this.done || !this.pl[fid] || !this.pl[vid]) return null;
+      const M = TL.EventsData.MATCH, L = TL.LIVE || {}, opp = 1 - i;
+      const fouler = this.P(fid), victim = this.P(vid);
+      const start = this.events.length;
+      this.stats.fouls[i]++;
+      this.pl[fid].f++;
+      const lfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
+      const strict = this.ref.strict * this.bonus[i].cards * (lfx(fid).card || 1);
+      const late = this.min > 75 ? 1.2 : 1;
+      const kind = ctx.kind || 'trip', kfx = FOUL_CARD[kind] || 1;
+      let pen = false, missed = false, card = null;
+      if (ctx.inBox) {
+        const hand = kind === 'hand';
+        const ptxt = hand ? say('penHand', { p: fouler.short }) : say('pen', { p: fouler.short, v: victim.short });
+        if (Math.random() < this.ref.err * 0.6) {
+          // El árbitro no lo ve; el VAR corrige la mayoría
+          if (this.ref.var && Math.random() < 0.65) {
+            if (this.detail) this._ev('var', opp, null, null, say('var', {}));
+            this._ev('pen', opp, vid, fid, this.detail ? say('varPen', {}) : '', { kind, live: true });
+            pen = true;
+          } else {
+            this._ev('refmiss', opp, vid, null, this.detail ? say('refMiss', { v: victim.short }) : '', { controversy: true });
+            this.incidents.push({ type: 'penaltyDenied', team: opp, pid: vid, min: this.min });
+            missed = true;
+          }
+        } else { this._ev('pen', opp, vid, fid, this.detail ? ptxt : '', { kind, live: true }); pen = true; }
+        if (pen) this._penalty(opp, victim, fouler);
+      }
+      if (!missed) {
+        const cr = Math.random(), booked = this.pl[fid].y ? 0.5 : 1, CK = L.CARD || 1;
+        const n0 = this.events.length;
+        if (ctx.dogso && !pen) { this._red(i, fouler, true, 'dogso', victim); card = 'red'; }
+        else if (cr < M.redPerFoul * strict * (FOUL_RED[kind] || 1) * CK) { this._red(i, fouler, true, null, victim, kind); card = 'red'; }
+        else if (cr < (M.redPerFoul * (FOUL_RED[kind] || 1) + M.yellowPerFoul * late * booked * kfx) * strict * CK || (ctx.dogso && pen)) { this._yellow(i, fouler, victim, kind); card = this.pl[fid].r ? 'red' : 'yellow'; }
+        for (let k = n0; k < this.events.length; k++) { const e = this.events[k]; if (e.type === 'yellow' || e.type === 'red') { e.live = true; if (pen) e.afterPen = true; } }
+        if (!pen && !card && this.detail) {
+          const txt = ctx.adv ? say('adv', { p: fouler.short, v: victim.short }) : Math.random() < 0.3 ? say('f_' + kind, { p: fouler.short, v: victim.short }) : '';
+          this._ev('foul', i, fid, vid, txt, { hard: kind === 'late' || kind === 'high' || kind === 'elbow', kind, adv: !!ctx.adv, live: true });
+        }
+        if (Math.random() < M.heatedPerFoul * (card ? 3 : 1)) this._heated();
+      }
+      return { evs: this.events.slice(start), pen, card, missed };
+    }
+
+    /** Fuera de juego señalado en el campo. */
+    liveOffside(i, pid) {
+      if (this.done) return null;
+      this.stats.offsides[i]++;
+      const p = this.P(pid);
+      return this._ev('offside', i, pid, null, this.detail && p && Math.random() < 0.4 ? say('offside', { p: p.short }) : '', { live: true });
+    }
+
+    /** Córner que se ha visto en el campo. */
+    liveCorner(i) {
+      if (this.done) return null;
+      this.stats.corners[i]++;
+      return this._ev('corner', i, null, null, this.detail && Math.random() < 0.35 ? say('corner', { t: this.S.clubs[this.teams[i].club].name }) : '', { live: true });
     }
 
     /** Falta cometida por el equipo i. */

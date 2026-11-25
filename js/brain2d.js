@@ -48,6 +48,8 @@
   }
   function hash01(v) { let h = 2166136261; for (const ch of String(v)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return (h % 10007) / 10007; }
 
+  // Ajustes del partido en vivo (js/live.js los define; aquí, por si se carga sin él)
+  const LV = new Proxy({}, { get: (o, k) => (TL.LIVE && TL.LIVE[k] != null ? TL.LIVE[k] : { CARRY_FWD: 0.06, PASS_FWD: 0.12, DRIBBLE: 0.05 }[k]) });
   const ROLE = { GK: 'GK', CB: 'CB', RB: 'FB', LB: 'FB', CDM: 'DM', CM: 'CM', CAM: 'AM', RM: 'WM', LM: 'WM', RW: 'W', LW: 'W', ST: 'ST' };
   const ATT_ROLES = { ST: 4, W: 3, AM: 2.5, WM: 2, WB: 1.6, CM: 1.3, FB: 0.8, DM: 0.5, CB: 0.15, GK: 0 };
 
@@ -108,7 +110,7 @@
     gov(i) {
       // La posesión que se ve en el campo se acerca a la del motor (que es la que cuenta en las estadísticas)
       const m = this.P.m, tot = this.possT[0] + this.possT[1];
-      if (!m.min || tot < 6) return 0;
+      if (this.P.live || !m.min || tot < 6) return 0;
       const t0 = m.stats.possSum[0] / m.min, tgt = i === 0 ? t0 : 1 - t0;
       return clamp((tgt - this.possT[i] / tot) * 2.5, -0.35, 0.35);
     }
@@ -601,7 +603,7 @@
       if (pr > 3.2 && off < 93 && cd < off - 5 && Math.random() < (ph === 'counter' ? 0.65 : 0.3)) {
         const cand = mates.filter(a => {
           const r = this.role(a).role, d = P.depth(att, a.x);
-          return ATT_ROLES[r] >= 1.3 && d <= off + 0.1 && d > off - 7;
+          return ATT_ROLES[r] >= 1.3 && d <= off + 0.1 + (P.live && Math.random() < 0.12 ? 1.4 : 0) && d > off - 7;
         }).sort((p, q) => ATT_ROLES[this.role(q).role] * (q.pace || 1) - ATT_ROLES[this.role(p).role] * (p.pace || 1));
         const a = cand[0];
         if (a) { const al = P.lat(att, a.y); start(a, 'behind', off + U.rand(8, 15), al + (CY - al) * 0.3 + U.rand(-4, 4), 2.6); return; }
@@ -689,7 +691,7 @@
       const defends = b.x < CY ? (P.dir[0] > 0 ? 0 : 1) : (P.dir[0] > 0 ? 1 : 0); // quién defiende esa portería
       if (last === defends) {
         // La tocó por última vez quien defiende: córner
-        P.m.stats.corners[1 - defends]++;
+        if (P.live && P.m.liveCorner) { const ce = P.m.liveCorner(1 - defends); if (ce) P._reveal(ce); } else P.m.stats.corners[1 - defends]++;
         this._restart(1 - defends, 'corner');
         P._seq(P._cornerSetup(1 - defends, null).concat(P._cornerPlay(1 - defends)));
       } else { this._restart(defends, 'gk'); P._seq(P._goalKick(defends)); }
@@ -747,6 +749,7 @@
       const box = P.depth(i, c.x) > 84 && Math.abs(c.y - CY) < 22 && !(this.ag && this.ag.team === i);
       const rate = (0.8 + T.press * 0.9) * (this.phase[1 - i] === 'counterpress' ? 1.5 : 1) * (box ? 1.6 : 1);
       if (Math.random() > rate * dt) return false;
+      if (P.live && this._liveFoulRoll(c, o, box, false)) return true;
       const sc = this.st(c), so = this.st(o);
       let pWin = sig((so[4] - (sc[3] * 0.7 + sc[5] * 0.3)) / 11 + 0.1 - this.gov(i) * 3 + this.gov(1 - i) * 3);
       if (box) pWin = 1 - (1 - pWin) * 0.6;
@@ -766,6 +769,8 @@
         }
         return true;
       }
+      // La han superado: a veces corta con falta (falta táctica)
+      if (P.live && this._liveFoulRoll(c, o, box, true)) return true;
       o.beat = P.t + 1.0; o.vx *= 0.3; o.vy *= 0.3;
       this.say(moving ? 'dribble' : 'shield', { team: i, p: c.pid, o: o.pid });
       if (moving) this.next = Math.min(this.next, P.t + 0.2);
@@ -778,9 +783,16 @@
       const scripted = !!(P.beat || P.script.length);
       const prev = this.ownTeam;
       const lk = this.lastKick;
+      const op = this.offPend;
+      this.offPend = null;
+      if (op && op.pid === a.pid && op.team === team && P.live && !scripted) {
+        if (op.flag && P.liveOffsideCall(a, op)) return;
+        this.offMiss = { team, pid: a.pid, t: P.t };
+      }
       this.lastTouch = team;
       this.carry = null; this.holdN = 0;
       if (prev != null && prev !== team) {
+        if (this.offMiss && this.offMiss.team !== team) this.offMiss = null;
         this.lost[prev] = P.t; this.won[team] = P.t; this.wonD[team] = P.depth(team, a.x);
         this.passes = 0; this.runs = {}; this.sup = null;
         if (!scripted && !this.restart) {
@@ -833,7 +845,10 @@
       if (this.mustClear === c.pid) { this.mustClear = null; this._clear(c, this.mustHead !== false); this.mustHead = null; return; }
       // 1) Pases
       for (const r of mates) {
-        if (this.offside(i, r) && !(this.runs[r.pid] && this.runs[r.pid].k === 'behind' && P.depth(i, r.x) <= this.offD(i) + 0.25)) continue;
+        if (this.offside(i, r) && !(this.runs[r.pid] && this.runs[r.pid].k === 'behind' && P.depth(i, r.x) <= this.offD(i) + 0.25)) {
+          const mOff = P.depth(i, r.x) - this.offD(i);
+          if (!(P.live && mOff < 2.2 && Math.random() < 0.3 * (1.25 - pas / 100))) continue;
+        }
         const o = this._passOpt(c, r, { pas, pr, lossAt, cd, cl, T, i, opp, gk });
         if (o) opts.push(o);
       }
@@ -849,6 +864,7 @@
         const td = P.depth(i, tx), tl = P.lat(i, ty);
         let v = pKeep * threat(td, tl) - (1 - pKeep) * lossAt(c.x, c.y) - 0.012 - 0.024 * (this.carryN || 0) - (Math.abs(ang) > 0.8 ? 0.008 : 0);
         if (favored) v += 0.02 * Math.max(0, td - cd) / 7;
+        if (P.live) v += LV.CARRY_FWD * Math.max(0, td - cd) / 7 + (cd > 70 && td > cd ? 0.03 : 0);
         opts.push({ k: 'carry', tx, ty, v, ang });
       }
       // 3) Regate: una rival delante, y espacio detrás de ella
@@ -860,22 +876,30 @@
         const tx = clamp(o0.x + dir * 4, 1, L - 1), ty = clamp(c.y + (c.y - o0.y) * 0.8, 1.5, Wd - 1.5);
         let v = pD * (threat(P.depth(i, tx), P.lat(i, ty)) + 0.03) - (1 - pD) * lossAt(c.x, c.y);
         if (favored) v += 0.03;
+        if (P.live && cd > 60) v += LV.DRIBBLE;
         opts.push({ k: 'dribble', tx, ty, v, o: o0 });
       }
       // 4) Centro desde la banda en tres cuartos
-      if (!gk && cd > 76 && Math.abs(cl - CY) > 16) {
-        const box = mates.filter(a => P.depth(i, a.x) > 84 && Math.abs(a.y - CY) < 13).length;
+      if (!gk && cd > (P.live ? 70 : 76) && Math.abs(cl - CY) > (P.live ? 13 : 16)) {
+        const box = mates.filter(a => P.depth(i, a.x) > 82 && Math.abs(a.y - CY) < 14).length;
         const defs = opp.filter(a => P.depth(i, a.x) > 86 && Math.abs(a.y - CY) < 14).length;
-        if (box) opts.push({ k: 'cross', v: 0.06 + 0.035 * box - 0.012 * defs + (favored && ag.kind === 'shot' && ag.origin === 'cross' ? 0.4 : 0) });
+        // En vivo, desde la banda el centro es el recurso natural: más valor cuantas más compañeras atacan el área
+        if (box) opts.push({ k: 'cross', v: (P.live ? 0.32 + 0.07 * box - 0.03 * defs : 0.06 + 0.035 * box - 0.012 * defs) + (favored && ag.kind === 'shot' && ag.origin === 'cross' ? 0.4 : 0) });
       }
       // 5) Despejar (en su área y apretada) — o la portera en largo
       if ((cd < 24 && pr < 1.6 && !gk) || gk) {
         const v = gk ? 0.012 + (1 - T.short) * 0.05 + (pr < 5 ? 0.05 : 0) : 0.02 + 0.35 * lossAt(c.x, c.y) * (pr < 1.5 ? 1 : 0.4);
         opts.push({ k: 'clear', v });
       }
-      // 6) Aguantar y esperar apoyos
+      // 6) Tirar (partido en vivo: el resultado se calcula en el momento)
+      if (P.live && !forced) {
+        const so = this._shotOpt(c);
+        if (so && Math.random() < so.pShoot) { if (this._dbgOpts) this._dbgOpts(c, opts.concat([so]), so); if (P.liveShoot(c, so)) return; }
+      }
+      // 7) Aguantar y esperar apoyos
       const pHold = pr > 4 ? 0.97 : pr > 2.2 ? 0.85 : 0.6;
-      opts.push({ k: 'hold', v: pHold * here - (1 - pHold) * lossAt(c.x, c.y) - 0.01 - 0.01 * this.holdN - (favored ? 0.05 : 0) });
+      const urge = P.live && cd > 50 ? 0.05 + 0.12 * (cd - 50) / 55 + 0.03 * this.holdN : 0;
+      opts.push({ k: 'hold', v: pHold * here - (1 - pHold) * lossAt(c.x, c.y) - 0.01 - 0.01 * this.holdN - (favored ? 0.05 : 0) - urge });
       // Elegir: las buenas eligen casi siempre lo mejor; las demás, a veces otra cosa
       const skill = (pas + reg) / 198;
       const tau = 0.008 + 0.02 * (1 - skill);
@@ -886,12 +910,14 @@
         pick = U.weighted(opts, o => Math.exp((o.v - mx) / tau));
       }
       if (!pick) { this.next = P.t + 0.4; return; }
+      if (this._dbgOpts) this._dbgOpts(c, opts, pick);   // solo pruebas
       switch (pick.k) {
         case 'pass': this._pass(c, pick, forced); break;
         case 'carry': this._carry(c, pick); break;
         case 'dribble': this._carry(c, Object.assign({}, pick, { dribble: true })); break;
         case 'cross': this._cross(c); break;
         case 'clear': this._clear(c, false); break;
+        case 'shot': if (!P.liveShoot(c, pick)) { this.holdN++; this.next = P.t + 0.3; } break;
         default: this.holdN++; this.next = P.t + U.rand(0.35, 0.7);
       }
     }
@@ -926,7 +952,7 @@
       const h = lofted ? clamp(dist * 0.12, 2.5, 9) : 0.05;
       const Tt = lofted ? 0.6 + dist / 26 : 0.12 + dist / 17;
       // ¿Quién puede cortarlo? (reacción según su defensa, arrancada y velocidad). Al área, sin remate del motor, cuesta más
-      const intoBox = td > 86 && Math.abs(ty - CY) < 20 && !(this.ag && this.ag.team === i);
+      const intoBox = !P.live && td > 86 && Math.abs(ty - CY) < 20 && !(this.ag && this.ag.team === i);
       const gb = this.gov(i) - (intoBox ? 0.14 : 0);
       let pInt = 0, cut = null, cutM = 9;
       for (const o of k.opp) {
@@ -966,6 +992,11 @@
       if (td - k.cd > 22) v += 0.03 * (1 - k.T.short);
       if (td < k.cd - 3) v -= rGK ? (k.pr < 2 ? -0.01 : 0.03) : 0.004;
       if (type === 'through') v += 0.03;
+      if (P.live) {
+        v += LV.PASS_FWD * Math.max(0, td - k.cd) / 20;
+        if (td < k.cd - 3 && k.cd > 50) v -= 0.06;
+        if (td > 84 && Math.abs(ty - CY) < 18) v += 0.03;      // balón al área
+      }
       if (ag && ag.team === i) {
         v += 0.05 * Math.max(0, td - k.cd) / 20;
         if (ag.want && ag.want.includes(r.pid)) v += 0.04;
@@ -1008,6 +1039,11 @@
       } else if (Math.random() > o.pRec && o.duel) { to = o.duel.pid; what = 'duel'; }
       this.lastKick = { team: i, from: c.pid, to: o.r.pid, type: o.type, what, t: P.t, h: o.h };
       this.kickTeam = i; this.lastTouch = i; this.restart = null;
+      this.offPend = null;
+      if (P.live && to === o.r.pid && what === 'ok') {
+        const mOff = P.depth(i, o.r.x) - this.offD(i);
+        if (mOff > 0.05 && P.depth(i, o.r.x) > L / 2) this.offPend = { pid: o.r.pid, team: i, flag: Math.random() < (mOff > 0.6 ? 0.96 : 0.6), x: o.r.x, y: o.r.y, t: P.t };
+      }
       if (c.held) c.held = false;
       this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.carry = null; this.next = P.t + 99;
@@ -1044,8 +1080,14 @@
       this.offAtKick = new Set(P.team(i).filter(a => a !== c && this.offside(i, a)).map(a => a.pid));
       this.kickTeam = i; this.lastTouch = i;
       this.carry = null; this.next = P.t + 99;
-      if (kind === 'back') P._kick(tx, ty, { h: 0.05, to: win ? win.pid : null, done: win ? null : () => this._landed() });
-      else P._kick(tx, ty, { h: 4.2, T: 1.0, to: win ? win.pid : null, done: win ? () => { if (win.team === opp && P.isGK(win)) { this._how = 'catch'; P._receive(win.pid, true); win.held = true; } else P._receive(win.pid); } : () => this._landed() });
+      if (kind === 'back') P._kick(tx, ty, { h: 0.05, to: win ? win.pid : null, done: win ? (P.live && win.team === i ? () => { if (!P.liveHeaderAt(win, 'back')) P._receive(win.pid); } : null) : () => this._landed() });
+      // En vivo, un centro que despeja una defensa cerca de su portería a veces se va a córner
+      if (P.live && win && win.team === opp && !P.isGK(win) && kind !== 'back' && Math.random() < 0.3) {
+        P._kick(tx, ty, { h: 4.2, T: 1.0, to: win.pid, done: () => { win.jump = P.t; const gx = P.goalX(i); this.lastTouch = opp; P._kick(gx + P.dir[i] * 1.6, CY + (ty < CY ? -1 : 1) * U.rand(10, 22), { free: true, h: 2, T: 0.7, done: () => { this.lastTouch = opp; P._contest(); } }); this.lastTouch = opp; } });
+        this.say('pass', { team: i, p: c.pid, q: win.pid, type: 'cross' });
+        return;
+      }
+      else P._kick(tx, ty, { h: 4.2, T: 1.0, to: win ? win.pid : null, done: win ? () => { if (win.team === opp && P.isGK(win)) { this._how = 'catch'; P._receive(win.pid, true); win.held = true; } else if (P.live && win.team === i && P.liveHeaderAt(win, kind)) { /* remate */ } else P._receive(win.pid); } : () => this._landed() });
       this.say('pass', { team: i, p: c.pid, q: win ? win.pid : null, type: kind === 'back' ? 'cutback' : 'cross' });
     }
 
@@ -1101,6 +1143,7 @@
     /** Mientras se prepara la jugada del motor (el reloj espera). Devuelve false cuando ya se puede escenificar. */
     leading(e) {
       const P = this.P;
+      if (P.live) { this.ag = null; return false; }
       const kind = this._leadKind(e);
       if (!kind || P.instant || P.over || !P.A || !Object.keys(P.A).length) { this.ag = null; return false; }
       if (!this.ag || this.ag.e !== e) this.ag = this._agenda(e, kind);

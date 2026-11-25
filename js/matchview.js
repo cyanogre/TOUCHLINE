@@ -302,8 +302,23 @@
   function tick() {
     const m = MV.m;
     if (!m || MV.paused || m.done) return;
-    // El reloj espera a que el campo termine de escenificar la jugada en curso
     const narr = narrOn();
+    // Partido completo: motor en vivo. El campo decide lo que pasa y los minutos avanzan con el juego que se ve
+    const live = !!(MV.pitch && !narr && !MV.skip && MV.pitch.onEv);
+    m.live = live;
+    if (MV.pitch) MV.pitch.live = live;
+    if (live) {
+      if (MV.pitch.loading() || !MV.pitch.liveReady()) { schedule(40); return; }
+      m.livePoss = MV.pitch.liveStep();
+      const evs = m.step();
+      stepEvents(evs, false);
+      updateHead();
+      if (!evs.some(e => e.type === 'goal')) crowdSongs(evs);
+      if (MV.tab !== 'feed') renderTab();
+      finishStep(evs);
+      return;
+    }
+    // El reloj espera a que el campo termine de escenificar la jugada en curso
     if (MV.pitch && !MV.skip && MV.pitch.busy() && (!narr || MV.showing)) { schedule(70); return; }
     // Partido completo: cada minuto se ve un rato de juego antes de que avance el reloj
     if (MV.pitch && !MV.skip && !narr && !MV.pitch.ready()) { schedule(40); return; }
@@ -860,5 +875,5 @@
   };
 
   A['play-live'] = () => (UI.advance ? UI.advance(open) : open());
-  TL.MatchView = { open, MV };
+  TL.MatchView = { open, MV, _tick: () => tick() };   // _tick: solo para las pruebas automáticas
 })();
