@@ -680,7 +680,7 @@
           const dl0 = Math.max(0.01, Math.hypot(p.tx - p.fx, p.ty - p.fy)), vh = p.ease === 'out' ? 0 : dl0 / p.T;
           const vzEnd = ((p.tz - p.fz) - 4 * p.h) / p.T;
           const settle = () => {
-            if (b.path || b.owner != null || this.instant) return;
+            if (b.path || b.owner != null || this.instant || p.stay) return;      // balón dejado en su sitio: no rueda
             if (this.netShake && this.netShake.until > this.t) return;      // dentro de la red se queda
             const k = b.z > 0.3 || vzEnd < -2 ? 0.45 : 0.6;                 // si viene del aire pierde más al botar
             const v = Math.min(14, vh * k);
@@ -797,7 +797,7 @@
       b.owner = null; b.roll = null; b.x = bx; b.y = by; b.z = 1.2;
       b.trail = []; this._bpL = null; this._bl = null; this._recCut = true;
       const d = Math.hypot(x - bx, y - by);
-      b.path = { fx: bx, fy: by, fz: 1.2, tx: x, ty: y, tz: 0, h: Math.min(2.2, 0.6 + d * 0.06), T: clamp(d / 14, 0.45, 1.1), t: 0, to: null, curve: 0, nx: 0, ny: 0 };
+      b.path = { fx: bx, fy: by, fz: 1.2, tx: x, ty: y, tz: 0, h: Math.min(2.2, 0.6 + d * 0.06), T: clamp(d / 14, 0.45, 1.1), t: 0, to: null, curve: 0, nx: 0, ny: 0, stay: true, done: () => { b.roll = null; b.z = 0; } };
     }
     _boysStep(dt) {
       if (!this.boys.length && !this.spare.length) return;
@@ -833,6 +833,7 @@
         if (!P.boy && (b.x < -0.6 || b.x > L + 0.6 || b.y < -0.6 || b.y > Wd + 0.6) && Math.hypot(b.x - P.x, b.y - P.y) > 3) { P.boy = true; this._ballBoy(P.x, P.y); P.phase = 'land'; return; }
       }
       if (P.phase === 'fetch') {
+        if (!P.boy && (b.x < -0.4 || b.x > L + 0.4) && Math.abs(b.y - Wd / 2) < GW / 2 + 1.2 && Math.hypot(b.x - P.x, b.y - P.y) > 2) { P.boy = true; this._ballBoy(P.x, P.y); P.phase = 'land'; return; }
         if (P.rid == null || !this.A[P.rid]) {
           // va a por él la más cercana del equipo que saca (la que saca, si está cerca)
           const tk = P.to != null ? this.A[P.to] : null;
@@ -1666,10 +1667,13 @@
         // Lanzador: de los mejores pasadores, el que esté más cerca del banderín (nadie cruza el campo para sacar);
         // es él quien va a por el balón
         const flag = { x: gx - dir * 0.4, y: cy };
-        const good = atts.filter(a => a.pid !== shooter).sort((a, c) => (this.P(c.pid).st[2] || 0) - (this.P(a.pid).st[2] || 0)).slice(0, 4);
-        const taker = good.sort((a, c) => Math.hypot(a.x - flag.x, a.y - flag.y) - Math.hypot(c.x - flag.x, c.y - flag.y))[0] || atts[0];
+        // Lanzador: quien antes llegue al banderín, prefiriendo a quien centra bien (nadie cruza el campo para sacar)
+        const cand = atts.filter(a => a.pid !== shooter);
+        const taker = cand.sort((a, c) => (Math.hypot(a.x - flag.x, a.y - flag.y) - (this.P(a.pid).st[2] || 60) * 0.35) - (Math.hypot(c.x - flag.x, c.y - flag.y) - (this.P(c.pid).st[2] || 60) * 0.35))[0] || atts[0];
         this.cornerTaker = taker ? taker.pid : null;
-        this._placeBall(flag.x, flag.y, 1.4, taker ? taker.pid : null, i);
+        // El recogepelotas da un balón nuevo en el banderín (el viejo se queda donde salió, dentro de la red o fuera)
+        if (Math.hypot(b.x - flag.x, b.y - flag.y) > 1.2) { b.owner = null; b.path = null; b.roll = null; this._ballBoy(flag.x, flag.y); }
+        this.place = { x: flag.x, y: flag.y, to: taker ? taker.pid : null, team: i, phase: b.path ? 'land' : 'fetch', t0: this.t, rid: taker ? taker.pid : null, boy: true };
         this.poss = i;
         const p = {};
         if (taker) p[taker.pid] = { x: gx - dir * 0.9, y: top ? -0.3 : Wd + 0.3, run: 0.8 };
