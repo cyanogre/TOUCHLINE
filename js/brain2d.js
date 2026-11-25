@@ -84,8 +84,11 @@
 
     // ------------------------------------------------------------------ Utilidades
     say(k, d) { const P = this.P; if (P.instant || !P.onCall) return; try { P.onCall(Object.assign({ k }, d || {})); } catch (e) { /* la radio no puede romper el partido */ } }
-    st(a) { const p = this.P.P(a.pid); return (p && p.st) || [60, 60, 60, 60, 60, 60]; }
-    vmax(a) { return 6.2 * (a.pace || 1) * (0.6 + 0.4 * this.P.energy(a)); }
+    st(a) {
+      const p = this.P.P(a.pid), st = (p && p.st) || [60, 60, 60, 60, 60, 60];
+      return a.hurt ? st.map(v => v * 0.8) : st;     // lesionado que sigue en el campo: rinde menos en todo
+    }
+    vmax(a) { return 6.2 * (a.pace || 1) * (0.6 + 0.4 * this.P.energy(a)) * (a.hurt ? 0.65 : 1); }
     /** Segundos que tarda en llegar a (x, y): reacción + arrancada (aceleración limitada) + carrera. */
     reach(a, x, y, react) {
       const d = Math.max(0, hyp(a.x - x, a.y - y) - 0.9);

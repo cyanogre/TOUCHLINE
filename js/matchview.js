@@ -442,7 +442,13 @@
       case 'goalAgainst': title = `Gol del rival (${who})`; body = diff < 0 ? 'Toca arriesgar.' : 'Reorganiza al equipo.'; acts = btn('mv-ment', 'Ofensiva', 'data-m="2"') + btn('mv-tactic', 'Táctica') + btn('mv-subs', 'Cambios') + cont; break;
       case 'redMine': title = `Roja a ${who}`; body = 'Te quedas con uno menos. Reajusta el sistema.'; acts = btn('mv-tactic', 'Táctica') + btn('mv-subs', 'Cambios') + btn('mv-ment', 'Defensiva', 'data-m="0"') + cont; break;
       case 'redOpp': title = `Roja al rival (${who})`; body = 'Juegas con superioridad numérica.'; acts = btn('mv-ment', 'Ofensiva', 'data-m="2"') + cont; break;
-      case 'injMine': title = `Lesión: ${who}`; body = t.onPitch.some(o => o.hurt) ? 'Sigue en el campo mermado. Haz el cambio.' : 'Las asistencias le atienden.'; acts = btn('mv-subs', 'Hacer cambio', '', true) + btn('mv-resume', 'Seguir'); break;
+      case 'injMine': {
+        title = `Lesión: ${who}`;
+        const still = p.ev && t.onPitch.some(o => o.pid === p.ev.pid);
+        body = still ? (t.onPitch.some(o => o.hurt) ? 'Sigue en el campo mermado. Haz el cambio.' : 'Las asistencias le atienden.') : 'Ya lo has cambiado.';
+        acts = (still ? btn('mv-subs', `Cambiar a ${who}`, `data-out="${p.ev.pid}"`, true) : '') + btn('mv-resume', 'Seguir');
+        break;
+      }
       case 'pen': title = 'Penalti'; body = p.ev && p.ev.text ? p.ev.text : ''; acts = cont; break;
       case 'var': title = 'Polémica arbitral'; body = p.ev && p.ev.text ? p.ev.text : ''; acts = cont; break;
       case 'crowd': title = 'Partido detenido'; body = p.ev && p.ev.text ? p.ev.text : ''; acts = cont; break;
@@ -769,10 +775,12 @@
   A['mv-ment2'] = b => { MV.m.setMentality(MV.me, +b.dataset.m); tacticSheet(MV.tacticWasPaused); };
 
   // Cambios
-  A['mv-subs'] = () => {
+  A['mv-subs'] = b => {
     const wasPaused = MV.paused;
-    if (!MV.paused) pause('manual', null);
-    MV.subOut = null;
+    if (!MV.paused) pause(MV.prompt ? MV.prompt.reason : 'manual', MV.prompt ? MV.prompt.ev : null);
+    // Desde el aviso de lesión, el que sale es el lesionado (solo falta elegir quién entra)
+    const out = b && b.dataset && b.dataset.out != null ? +b.dataset.out : null;
+    MV.subOut = out != null && MV.m.teams[MV.me].onPitch.some(o => o.pid === out) ? out : null;
     MV.subWasPaused = wasPaused;
     subSheet();
   };
@@ -789,13 +797,13 @@
     else if (!m.canSubNow(MV.me)) html += `<div class="empty">Ya has usado tus ${E.MAX_WINDOWS} paradas para cambios.${m.min < 45 ? ' Podrás hacer los que te quedan en el descanso.' : ''}</div>`;
     else if (MV.subOut == null) {
       html += `<p class="note sub-rule">${rule}</p>`;
-      html += '<p class="note">¿Quién sale? Los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => m.energy(a.pid) - m.energy(b.pid)).map(o => {
+      html += '<p class="note">¿Quién sale? Los lesionados y los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => (b.hurt ? 1 : 0) - (a.hurt ? 1 : 0) || m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
         return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · ${TL.Feel.fit(S, m.energy(o.pid)).word.toLowerCase()}${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
       }).join('');
     } else {
       const o = t.onPitch.find(x => x.pid === MV.subOut);
-      html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]}). ¿Quién entra?</p>` +
+      html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]})${o.hurt ? ' · 🚑 lesionado' : ''}. ¿Quién entra? <button class="btn sm ghost" data-act="mv-sub-other">Que salga otro</button></p>` +
         (t.bench.length ? t.bench.map(id => S.players[id]).sort((a, b) => E.eff(b, o.slot) - E.eff(a, o.slot)).map(p =>
           UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${TL.Feel.posFit(S, E.fit(p, o.slot)).word} · ${TL.Feel.fit(S, p.fit).word.toLowerCase()}` })).join('')
           : '<div class="empty">No quedan suplentes.</div>');
@@ -803,6 +811,7 @@
     UI.sheet(html, { onClose: done });
   }
   A['mv-sub-out'] = b => { MV.subOut = +b.dataset.id; subSheet(); };
+  A['mv-sub-other'] = () => { MV.subOut = null; subSheet(); };
   A['mv-sub-in'] = b => {
     const m = MV.m;
     const ok = m.substitute(MV.me, MV.subOut, +b.dataset.id);
