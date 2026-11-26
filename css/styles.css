@@ -1670,14 +1670,13 @@ body.shake-s { animation: shake-s .35s; }
 .pr-stage { position: relative; width: min(100%, 980px); aspect-ratio: 1376 / 768; flex: none; overflow: hidden; }
 .pr-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .pr-wall { position: absolute; left: 22.4%; top: 13.7%; width: 56.3%; height: 40.8%; mix-blend-mode: screen; opacity: .55; }
-.pr-tv { position: absolute; left: 0; top: 25.26%; width: 18.24%; height: 22.01%; overflow: hidden; clip-path: polygon(0 0, 100% 7.1%, 100% 97.6%, 0 100%); }
-.pr-tv .pr-ad { transform: perspective(260px) rotateY(-14deg) scaleX(1.08); transform-origin: 0 50%; }
+.pr-tv { position: absolute; left: 0; top: 25.26%; width: 18.24%; height: 22.01%; overflow: hidden; }
 .pr-light { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; image-rendering: auto; }
 .pr-ad { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4%; }
 .pr-ad b { font: italic 900 clamp(12px, 3.4vw, 30px)/1 var(--font-c), sans-serif; letter-spacing: .02em; }
 .pr-ad span { font-size: clamp(7px, 1.2vw, 12px); opacity: .85; margin-top: 3%; }
 .pr-ad.in { animation: prAd .45s ease-out; }
-@keyframes prAd { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes prAd { from { opacity: 0; filter: brightness(3) blur(2px); } to { opacity: 1; filter: none; } }
 .pr-dot { position: absolute; top: 57.5%; width: 11.5%; aspect-ratio: 1; transform: translate(-50%, -50%); }
 .pr-dot i { position: absolute; inset: 0; border-radius: 50%; background: var(--c2); box-shadow: 0 0 0 3px var(--c1), 0 4px 10px rgb(0 0 0 / .45); }
 .pr-dot.me i { background: var(--c1); box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--accent), 0 4px 10px rgb(0 0 0 / .45); }
