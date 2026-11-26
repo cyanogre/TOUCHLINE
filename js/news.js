@@ -454,13 +454,14 @@
     }
   };
 
-  const CROWD_FINE = { crowd_insults: 6000, crowd_racism: 45000, crowd_objects: 12000, crowd_pyro: 8000, crowd_invader: 4000, crowd_ultrasFight: 30000 };
+  const CROWD_FINE = { crowd_insults: 6000, crowd_racism: 45000, crowd_objects: 12000, crowd_pyro: 8000, crowd_invader: 4000, crowd_fight: 15000, crowd_ultrasFight: 30000 };
   const CROWD_TXT = {
     crowd_insults: (c, r) => [`Insultos desde la grada en el ${c.name}–${r.name}`, `El acta arbitral recoge cánticos e insultos de la afición de ${c.name}. LaLiga lo denunciará ante Competición.`],
     crowd_racism: (c, r) => [`Insultos racistas en el estadio de ${c.name}`, `El árbitro activó el protocolo antirracismo. El club identifica a los autores y se enfrenta a una fuerte sanción.`],
     crowd_objects: (c) => [`Lanzamiento de objetos desde la grada de ${c.name}`, 'Un mechero impacta cerca de un asistente. Competición abre expediente.'],
     crowd_pyro: (c) => [`Bengalas en la grada de la afición de ${c.name}`, 'El partido se detuvo unos minutos por el humo.'],
     crowd_invader: (c) => [`Un aficionado de ${c.name} invade el césped`, 'El espontáneo fue detenido por la seguridad privada.'],
+    crowd_fight: (c) => [`Pelea en la grada del ${c.name}`, 'Varios aficionados se enzarzaron durante el partido y la seguridad privada tuvo que separarlos.'],
     crowd_ultrasFight: (c, r) => [`Pelea entre ultras antes del ${c.name}–${r.name}`, 'La Policía detiene a varios radicales tras los enfrentamientos en los alrededores del estadio.']
   };
 
