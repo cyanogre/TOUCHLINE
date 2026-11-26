@@ -190,6 +190,8 @@
   // ------------------------------------------------------------ Cada semana
   /** Sueldo, efectos de tus atributos, tu pareja… y la posibilidad de que se destape lo de la amante. */
   function weekly(S) {
+    return;   // desactivado junto con el móvil
+    // eslint-disable-next-line no-unreachable
     if (!fan(S)) return;
     const m = me(S), n = N();
     m.salaryW = salary(S, S.clubs[S.user]);
@@ -284,9 +286,6 @@
   A['movil-send'] = b => sendMsg(G.S, b.dataset.c, +b.dataset.k);
   A['movil-meet'] = b => meet(G.S, b.dataset.k);
 
-  // El móvil vive en la pantalla de inicio (modo fantasía)
-  const home0 = UI.VIEWS.home;
-  UI.VIEWS.home = S => home0(S) + (fan(S) && S.mode !== 'tour' ? `<button class="mv-fab" data-act="movil-open" aria-label="Tu móvil" title="Tu móvil">📱${me(S).unknown ? '<b class="mv-badge">1</b>' : ''}</button>` : '');
-
+  // El móvil del entrenador está desactivado: solo se usa la animación de «un día» (actividades de equipo).
   TL.Movil = { me, weekly, dayAnim, expose, render, STATS };
 })();
