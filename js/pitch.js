@@ -1081,6 +1081,9 @@
       this.instant = true;
       // Lo que se estaba escenificando ya no vale: el reloj ha saltado
       this.script = []; this.beat = null; this.ov = null; this.refOv = null; this.slow = this.slowT = 1; this.fetch = null; this.place = null;
+      this.replay = null; this.wall = null;
+      // El reloj del directo estaba parado esperando un saque (gol, descanso) que ya no se va a escenificar
+      this.clockStop = false;
       this.brain.ag = null;
       for (const e of this.queue) this.handled.push(e);
       this._revealAll();
@@ -1099,7 +1102,13 @@
       }
       if (!placed && !this.over) this._reseat();
       // Segunda parte: todos colocados y el saque espera a que reanudes (solo si seguimos en el descanso)
-      if (this.htKick) { this.htKick = false; if (this.m.min <= 45 && !this.over) this._seq(this._kickoffSeq(1)); }
+      if (this.htKick) {
+        this.htKick = false;
+        // Seguimos en el descanso: el saque de la segunda parte se ve (y hasta entonces el reloj espera)
+        if (this.m.min <= 45 && !this.over) { this._seq(this._kickoffSeq(1)); if (this.live) this.clockStop = true; }
+      }
+      // Si el salto ya ha dejado atrás el descanso, la segunda parte está en juego aunque no se viera el saque
+      if (this.m.htDone && this.m.min > 45) this.m.h2 = true;
       this.instant = false;
     }
 

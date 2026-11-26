@@ -214,11 +214,17 @@
     if (!root) return;
     root.classList.toggle('narr', on);
     root.classList.remove('narr-show');
+    // Si se estaba viendo una jugada clave, se acaba ya y se cuenta lo que pasó (si no, esos sucesos se
+    // quedarían sin apuntar y, si era el final del partido, este no terminaría nunca)
+    const held = !on && MV.held;
+    if (held && MV.pitch) MV.pitch.flush();
+    if (MV.pitch && MV.showing) MV.pitch.speed = settings().speed || 1;
     MV.showing = false;
     if (MV.pitch) {
       if (on) { MV.pitch.flush(); MV.pitch.onEv = null; }
       else MV.pitch.onEv = revealEv;
     }
+    if (held) reveal();
     requestAnimationFrame(() => MV.pitch && MV.pitch.resize());
   }
   /** ¿Merece la pena enseñar esta jugada en el campo? */
@@ -308,6 +314,9 @@
     m.live = live;
     m.userAway = !!MV.skip;   // al saltar, el asistente hace tus cambios (si los tienes en automático)
     if (MV.pitch) MV.pitch.live = live;
+    // Relevo: el motor por minutos (salto, jugadas clave) devuelve el mando al campo
+    if (live && !MV.wasLive && MV.pitch.liveResync) MV.pitch.liveResync();
+    MV.wasLive = live;
     if (live) {
       if (MV.pitch.loading() || !MV.pitch.liveReady()) { schedule(40); return; }
       m.livePoss = MV.pitch.liveStep();

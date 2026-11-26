@@ -278,6 +278,13 @@
     this.playT = (this.playT || 0) + dt * w;
   };
   PP.liveReady = function () { return (this.playT || 0) - (this.stepPlay || 0) >= LIVE.MIN_S; };
+  /** Al volver al directo (tras un salto o las jugadas clave): el minuto y la posesión empiezan de cero aquí,
+   *  sin arrastrar lo que el campo jugó mientras mandaba el motor por minutos. */
+  PP.liveResync = function () {
+    this.stepPlay = this.playT || 0;
+    this._possPrev = this.brain.possT.slice();
+    this.clockStop = false;
+  };
   /** Al pasar un minuto: lo que ha tenido cada equipo el balón en ese rato. */
   PP.liveStep = function () {
     this.stepPlay = this.playT || 0;
