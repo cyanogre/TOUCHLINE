@@ -286,8 +286,88 @@
     const locked = all.filter(o => o.need && lv(S, o.need[0]) < o.need[1]);
     let shown = open;
     if (open.length > 3) { const worst = open.slice().sort((a, b) => a.g - b.g)[0]; shown = open.filter(o => o !== worst); }
+    shown.forEach(o => { o.t = dress(o.t, o.g); });
     return { shown: shown.slice().sort(() => Math.random() - 0.5), locked: locked.slice(0, 1) };
   }
+
+  // ------------------------------------------------------------ Giros de guion: el flechazo
+  // Un titular retorcido sobre una jugadora (o un jugador) puede acabar, semanas después, en un culebrón: la prensa
+  // destapa que le gustas, os pillan de croquetas… y si la cosa sale bien, desbloqueas un alma especial y un supertiro
+  // (en el modo fantasía) o un subidón de verdad para ese jugador. O acabas en la friendzone, que también pasa.
+  const ago = (S, r) => (S.season - r.s) * 52 + (S.week - r.w);
+  const romAt = (S, stage, gap) => { const r = S.romance; return r && !r.done && r.stage === stage && S.players[r.pid] && ago(S, r) >= gap; };
+  const rn = c => c.S.players[c.S.romance.pid].short;
+  const romStep = (d, fx) => Object.assign({ arc: S => { const r = S.romance; r.aff = (r.aff || 0) + d; r.stage++; r.w = S.week; r.s = S.season; } }, fx ? { fx } : {});
+  function romFinish(S) {
+    const r = S.romance, p = S.players[r.pid], club = S.clubs[S.user];
+    r.done = true; r.win = (r.aff || 0) >= 2;
+    if (!r.win) { if (TL.News) TL.News.add(S, 'redes', `${p.short} manda a ${S.manager} a la friendzone`, `«Es como un tío majo que me explica el fuera de juego», declara. Las redes, en shock.`, club.id, null, 'neg'); return; }
+    p.mor = 100;
+    let extra = '';
+    if (TL.Events && TL.Events.fantasy(S)) {
+      const souls = Object.keys(TL.Events.DB().souls);
+      const k = souls[Math.floor(Math.random() * souls.length)];
+      const g = TL.Events.giveSoul(S, k);
+      if (g && TL.Events.canEquip && TL.Events.canEquip(S, 'soul', g.u, p.id) !== false) { try { TL.Events.equip(S, 'soul', g.u, p.id); } catch (e) { /* va al inventario */ } }
+      extra = ` Desbloqueas un alma especial y el «Disparo del Flechazo» para ${p.short}.`;
+    } else {
+      p.st[1] = Math.min(99, p.st[1] + 4); p.st[4] = Math.min(99, (p.st[4] || 60) + 3);
+      extra = ` ${p.short} juega con una motivación que no se había visto nunca.`;
+    }
+    if (TL.News) TL.News.add(S, 'positivo', `Flechazo en el banquillo`, `${p.short} dedica su gol con un corazón hacia ${S.manager}. Medio país ya les ha puesto nombre de pareja.${extra}`, club.id, null, 'pos');
+  }
+  const ROM = [
+    { id: 'rom1', w: c => (romAt(c.S, 1, 3) ? 9 : 0), q: c => `Después del lío con aquel titular, ¿ha hablado con ${rn(c)}?`, o: () => [
+      Object.assign({ t: 'Le pedí perdón en persona. Se rio y me dijo que soy muy raro. Lo acepto.', g: 2 }, romStep(1, { team: 0.5 })),
+      Object.assign({ t: 'No hay nada que hablar. Fue un bulo y punto.', g: 1 }, romStep(0)),
+      Object.assign({ t: 'Hablamos por WhatsApp. Me dejó en visto dos días. Normal.', g: 1 }, romStep(1)),
+      Object.assign({ t: 'Pregúntenle a quien escribió el titular, que parece que sabe más que yo.', g: 0 }, romStep(-1, { board: -0.5 }))] },
+    { id: 'rom2', w: c => (romAt(c.S, 2, 4) ? 9 : 0), q: c => `Exclusiva: fuentes del vestuario dicen que a ${rn(c)}… le gusta usted. Dicen que dibuja corazones en la pizarra táctica.`, o: () => [
+      Object.assign({ t: '😳 … Siguiente pregunta, por favor.', g: 1 }, romStep(1)),
+      Object.assign({ t: 'Aquí somos profesionales. La pizarra es para flechas, no para corazones.', g: 2 }, romStep(0, { board: 0.5 })),
+      Object.assign({ t: '¿Corazones? ¿De qué color? Pregunto por… cuestiones tácticas.', g: 1 }, romStep(2, { fans: 0.003 })),
+      Object.assign({ t: 'Eso es mentira y ustedes lo saben.', g: 0 }, romStep(-1))] },
+    { id: 'rom3', w: c => (romAt(c.S, 3, 5) ? 9 : 0), q: c => `Les han pillado a usted y a ${rn(c)} compartiendo croquetas en una tasca a las dos de la mañana. ¿Reunión táctica?`, o: () => [
+      Object.assign({ t: 'Totalmente. Las croquetas eran los centrales. Hablábamos de la línea de cuatro.', g: 2 }, romStep(1)),
+      Object.assign({ t: 'Mi vida privada es privada. Las croquetas, también.', g: 1 }, romStep(1)),
+      Object.assign({ t: 'Me habéis pillado. Pero eran de jamón, y eso no lo voy a negar.', g: 1 }, romStep(2, { fans: 0.004 })),
+      Object.assign({ t: 'Coincidencia. Tengo muchas croquetas en mi vida.', g: 0 }, romStep(-1))] },
+    { id: 'rom4', w: c => (romAt(c.S, 4, 4) ? 9 : 0), q: c => (c.S.romance.aff >= 2 ? `${rn(c)} ha celebrado su último gol haciendo un corazón hacia el banquillo. ¿Algo que declarar?` : `${rn(c)} dice que usted es «como un tío majo que le explica el fuera de juego». ¿Cómo lo encaja?`), o: c => (c.S.romance.aff >= 2 ? [
+      { t: 'Que me ha dedicado un gol. Y yo le dedico la temporada.', g: 2, arc: romFinish, fx: { fans: 0.005 } },
+      { t: 'Que el amor y el fútbol no se mezclan… pero hoy un poquito sí.', g: 2, arc: romFinish },
+      { t: 'Sin comentarios. Pero que no pare de marcar.', g: 1, arc: romFinish }] : [
+      { t: 'Con deportividad. El fuera de juego se lo seguiré explicando, que no lo pilla.', g: 2, arc: romFinish },
+      { t: 'Friendzone confirmada. Lo superaré con una caña.', g: 1, arc: romFinish, fx: { fans: 0.003 } },
+      { t: 'Yo tampoco estaba interesado. Que conste.', g: 0, arc: romFinish, fx: { team: -0.5 } }]) }
+  ];
+  QS.push(...ROM);
+  RESULT.push('rom1', 'rom2', 'rom3', 'rom4');
+
+  // ------------------------------------------------------------ Variedad
+  // Cada pregunta y cada respuesta se monta con entradillas y coletillas al azar (según el tono), así que entre las
+  // ~150 frases base y estas piezas salen miles de combinaciones y nunca suena igual dos veces.
+  const Q_IN = ['Buenas noches, míster.', 'Una rápida:', 'Desde la radio:', 'Para los que nos ven en streaming:', 'Le pregunto lo que pregunta todo el mundo en X:',
+    'Sin rodeos:', 'Ojo, que viene curva:', 'Hola, hola.', 'Con todo el cariño:', 'La pregunta del millón:', 'Vamos al lío:', 'Para el directo de Twitch:',
+    'Llevo toda la semana queriendo preguntarle esto:', 'Perdone que insista:', 'Mi abuela me ha pedido que le pregunte:', 'Rapidito, que cierra la edición:',
+    'Míster, sin filtro:', 'Una de las de verdad:', 'Para el podcast:', 'Le leo una pregunta de un oyente:'];
+  const IN = {
+    2: ['Mira:', 'A ver:', 'Te soy sincero:', 'Real:', 'Escúchame bien:', 'Con la mano en el corazón:', 'Lo digo y me quedo tan ancho:', 'Hoy toca decirlo:', 'Fuera de bromas:', 'Sin postureo:'],
+    1: ['Bueno…', 'Pues mira:', 'Hmm.', 'Qué quieres que te diga:', 'En plan:', 'A ver cómo lo digo:', 'Uf.'],
+    0: ['Pues mira, sin anestesia:', 'Te lo digo claro:', 'Ya que preguntas:', 'Perdón, pero lo digo:', 'Vale, voy:', 'Sin pelos en la lengua:', 'Agárrate:']
+  };
+  const OUT = {
+    2: ['Y punto.', 'Así de fácil.', 'Siguiente.', 'Lo firmo.', 'Eso es todo, amigos.', 'Grábenlo.', 'Y lo saben.', 'Fin del hilo.', 'Con cariño.', 'Así somos.'],
+    1: ['Ya veremos.', 'Y poco más.', 'Es lo que hay.', 'No sé, la verdad.', 'Pues eso.', 'Lo que yo te diga.', 'Ahí lo dejo.'],
+    0: ['Y el que se pique, ajos come.', 'Tal cual.', 'Que se escuche bien.', 'Y no me arrepiento.', 'Clip para TikTok, de nada.', 'Pónganlo en grande.', 'Lo he dicho y lo repito.']
+  };
+  function dress(t, g) {
+    const k = g >= 2 ? 2 : g === 1 ? 1 : 0;
+    let out = t;
+    if (Math.random() < 0.35) out = pick(IN[k]) + ' ' + out;
+    if (Math.random() < 0.3 && /[.!?»]$/.test(out)) out = out + ' ' + pick(OUT[k]);
+    return out;
+  }
+  const dressQ = q => (Math.random() < 0.45 ? pick(Q_IN) + ' ' + q.charAt(0).toLowerCase() + q.slice(1) : q);
 
   // ------------------------------------------------------------ Efectos
   function apply(S, fx, log) {
@@ -303,6 +383,12 @@
   /** Final del minijuego: con tres buenas seguidas, redonda; si no, no has convencido o se te ha ido de las manos. */
   function verdict(S, st) {
     const club = S.clubs[S.user];
+    const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
+    ps.n++; ps.bestStreak = Math.max(ps.bestStreak, st.best);
+    if (st.twisted) { ps.twists++; if (st.log.twistOk) ps.twistOk++; }
+    const badN = st.marks.filter(x => x === 0).length;
+    ps.rep = U.clamp(ps.rep + (st.best >= NEED_STREAK ? 6 : -2 - badN * 2), 0, 100);
+    if (st.best >= NEED_STREAK) ps.wins++;
     if (st.best >= NEED_STREAK) {
       apply(S, { team: 1.5, board: 1.5, fans: 0.006 }, st.log);
       if (TL.News) TL.News.add(S, 'club', `${S.manager}, sobresaliente ante los micrófonos`, `El técnico de ${club.name} firmó una rueda de prensa impecable tras el partido.`, club.id, null, 'pos');
@@ -397,6 +483,7 @@
     const out = [];
     if (F && pid != null && /(físic|fuerte|forma|cuerpo|espectacular|zurda|pulm|hambre|valorad|talento|diferente)/.test(t + ' ' + (a.fx && a.fx.pl ? 'valorad' : '')))
       out.push(`${co}, en el punto de mira por sus comentarios sobre el físico de ${nm}`, `«¿Espectacular?»: la frase de ${co} sobre ${nm} que incomoda al vestuario`);
+    R.twistPid = pid; R.twistHot = F && pid != null && out.length >= 2;
     if (a.fx && a.fx.pl && a.fx.pl[1] > 0) out.push(`${co} desprecia al resto: «aquí solo hay ${F ? 'una' : 'uno'}»`);
     if (a.fx && a.fx.pl && a.fx.pl[1] < 0) out.push(`${co} humilla a ${nm} delante de toda España`);
     if (/(culpa|mía|mio|asumo|perdón|disculpa|equivoqu)/.test(t)) out.push(`${co} entona el mea culpa: ¿preparando la despedida?`);
@@ -437,6 +524,9 @@
     if (TL.News) TL.News.add(S, 'polemica', R.twisted, `${pick(TABLOIDS)} saca de contexto unas palabras del técnico de ${club.name}. Las redes, divididas.`, club.id, null, 'neg');
     TL.News.fx.board(S, -0.8); TL.News.fx.fans(S, -0.002);
     R.log.twistBad = R.twisted;
+    const hot = R.twistHot && /físico|Espectacular/.test(R.twisted);
+    if (!S.romance && R.twistPid != null && S.players[R.twistPid] && S.players[R.twistPid].club === S.user && (hot || Math.random() < 0.2))
+      S.romance = { pid: R.twistPid, stage: 1, w: S.week, s: S.season, aff: 0 };
     return 'Mañana estará en todas partes.';
   }
 
@@ -484,7 +574,7 @@
     const panel = document.querySelector('#prensa .pr-panel');
     if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
     meter();
-    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${esc(q.q(c))}`;
+    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${esc(dressQ(q.q(c)))}`;
     const { shown, locked } = options(c.S, q, c);
     R.cur = shown;
     panel.querySelector('.pr-as').innerHTML = shown.map((a, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(a.t)}</button>`).join('')
@@ -517,6 +607,7 @@
   function answer(a) {
     R.cur = null;
     if (R.inTwist) { R.inTwist = false; a.react = settleTwist(R.c.S, a); }
+    if (a.arc) a.arc(R.c.S);
     apply(R.c.S, a.fx, R.log);
     let g = a.g;
     if (g === 1 && R.grace > 0 && R.streak > 0) { R.grace--; g = 1.5; }
@@ -636,7 +727,10 @@
   /** No ir: con «Portavoz» va el jefe de prensa y no pasa nada; si no, a la directiva y a la prensa no les gusta. */
   function skip(S, m, me) {
     const club = S.clubs[S.user];
+    const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
+    ps.skipped++;
     if (lv(S, 'pre2') >= 1) return 'El jefe de prensa atiende a los medios por ti.';
+    ps.rep = Math.max(0, ps.rep - 5);
     const N = TL.News && TL.News.fx;
     if (N) { N.board(S, -1.2); N.fans(S, -0.002); }
     if (TL.News) TL.News.add(S, 'polemica', `${S.manager} plantó a la prensa`, `El técnico de ${club.name} no compareció tras el partido.`, club.id, null, 'neg');
@@ -644,5 +738,5 @@
   }
   const canDelegate = S => lv(S, 'pre2') >= 1;
 
-  TL.Prensa = { open, offered, skip, canDelegate, _options: options, _verdict: verdict, _questions: questions, _context: context };
+  TL.Prensa = { MULES, STEPS, open, offered, skip, canDelegate, _options: options, _verdict: verdict, _questions: questions, _context: context };
 })();

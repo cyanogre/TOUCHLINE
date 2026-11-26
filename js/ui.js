@@ -12,6 +12,7 @@
     tactics: '<rect x="3" y="2" width="18" height="20" rx="2"/><path d="M3 12h18"/><circle cx="12" cy="12" r="3"/><path d="M8 2v4h8V2M8 22v-4h8v4"/>',
     league: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
     market: '<path d="M7 7h13l-4-4M17 17H4l4 4"/>',
+    stats: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/><circle cx="19" cy="8" r="1.5"/>',
     club: '<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5"/>',
     musicOn: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
     musicOff: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M2 2l20 20"/>',
@@ -27,7 +28,7 @@
 
   const TABS = [
     ['home', 'Inicio'], ['squad', 'Plantilla'], ['tactics', 'Tácticas'],
-    ['league', 'Liga'], ['market', 'Mercado'], ['club', 'Club']
+    ['league', 'Liga'], ['market', 'Mercado'], ['club', 'Club'], ['stats', 'Panel']
   ];
 
   // ------------------------------------------------------------ Estado de la UI
@@ -400,6 +401,7 @@
   }
 
   const VIEWS = {};
+  UI.VIEWS = VIEWS;
   function render(keepScroll) {
     const S = G.S;
     if (!S) return renderTitle();
