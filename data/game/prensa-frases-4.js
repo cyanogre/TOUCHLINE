@@ -1,0 +1,55 @@
+/* TOUCHLINE — frases de la rueda de prensa (4): más respuestas por pregunta, mismo orden y tono que en js/prensa.js.
+ * add(pregunta, nº de respuesta, [variantes]). */
+(function () {
+  const P = window.TL_PRENSA = window.TL_PRENSA || {};
+  const add = (id, k, arr) => { const e = P[id] || (P[id] = { q: [], o: [] }); (e.o[k] || (e.o[k] = [])).push(...arr); };
+  const addQ = (id, arr) => { const e = P[id] || (P[id] = { q: [], o: [] }); e.q.push(...arr); };
+
+  addQ('win', ['¿Qué ha cambiado respecto a la semana pasada?', 'Han sumado de tres. ¿Era un partido trampa?', '¿Ha visto a su equipo como esperaba?', '¿Se puede soñar después de esto?', '¿Qué nota le pone al equipo hoy?', 'Ganar al {rival} no es fácil. ¿Cuál ha sido la clave?']);
+  add('win', 0, ['Hoy los chavales se han ganado el día libre. Yo no, que tengo vídeo.', 'Que les den un aplauso a ellos. Yo me lo doy en casa.', 'Ganan ellos, pierdo yo. Así es este oficio y me encanta.', 'Les he visto sufrir y sonreír. Eso es un equipo.', 'Hoy han sido una familia. Una familia que corre mucho.', 'Ellos juegan, yo me como las uñas. Reparto justo.', 'Si hay que poner nota, un diez para ellos y un cinco para mí.', 'Lo han hecho todo bien. Yo he acertado con la corbata.', 'Equipo de verdad. Nadie ha mirado su propio ombligo.', 'Me quedo con el sudor de mis jugadores. Huele a victoria.']);
+  add('win', 1, ['Contento, pero en el descanso ha habido bronca. Y merecida.', 'Ganamos, sí. Pero esta noche me pongo el partido en bucle.', 'Victoria con matices. Muchos matices.', 'Bien. Pero no me voy a engañar: hay cosas feas.', 'Hemos ganado jugando a ratos. Quiero el partido entero.', 'Los puntos, para la saca. El juego, a revisión.', 'Me vale el resultado. El rendimiento, a medias.', 'Ganar está genial. Ganar mejorando, mejor todavía.', 'Notable bajo. Se puede subir nota.', 'Satisfecho, que no saciado.']);
+  add('win', 2, ['Hoy éramos el jefe final y ellos acababan de empezar la partida.', 'Les hemos hecho un speedrun.', 'Ni con trucos nos ganaban hoy.', 'Que vuelvan a la Play a practicar.', 'Ha sido como jugar contra los bots en fácil.', 'Diferencia de nivel evidente. Muy evidente.', 'Si el {rival} es candidato a algo, que me lo expliquen.', 'Hoy ganábamos con los ojos cerrados.', 'Ellos jugaban al fútbol y nosotros a otro deporte. Mejor.', 'Repaso. Lo digo así, sin anestesia.']);
+  add('win', 3, ['Hay noches en las que uno sabe que está construyendo algo grande. Hoy es una.', 'Si este grupo se cree lo que vale, no lo para nadie.', 'Lo de hoy es un aviso: vamos en serio.', 'Hoy he visto el equipo que soñaba en verano.', 'Esto es solo el tráiler. La película viene después.', 'Este vestuario tiene alma. Y el alma no se ficha.', 'Cuando un grupo juega así, el entrenador solo tiene que no estropearlo.', 'Ganamos porque creemos. Y vamos a creer todavía más.']);
+
+  addQ('draw', ['¿Ha faltado ambición?', 'Empate. ¿Hubo miedo a perder?', '¿Le sirve este punto en la clasificación?', '¿El {rival} les ha puesto en problemas?', '¿Qué le ha dicho al equipo tras el empate?']);
+  add('draw', 0, ['Ni ganamos ni perdemos. Sumamos.', 'Un punto en el campo del miedo no es poco.', 'Hay empates que saben a gloria dentro de un mes.', 'Hemos sufrido y no hemos caído. Bien.', 'El equipo ha mostrado oficio. Me quedo con eso.', 'No perder también es una forma de crecer.', 'Puntito y a casa. Hay días así.', 'Hemos competido de tú a tú. Positivo.']);
+  add('draw', 1, ['Me voy con la sensación de que se nos ha escapado un tren.', 'Esto ha sido un empate de los que se quedan en la garganta.', 'Dos puntos perdidos. No lo voy a maquillar.', 'Hemos tenido el partido en la mano y se nos ha caído.', 'Un empate que me sabe a derrota, sinceramente.', 'Hoy tocaba ganar. No lo hemos hecho.', 'Hemos dejado escapar una oportunidad muy clara.', 'Rabia. Mucha rabia.']);
+  add('draw', 2, ['El árbitro hoy ha sido el mejor jugador del {rival}.', 'Hoy jugábamos contra doce.', 'No sé qué pitaba, pero no era fútbol.', 'Me gustaría ver ese penalti otra vez. Con gafas.', 'Hoy los colegiados tenían prisa por irse a casa.', 'Empate con ayuda externa, digamos.']);
+  add('draw', 3, ['Si un empate nos enfada es que estamos creciendo.', 'Hemos dominado. Los puntos llegarán si seguimos así.', 'El rendimiento ha sido de victoria. El marcador ya se alineará.', 'Me quedo con el cómo, no con el cuánto.', 'Estamos en el camino correcto, aunque hoy no lo diga el marcador.']);
+
+  addQ('loss', ['¿Esta derrota cambia algo?', '¿Ha sido justa la derrota?', '¿Le preocupa la racha?', '¿Qué no ha funcionado hoy?', 'Derrota dolorosa. ¿Cómo se levanta el equipo?']);
+  add('loss', 0, ['Me equivoqué en la alineación. Lo pago yo.', 'Hoy el que ha fallado he sido yo.', 'He tomado malas decisiones. Lo reconozco.', 'Cargo con esta derrota yo solito.', 'No supe leer el partido. Eso es mío.', 'Si alguien tiene que dar explicaciones, soy yo.', 'Mis jugadores no merecen las críticas. Yo sí.', 'Hoy he sido el peor del equipo. Y no he tocado el balón.']);
+  add('loss', 1, ['Hay quien hoy ha jugado con el móvil en la mano.', 'Algunos han salido sin encender el modo competición.', 'Unos cuantos han estado en otro planeta.', 'He visto actitudes que no me han gustado nada.', 'Hay gente a la que le sobra comodidad.', 'Alguno se pensaba que esto era un amistoso de verano.', 'Lo hablaremos en el vestuario. Con la puerta cerrada.', 'No todos han estado a la altura. Ni de lejos.']);
+  add('loss', 2, ['Mal día. No hay más misterio.', 'El fútbol a veces te pega una colleja.', 'Hoy no había forma.', 'Ha salido cruz. Mañana, cara.', 'Hay derrotas sin explicación y esta es una.', 'Toca dormir y olvidar.', 'Se pierde. Forma parte del juego.', 'Hoy nada salía. Ni los saques de banda.']);
+  add('loss', 3, ['La segunda jugada ha sido suya. Esa batalla la vamos a ganar el próximo día.', 'Nos han ganado en las bandas. Ya sé cómo cerrarlo.', 'Nos ha faltado intensidad en la presión. Se recupera trabajando.', 'Hemos dado vida al rival en las pérdidas. Lo corregimos esta semana.', 'Tengo tres conclusiones y tres ejercicios para el martes.', 'El fallo ha sido estructural y tiene solución.']);
+
+  addQ('thrash', ['¿Ha pensado en dimitir esta noche?', '¿Es la peor noche de su carrera?', '¿Qué explicación le da a esta goleada?', '¿El equipo se ha rendido?']);
+  add('thrash', 0, ['Esta noche no merece excusas. Merece una disculpa.', 'Perdón a cada persona que ha venido. Sin peros.', 'Lo siento. Y lo siento de verdad.', 'Avergonzado. Así me siento.', 'A la gente le debemos mucho después de hoy.', 'Hoy hemos fallado a nuestra gente. Duele.']);
+  add('thrash', 1, ['Algunos han firmado su billete a la grada.', 'Habrá consecuencias. Para varios.', 'Hoy he visto quién compite y quién no.', 'Esta camiseta no es un pijama.', 'Unos han dado la cara y otros se han escondido. Lo tengo apuntado.', 'Quien no quiera estar, que lo diga.']);
+  add('thrash', 2, ['Mañana sale el sol igual.', 'No es el fin del mundo.', 'Hay que relativizar.', 'Es fútbol. Mañana más.', 'Un mal partido no define una temporada.', 'Ni tan grave. Bueno, sí. Pero ni tan grave.']);
+  add('thrash', 3, ['Hoy el equipo ha tocado suelo. Vamos a usar ese suelo para impulsarnos.', 'Esto escuece y lo voy a usar de gasolina.', 'De esta noche saldrá un equipo más duro.', 'No olvidaremos esta noche. Por eso no se repetirá.', 'Hoy empieza la reacción. Apúntenlo.']);
+
+  addQ('next', ['¿Qué espera del duelo ante el {next}?', '¿Se juega mucho contra el {next}?', '¿El {next} es un rival directo?', '¿Ha empezado ya a preparar el partido ante el {next}?']);
+  add('next', 0, ['Un rival de mucho nivel. Lo respetamos.', 'Gran equipo y gran entrenador.', 'Será un partido precioso de jugar.', 'Tienen muy buenos jugadores. Habrá que estar finos.', 'Un rival serio. Muy serio.']);
+  add('next', 1, ['Vamos a por ellos, y que pase lo que tenga que pasar.', 'Saldremos a ganar, como siempre.', 'Tres puntos. Es lo único que me importa.', 'Les vamos a meter mucha presión.', 'Que preparen el chubasquero, que vamos con todo.']);
+  add('next', 2, ['Ellos verán. Nosotros vamos a lo nuestro.', 'No me quita el sueño.', 'Rival más, rival menos.', 'Ni lo he mirado. Ni lo pienso mirar.', 'Que se estudien ellos el vídeo.']);
+  add('next', 3, ['Tienen un lateral que sube mucho. Ahí está la llave.', 'Sufren en las pelotas paradas. Algo prepararemos.', 'Su mediocentro es su corazón. Vamos a por el corazón.', 'Sé cómo presionan. Y sé cómo salir de esa presión.', 'Hay un pasillo interior que dejan abierto. Lo veremos.']);
+
+  addQ('season', ['¿Hasta dónde sueña llegar?', '¿Qué tendría que pasar para estar satisfecho en mayo?', '¿Le asusta la presión de la temporada?']);
+  add('season', 0, ['Lo que diga el club, y algo más si se puede.', 'Cumplir. Luego ya veremos si soñamos.', 'El objetivo está claro y es compartido.', 'El club marca la meta y nosotros corremos.']);
+  add('season', 1, ['Soñar es gratis. Yo sueño a lo grande.', 'Mi objetivo es que hablen de nosotros en mayo.', 'Quiero todo lo que brille.', 'Ganarlo todo. Y luego volver a ganarlo.']);
+  add('season', 2, ['Domingo a domingo.', 'Un partido detrás de otro.', 'El calendario manda.', 'Mañana es lo único que existe.']);
+  add('season', 3, ['Crecer. Y que la gente disfrute viéndonos.', 'Que cada lunes seamos un poco mejores que el anterior.', 'Construir un equipo que la gente reconozca.']);
+
+  addQ('fans', ['¿Qué le pide a la afición para el próximo partido?', '¿Cómo es su relación con la grada?', '¿Necesitan más a la afición que nunca?']);
+  add('fans', 0, ['Gracias por la paciencia y por los gritos.', 'Sois el jugador número doce. Y a veces el uno.', 'Sin vosotros esto no tendría sentido.', 'Que sigan empujando. Lo notamos.', 'Cuando la grada aprieta, nosotros volamos.']);
+  add('fans', 1, ['Que esperen un poco más.', 'Paciencia, que llegará lo bueno.', 'Confianza en el proyecto.', 'Que nos den tiempo.']);
+  add('fans', 2, ['A ver si llenamos el estadio de una vez.', 'Más gente y menos sofá.', 'Que se note que estamos en casa.', 'Que no se queden en las redes y vengan.']);
+  add('fans', 3, ['Este club es de quien lo siente. Y lo sentís como nadie.', 'Cada gol es para vosotros. Literal.', 'Somos un reflejo de nuestra grada. Y nuestra grada es enorme.']);
+
+  addQ('board', ['¿Cuánto le queda en el banquillo?', '¿Le han dado un ultimátum?', 'El presidente no ha bajado al vestuario. ¿Mala señal?']);
+  add('board', 0, ['El club confía en mí. Lo noto cada día.', 'Me siento muy arropado.', 'Tengo crédito y ganas.', 'Hay confianza mutua.']);
+  add('board', 1, ['Mi futuro depende de los resultados. Como el de todos.', 'Hablarán los domingos.', 'Mi respuesta será el próximo partido.', 'No me preocupa lo que se dice.']);
+  add('board', 2, ['Si hay que irse, me iré. Pero de frente.', 'Que se atrevan a decirlo.', 'No me escondo. Que no se escondan ellos.', 'Si tienen dudas, que me llamen. Tengo el móvil encendido.']);
+  add('board', 3, ['Ayer comí con el presidente. Pagó él, buena señal.', 'Estamos en sintonía total con la directiva.', 'Hay un plan común y lo seguimos todos.']);
+})();

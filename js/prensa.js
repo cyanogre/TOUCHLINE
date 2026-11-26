@@ -279,9 +279,36 @@
     out.sort((a, b) => (RESULT.includes(b.id) ? 1 : 0) - (RESULT.includes(a.id) ? 1 : 0));
     return out;
   }
+  // Frases de base (data/game/prensa-frases-*.js): otras formas de preguntar y de responder cada cosa.
+  const BANK = () => window.TL_PRENSA || {};
+  const bankKey = (q, c) => (q.id === 'sponsor' && c.feed.sponsor && c.feed.sponsor.risky ? 'sponsorR' : q.id);
+  function jugOf(id, c) {
+    const f = c.feed;
+    const m = { penMiss: c.penMiss, og: c.og, red: c.reds[0], subGoal: c.subScorer, hat: c.hat, star: c.star, kid: c.kid, inj: c.inj[0], bolt: c.bolt,
+      signing: f.signing && f.signing.pid, sale: f.sale && f.sale.pid, lateWin: c.lateWin };
+    const pid = m[id];
+    return pid != null && c.S.players[pid] ? c.S.players[pid].short : 'él';
+  }
+  function fill(t, q, c) {
+    const f = c.feed;
+    return t.replace(/\{(\w+)\}/g, (_, k) => ({
+      rival: c.opp.name, next: c.next ? c.next.name : 'próximo rival', gf: c.gf, ga: c.ga, jug: jugOf(q.id, c),
+      staff: f.staff ? f.staff.name : 'el nuevo', brand: f.sponsor ? f.sponsor.brand : 'la marca', camp: f.campaign ? f.campaign.name : 'la campaña'
+    })[k] ?? _);
+  }
+  function qText(q, c) {
+    const b = BANK()[bankKey(q, c)];
+    return b && b.q && Math.random() < 0.65 ? fill(pick(b.q), q, c) : q.q(c);
+  }
+  function bankVary(all, q, c) {
+    const b = BANK()[bankKey(q, c)];
+    if (!b || !b.o) return;
+    all.forEach((o, k) => { const v = b.o[k]; if (v && v.length && Math.random() < 0.8) o.t = fill(pick(v), q, c); });
+  }
   /** Las opciones que puedes dar: las de tus habilidades sustituyen a la peor; las bloqueadas se enseñan. */
   function options(S, q, c) {
     const all = q.o(c);
+    bankVary(all, q, c);
     const open = all.filter(o => !o.need || lv(S, o.need[0]) >= o.need[1]);
     const locked = all.filter(o => o.need && lv(S, o.need[0]) < o.need[1]);
     let shown = open;
@@ -574,7 +601,7 @@
     const panel = document.querySelector('#prensa .pr-panel');
     if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
     meter();
-    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${esc(dressQ(q.q(c)))}`;
+    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${esc(dressQ(qText(q, c)))}`;
     const { shown, locked } = options(c.S, q, c);
     R.cur = shown;
     panel.querySelector('.pr-as').innerHTML = shown.map((a, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(a.t)}</button>`).join('')
