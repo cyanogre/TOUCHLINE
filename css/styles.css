@@ -1702,3 +1702,4 @@ body.shake-s { animation: shake-s .35s; }
 .pr-a.mule small{font-style:normal;font-size:.72em;opacity:.75}
 .pr-react{display:block;font-size:.8em;font-weight:400;opacity:.75;margin-top:4px;font-style:italic}
 .pr-fame{color:#fde68a}
+.pr-head{display:block;color:#fca5a5;font-style:italic;margin:2px 0 4px}
