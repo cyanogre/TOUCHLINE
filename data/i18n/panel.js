@@ -129,3 +129,4 @@ TL_I18N_ADD([
   ['Panel · TOUCHLINE//OS', 'Panel · TOUCHLINE//OS', 'Panneau · TOUCHLINE//OS', 'Panel · TOUCHLINE//OS', 'Pannello · TOUCHLINE//OS'],
   ['Directiva, afición, vestuario, prensa y tu historial.', 'Board, fans, dressing room, press and your history.', 'Direction, supporters, vestiaire, presse et votre parcours.', 'Vorstand, Fans, Kabine, Presse und deine Laufbahn.', 'Dirigenza, tifosi, spogliatoio, stampa e la tua storia.']
 ]);
+TL_I18N_ADD([['‹ Inicio', '‹ Home', '‹ Accueil', '‹ Start', '‹ Home']]);

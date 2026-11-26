@@ -397,7 +397,7 @@
     const tabs = S.mode === 'tour' ? [['home', 'Inicio'], ['squad', 'Plantilla'], ['tactics', 'Tácticas'], ['league', 'Torneo']] : TABS;
     if (S.mode === 'tour' && !tabs.some(t => t[0] === UI.tab)) UI.tab = 'home';
     document.getElementById('nav').innerHTML = tabs.map(([k, label]) =>
-      `<button class="${UI.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" aria-current="${UI.tab === k ? 'page' : 'false'}">
+      `<button class="${UI.tab === k || (UI.tab === 'stats' && k === 'home') ? 'on' : ''}" data-act="tab" data-tab="${k}" aria-current="${UI.tab === k ? 'page' : 'false'}">
         ${icon(k)}<span>${label}</span>${k === 'home' && unread ? `<span class="badge">${unread > 9 ? '9+' : unread}</span>` : ''}${k === 'market' && offers ? `<span class="badge">${offers}</span>` : ''}</button>`).join('');
   }
 
