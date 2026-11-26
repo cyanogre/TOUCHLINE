@@ -554,7 +554,7 @@
     TL.News.fx.board(S, -0.8); TL.News.fx.fans(S, -0.002);
     R.log.twistBad = R.twisted;
     const hot = R.twistHot && /físico|Espectacular/.test(R.twisted);
-    if (!S.romance && R.twistPid != null && S.players[R.twistPid] && S.players[R.twistPid].club === S.user && (hot || Math.random() < 0.2))
+    if (!S.romance && R.twistPid != null && S.players[R.twistPid] && S.players[R.twistPid].club === S.user && (hot ? Math.random() < 0.3 : Math.random() < 0.04))
       S.romance = { pid: R.twistPid, stage: 1, w: S.week, s: S.season, aff: 0 };
     return 'Mañana estará en todas partes.';
   }
@@ -565,7 +565,7 @@
 
   function open(S, m, me, onDone) {
     const c = context(S, m, me);
-    R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null; R.streak = 0; R.best = 0; R.marks = []; R.grace = lv(S, 'pre1'); R.muleUsed = false; R.twisted = null; R.inTwist = false;
+    R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null; R.streak = 0; R.best = 0; R.marks = []; R.grace = lv(S, 'pre1') + (S.me && S.me.st.lab >= 65 ? 1 : 0); R.muleUsed = false; R.twisted = null; R.inTwist = false;
     for (const k in c.feed) c.feed[k].asked = true;
     if (!R.qs.length) { if (onDone) onDone(); return; }
     const club = S.clubs[S.user], [c1, c2] = U.clubColors(club.name);

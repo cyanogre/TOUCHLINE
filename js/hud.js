@@ -91,6 +91,49 @@
     return `<div class="cv"><div class="group-title">Historial de entrenador</div>${rows}<p class="cv-story">${esc(story(S))}</p></div>`;
   }
 
+  // ------------------------------------------------------------ IA copiloto: lo útil, dicho con guasa
+  function copilot(S) {
+    const sq = W.squad(S, S.user), out = [];
+    const sad = sq.filter(p => (p.mor == null ? 70 : p.mor) < 40);
+    const inj = sq.filter(p => p.inj > 0);
+    const tired = sq.filter(p => p.fit < 70 && !(p.inj > 0));
+    const conf = S.board.conf, cash = S.clubs[S.user].cash;
+    if (conf < 35) out.push(['🔥', `La directiva está más mosca que un portero en una tanda. Gana el próximo o ve actualizando el LinkedIn.`, 'league', 'Ver liga']);
+    if (sad.length) out.push(['😤', `${sad.length} jugador${sad.length > 1 ? 'es están' : ' está'} de morros (${sad.slice(0, 3).map(p => p.short).join(', ')}). Recomendación de la IA: charla, minutos o barbacoa. La IA prefiere barbacoa.`, 'squad', 'Vestuario']);
+    if (inj.length) out.push(['🩹', `${inj.length} en la enfermería. La IA ha calculado que con un fisio mejor volverían antes. La IA también cobra comisión.`, 'club', 'Personal']);
+    if (tired.length >= 3) out.push(['🥵', `${tired.length} jugadores con las piernas de gelatina. Rota antes de que se rompan.`, 'tactics', 'Tácticas']);
+    if (cash < 0) out.push(['💸', 'Números rojos. La IA sugiere vender a alguien o empezar un OnlyFans del club. Lo primero es más legal.', 'market', 'Mercado']);
+    const fx = TL.Season.nextFixture && TL.Season.nextFixture(S);
+    if (fx) { const o = S.clubs[fx[0] === S.user ? fx[1] : fx[0]]; out.push(['🎯', `Próximo rival: ${o.name}. La IA lo ha estudiado durante 0,4 segundos y dice que se puede.`, 'tactics', 'Preparar']); }
+    if (S.prensaStats && S.prensaStats.rep < 40) out.push(['🎙️', 'Tu imagen en prensa está regular. Practica frases con gancho, o no digas nada (también funciona).', null, null]);
+    if (!out.length) out.push(['😎', 'Todo en orden. La IA se va a tomar un café. Vuelve en 5 minutos.', null, null]);
+    return out.slice(0, 5).map(([ic, t, tab, lb]) => `<div class="hud-cop"><span>${ic}</span><p>${esc(t)}</p>${tab ? `<button class="hud-go" data-act="tab" data-tab="${tab}">${esc(lb)} ›</button>` : ''}</div>`).join('');
+  }
+
+  // ------------------------------------------------------------ Presentación (y de dónde sale todo esto)
+  const LORE = [
+    '¿Que de dónde ha salido este centro de mando? Buena pregunta.',
+    'Lo montó el cuñado del presidente, que «sabe de ordenadores», en el antiguo cuarto de la lavadora del estadio.',
+    'Lo pagaron con el presupuesto de las equipaciones de 2019. Por eso aquel año jugasteis con camisetas de mercadillo.',
+    'Funciona con un router de 2009, la nevera del utillero (refrigeración líquida, dice él) y tres IAs con la prueba gratuita caducada.',
+    'Nadie sabe apagarlo. Una vez lo intentaron y se fue la luz en medio barrio.',
+    'Desde hoy, es tuyo. Trátalo bien: es lo único del club que no pide renovar.'
+  ];
+  function intro(first) {
+    const el = document.createElement('div');
+    el.className = 'hud-intro';
+    const boot = ['Inicializando TOUCHLINE//OS…', 'Despertando a las 3 IAs (una protesta)…', 'Calibrando el tarot con datos de la liga…', 'Descongelando la nevera del utillero…', 'Comprobando que nadie ha desenchufado el router…'];
+    el.innerHTML = `<div class="hud-intro-in">${first ? `<div class="hud-lore">${LORE.map((l, k) => `<p style="--d:${k * 1.1}s">${esc(l)}</p>`).join('')}</div>` : ''}
+      <div class="hud-bootlog" style="--d0:${first ? LORE.length * 1.1 : 0}s">${boot.map((l, k) => `<p style="--d:${k * 0.28}s">&gt; ${esc(l)} <b>OK</b></p>`).join('')}</div>
+      <div class="hud-grant" style="--d0:${(first ? LORE.length * 1.1 : 0) + boot.length * 0.28 + 0.2}s">ACCESO CONCEDIDO</div>
+      <button class="hud-skip">${first ? 'Saltar historia' : 'Saltar'}</button></div>`;
+    document.body.appendChild(el);
+    const done = () => { el.classList.add('out'); setTimeout(() => el.remove(), 300); };
+    el.querySelector('.hud-skip').onclick = done;
+    setTimeout(done, ((first ? LORE.length * 1.1 : 0) + boot.length * 0.28 + 1.4) * 1000);
+  }
+  let introShown = false;
+
   // ------------------------------------------------------------ Vista
   function view(S) {
     const conf = Math.round(S.board.conf), fan = fansOpinion(S), mood = squadMood(S), ps = press(S);
@@ -146,14 +189,16 @@
       <div class="hud-row"><span>Habilidades aprendidas</span><b>${Object.values(m.skills || {}).reduce((a, b) => a + b, 0)}</b></div>
       <div class="hud-row"><span>Temporadas</span><b>${(S.history || []).length + 1}</b></div>`);
 
+    const cop = panel('IA copiloto', 'COPILOT.AI', copilot(S), 'span2');
     const cvp = panel('Expediente', 'CV.BLOCKCHAIN', cvHtml(S) + '<p class="hud-note">Registrado en 7 blockchains distintas. Nadie podrá borrarte la vergüenza ni la gloria.</p>', 'span2');
-    return `<div class="hud">${head}${gauges}<div class="hud-cards">${aurab}${silla}${liga}${trend}${prensa}${mule}${car}${cvp}</div>
+    return `<div class="hud">${head}${gauges}<div class="hud-cards">${cop}${aurab}${silla}${liga}${trend}${prensa}${mule}${car}${cvp}</div>
       <p class="hud-foot">TOUCHLINE//OS no se hace responsable de despidos, memes ni bocadillos. Datos actualizados hace 0,0001 s.</p></div>`;
   }
 
-  function after() {
+  function after(S) {
     const root = document.querySelector('.hud');
     if (!root) return;
+    if (!introShown) { introShown = true; const first = !S.hudLore; S.hudLore = true; intro(first); }
     // Contadores que suben y anillos que se llenan
     root.querySelectorAll('[data-count]').forEach(el => {
       const to = +el.dataset.count, t0 = performance.now();

@@ -1097,9 +1097,30 @@
   }
 
   A['lk-act'] = el => {
-    const r = TL.Locker.activity(G.S, el.dataset.k);
+    const S = G.S, k = el.dataset.k;
+    if (!UI.canSpendDay(S)) { toast('Hoy hay partido: no te queda ningún día libre para eso.', true); return; }
+    const r = TL.Locker.activity(S, k);
     toast(r.msg, !r.ok);
-    if (r.ok) { TL.FX && TL.FX.sparkle(el); TL.SFX && TL.SFX.success(); G.save(); UI.refresh(); }
+    if (r.ok) {
+      TL.FX && TL.FX.sparkle(el); TL.SFX && TL.SFX.success();
+      UI.spendDay(S, { bbq: ['🍖', 'Barbacoa con la plantilla'], dayoff: ['🏖️', 'Día libre para todos'], retreat: ['⛺', 'Concentración'] }[k] || ['📅', 'Actividad']);
+    }
+  };
+  /** ¿Queda algún día antes del partido? (en el modo torneo o sin calendario, no se gastan días) */
+  UI.canSpendDay = S => !TL.Events || S.mode === 'tour' || TL.Events.matchDay(S) == null || TL.Events.daysLeft(S) > 0;
+  /** Gasta un día del calendario con una animación del puntito del entrenador; si ese día pasa algo, lo enseña. */
+  UI.spendDay = async (S, anim, done) => {
+    const EV = TL.Events;
+    if (TL.Movil) await TL.Movil.dayAnim(S, anim);
+    let ev = null;
+    if (EV && S.mode !== 'tour' && EV.matchDay(S) != null && EV.daysLeft(S) > 0) {
+      const r = EV.step(S);
+      ev = r.pend || r.ev || null;
+    }
+    G.save();
+    if (ev) { await showEvent(S, ev, null); }
+    else render(true);
+    if (done) done();
   };
   C['lk-focus'] = el => { const S = G.S; if (el.value) TL.Locker.state(S).focus[+el.dataset.id] = el.value; else delete S.lk.focus[+el.dataset.id]; G.save(); toast('Plan de entrenamiento actualizado'); };
   C['lk-mentor'] = el => { const r = TL.Locker.setMentor(G.S, +el.dataset.id, el.value === '' ? null : +el.value); toast(r.msg, !r.ok); G.save(); openPlayer(+el.dataset.id); };
