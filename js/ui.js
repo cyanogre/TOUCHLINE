@@ -125,7 +125,7 @@
       const tr = LK.traits(S, p.id);
       if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
       const so = TL.Events?.soulOf(S, p.id);
-      if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${so.def.icon}</span>`);
+      if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${soulArt(so.k, so.def.icon)}</span>`);
       const spx = TL.Special && TL.Special.of(S, p);
       if (spx) t.push(`<span class="tag soul" style="--c1:${spx.c}" title="Supertiro: ${esc(spx.name)}">⚡</span>`);
       // Confianza tras un momento en el despacho: subidón o bajón de unas jornadas
@@ -635,6 +635,20 @@
   }
 
   // ------------------------------------------------------------ Almas y objetos
+  // La fila de cada alma en assets/almas/atlas_almas.png.
+  const SOUL_ART_ROWS = new Map([
+    'emperador', 'fantasma', 'dragon', 'muralla', 'bailarin', 'berserker', 'oraculo',
+    'ego_absoluto', 'leon', 'relampago', 'gato', 'general', 'pulga', 'rey',
+    'divino', 'ibra', 'guante_frio', 'centinela', 'rompeolas', 'rescoldo', 'relojera',
+    'ultimo_tren', 'costurera', 'aguja', 'avispa', 'tejado', 'niebla', 'afinadora'
+  ].map((key, row) => [key, row]));
+  function soulArt(key, fallback) {
+    const row = SOUL_ART_ROWS.get(key);
+    return row == null ? fallback : `<span class="soul-art" style="--soul-row:${row}" aria-hidden="true"></span>`;
+  }
+  function gearIcon(kind, key, def) {
+    return kind === 'soul' ? soulArt(key, def.icon) : def.icon;
+  }
   const EFF_TXT = { shot: 'Disparos', conv: 'Acierto', assist: 'Asistencias', fouled: 'Faltas recibidas', save: 'Paradas', mid: 'Centro del campo', att: 'Ataque', def: 'Defensa', team: 'Todo el equipo', foul: 'Faltas cometidas', card: 'Tarjetas' };
   /** «Acierto ▲», «Defensa ▲▲», «Tarjetas ▲» (malo)…: hacia dónde empuja, sin decir cuánto. */
   function effList(eff) {
@@ -662,7 +676,7 @@
     const d = gearDef(rw.kind, rw.k);
     if (!d) return '';
     const p = rw.pid != null ? S.players[rw.pid] : null;
-    return `<div class="rw-card ${rw.kind}" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div>
+    return `<div class="rw-card ${rw.kind}" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${gearIcon(rw.kind, rw.k, d)}</div>
       <div class="grow"><small><span>${rw.kind === 'soul' ? 'Nueva alma' : 'Nuevo objeto'}</span>${p ? `<span> · equipada a ${esc(p.short)}</span>` : ''}</small><b>${esc(d.name)}</b><p>${esc(d.desc)}</p>
       ${soulEffectHtml(d)}${d.line && rw.kind === 'soul' ? `<p class="note" style="margin:4px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')}</p>` : ''}
       ${p ? '' : `<button class="btn sm primary mt" data-act="gear" data-kind="${rw.kind}" data-u="${rw.u}">Equipar</button>`}</div></div>`;
@@ -684,7 +698,7 @@
       if (!d) return '';
       const p = x.pid == null ? null : S.players[x.pid];
       return `<button class="gear-it ${kind} ${p ? 'on' : ''}" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${d.c || '#ffd23f'}">
-        <span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b>
+        <span class="gi-ic">${gearIcon(kind, x.k, d)}</span><span class="grow"><b>${esc(d.name)}</b>
         <small>${p ? `<span>Lo lleva</span> ${esc(p.short)}` : 'Sin equipar'}</small>
         ${kind === 'soul' ? `<small>${soulLines(d)}</small>${soulEffectHtml(d)}` : ''}</span>${icon('next')}</button>`;
     };
@@ -726,7 +740,7 @@
     const cands = W.squad(S, S.user).filter(p => EV.canEquip(S, kind, x.k, p))
       .sort((a, b) => (kind === 'soul' ? EV.affinity(d, b) - EV.affinity(d, a) : 0) || b.ovr - a.ovr);
     const has = p => (kind === 'soul' ? EV.soulOf(S, p.id) : EV.itemOf(S, p.id));
-    sheet(sheetHead(d.icon + ' ' + esc(d.name)) + `<div class="rw-card ${kind} flat" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div><div class="grow"><p>${esc(d.desc)}</p>${soulEffectHtml(d)}
+    sheet(sheetHead(d.icon + ' ' + esc(d.name)) + `<div class="rw-card ${kind} flat" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${gearIcon(kind, x.k, d)}</div><div class="grow"><p>${esc(d.desc)}</p>${soulEffectHtml(d)}
       ${kind === 'soul' && d.line ? `<p class="note" style="margin:6px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')} <span>(en otra línea, a medias)</span></p>` : ''}${d.gk === true ? '<p class="note" style="margin:6px 0 0">Solo para porteros.</p>' : ''}</div></div>
       ${cur && kind === 'soul' && EV.affinity(d, cur) < 1 ? '<p class="note">En su posición actual rinde a medias.</p>' : ''}
       ${cur ? `<div class="row between mt"><span><span>Lo lleva</span> <b>${esc(cur.name)}</b></span><button class="btn sm" data-act="gear-off" data-kind="${kind}" data-u="${u}">Quitar</button></div>` : ''}
@@ -750,7 +764,7 @@
     const spBox = spx ? `<div class="gear-it soul on" style="--c1:${spx.c}"><span class="gi-ic">⚡</span><span class="grow"><b>Supertiro: ${esc(spx.name)}</b><small>${esc(spx.desc)}</small></span></div>` : '';
     const so = EV?.soulOf(S, p.id);
     const personal = so && so.u == null ? `<div class="gear-it soul on" style="--c1:${so.def.c}">
-      <span class="gi-ic">${so.def.icon}</span><div class="grow"><b>${esc(so.def.name)}</b><small>${esc(so.def.desc)}</small>
+      <span class="gi-ic">${soulArt(so.k, so.def.icon)}</span><div class="grow"><b>${esc(so.def.name)}</b><small>${esc(so.def.desc)}</small>
         ${soulEffectHtml(so.def)}${TL.Locker.onLoan(S, p.id) ? '<small>El alma viaja con el jugador durante la cesión.</small>' :
           p.club !== S.user ? '<small>Se incorpora a tu inventario si cierras el fichaje.</small>' : ''}
       </div></div>` : '';
@@ -759,7 +773,7 @@
     const freeSouls = fan ? S.ev.souls.filter(x => x.pid == null && EV.canEquip(S, 'soul', x.k, p)) : [];
     const freeItems = S.ev.items.filter(x => x.pid == null && EV.canEquip(S, 'item', x.k, p));
     if (!so && !it && !freeSouls.length && !freeItems.length) return spBox ? `<div class="group-title">Supertiro</div><div class="gear-sec">${spBox}</div>` : '';
-    const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+    const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${gearIcon(kind, x.k, x.def)}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     const pickers = [];
     if (freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ <span>${so ? 'Cambiar de alma' : 'Equipar un alma'}</span> (${freeSouls.length})</button>`);
     if (!it && freeItems.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="item" data-id="${p.id}">🎒 Equipar un objeto (${freeItems.length})</button>`);
@@ -771,7 +785,7 @@
     if (kind === 'soul') list.sort((a, b) => EV.affinity(gearDef(kind, b.k), p) - EV.affinity(gearDef(kind, a.k), p));
     sheet(sheetHead(kind === 'soul' ? '✨ Elige un alma' : '🎒 Elige un objeto') + `<p class="note">Para ${esc(p.name)} (${F.POS_ES[p.pos]}).</p>` + list.map(x => {
       const d = gearDef(kind, x.k);
-      return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
+      return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${gearIcon(kind, x.k, d)}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     }).join(''));
   };
 
@@ -1760,7 +1774,7 @@
     const q = Q[c.name.length % Q.length];
     sheet(sheetHead(R.icon + ' ' + R.name) + `<div class="office"><div class="office-head"><p style="margin:0;line-height:1.45"><b>${esc(c.name)}</b> se incorpora al cuerpo técnico y saluda:</p></div>
       <p class="sign-quote">«${esc(q)}»</p>
-      ${so ? `<div class="gear-it soul on" style="--c1:${so.def.c}"><span class="gi-ic">${so.def.icon}</span><span class="grow">
+      ${so ? `<div class="gear-it soul on" style="--c1:${so.def.c}"><span class="gi-ic">${soulArt(so.k, so.def.icon)}</span><span class="grow">
         <b>${esc(so.def.name)}</b><small>${loan ? 'El alma viaja con el jugador durante la cesión.' : 'Añadida al inventario y equipada.'}</small></span></div>` : ''}
       <div class="btn-row mt"><button class="btn primary" data-act="close-sheet">¡Bienvenid${a('o', 'a')}!</button></div></div>`);
     let h = 0; for (const ch of c.name) h = (h * 31 + ch.charCodeAt(0)) % 9973;

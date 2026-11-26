@@ -1440,6 +1440,24 @@ body.advancing .nm-actions .btn { pointer-events: none; opacity: .7; }
 .gear-it.soul .gi-ic { border-radius: 50%; box-shadow: 0 0 0 1px var(--c1) inset, 0 0 12px color-mix(in srgb, var(--c1) 60%, transparent); }
 .gear-sec { display: flex; flex-direction: column; gap: 2px; }
 .tag.soul { background: color-mix(in srgb, var(--c1, #b48cff) 25%, transparent); border: 1px solid var(--c1, #b48cff); padding: 0 4px; }
+.soul-art {
+  --soul-size: 32px;
+  display: inline-block;
+  vertical-align: middle;
+  width: var(--soul-size);
+  height: var(--soul-size);
+  background: url('../assets/almas/atlas_almas.png') no-repeat 0 calc(-1 * var(--soul-row) * var(--soul-size));
+  background-size: calc(8 * var(--soul-size)) calc(28 * var(--soul-size));
+  image-rendering: pixelated;
+  animation: soul-art-loop .84s steps(8, end) infinite;
+}
+.tag.soul .soul-art { --soul-size: 20px; }
+@keyframes soul-art-loop {
+  to { background-position-x: calc(-8 * var(--soul-size)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .soul-art { animation: none; }
+}
 .trait.edge { border-color: rgb(255 194 71 / .45); }
 .edge-tag { font-style: normal; font: 800 10px/1 var(--font-c); text-transform: uppercase; letter-spacing: .08em; color: var(--warn); border: 1px solid rgb(255 194 71 / .5); border-radius: 6px; padding: 2px 5px; margin-left: 4px; vertical-align: 2px; }
 .sub-rule { margin-top: 0; }
