@@ -35,8 +35,9 @@
   const UI = {
     tab: 'home',
     squadSort: 'pos',
+    gearFilters: { state: '', line: '' },
     league: { tab: 'table', round: null },
-    market: { tab: 'search', f: { q: '', pos: '', minOvr: '', maxAge: '', maxValue: '', league: '', sort: 'ovr' }, limit: 40 },
+    market: { tab: 'search', f: { q: '', pos: '', minOvr: '', maxAge: '', maxValue: '', league: '', sort: 'ovr', soul: '' }, limit: 40 },
     nego: null,
     wz: null,
     actions: {},
@@ -123,7 +124,7 @@
       if (g && p.club === S.user) t.push(`<span class="tag gem" title="Talento oculto">✨${g.stage >= 2 ? ' ADN' : ''}</span>`);
       const tr = LK.traits(S, p.id);
       if (tr.length) t.push(`<span class="trait-ic" title="${esc(tr.map(k => LK.traitInfo(S, k).name).join(' · '))}">${tr.map(k => LK.TRAITS[k].icon).join('')}</span>`);
-      const so = TL.Events && TL.Events.fantasy(S) && p.club === S.user && TL.Events.soulOf(S, p.id);
+      const so = TL.Events?.soulOf(S, p.id);
       if (so && so.def) t.push(`<span class="tag soul" style="--c1:${so.def.c}" title="${esc(so.def.name)}">${so.def.icon}</span>`);
       const spx = TL.Special && TL.Special.of(S, p);
       if (spx) t.push(`<span class="tag soul" style="--c1:${spx.c}" title="Supertiro: ${esc(spx.name)}">⚡</span>`);
@@ -648,35 +649,72 @@
   const effChips = eff => effList(eff).map(e => `<span class="ev-chip ${e[2] ? 'up' : 'down'}">${effTxt(e)}</span>`).join('');
   const LINES = ['Porteros', 'Defensas', 'Medios', 'Delanteros'];
   function gearDef(kind, k) { const D = TL.Events.DB(); return kind === 'soul' ? D.souls[k] : D.items[k]; }
+  function soulEffectHtml(d) {
+    const surge = d.surge;
+    return `<span class="ev-chips">${effChips(d.eff)}</span>${surge ? `
+      <span class="gear-surge"><span>${TL.Events.SOUL_TRIGGERS[surge.when].label}</span>
+        ${effChips(surge.eff)}</span>` : ''}`;
+  }
+  function soulLines(d) {
+    return d.line.map(l => LINES[l]).join(' · ');
+  }
   function rewardHtml(S, rw) {
     const d = gearDef(rw.kind, rw.k);
     if (!d) return '';
     const p = rw.pid != null ? S.players[rw.pid] : null;
     return `<div class="rw-card ${rw.kind}" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div>
       <div class="grow"><small><span>${rw.kind === 'soul' ? 'Nueva alma' : 'Nuevo objeto'}</span>${p ? `<span> · equipada a ${esc(p.short)}</span>` : ''}</small><b>${esc(d.name)}</b><p>${esc(d.desc)}</p>
-      <div class="ev-chips">${effChips(d.eff)}</div>${d.line && rw.kind === 'soul' ? `<p class="note" style="margin:4px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')}</p>` : ''}
+      ${soulEffectHtml(d)}${d.line && rw.kind === 'soul' ? `<p class="note" style="margin:4px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')}</p>` : ''}
       ${p ? '' : `<button class="btn sm primary mt" data-act="gear" data-kind="${rw.kind}" data-u="${rw.u}">Equipar</button>`}</div></div>`;
   }
 
-  /** Tarjeta de la plantilla: tu inventario. */
   function gearCard(S) {
-    const EV = TL.Events;
-    if (!EV || !S.ev || S.mode === 'tour') return '';
-    const E = S.ev, fan = EV.fantasy(S);
-    if (!fan && !E.items.length) return '';
+    const EV = TL.Events, E = S.ev, fan = EV.fantasy(S);
+    const filters = UI.gearFilters;
+    const souls = E.souls.filter(x => gearDef('soul', x.k));
+    const equipped = souls.filter(x => x.pid != null).length;
+    const shown = souls.filter(x => {
+      if (filters.state === 'free' && x.pid != null) return false;
+      if (filters.state === 'equipped' && x.pid == null) return false;
+      return filters.line === '' || gearDef('soul', x.k).line.includes(+filters.line);
+    }).sort((a, b) => Number(a.pid != null) - Number(b.pid != null)
+      || gearDef('soul', a.k).name.localeCompare(gearDef('soul', b.k).name, 'es'));
     const row = (kind, x) => {
       const d = gearDef(kind, x.k);
       if (!d) return '';
-      const p = x.pid != null ? S.players[x.pid] : null;
-      return `<button class="gear-it ${kind} ${p ? 'on' : ''}" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${p ? 'Lo lleva ' + esc(p.short) : 'En el inventario'}</small></span></button>`;
+      const p = x.pid == null ? null : S.players[x.pid];
+      return `<button class="gear-it ${kind} ${p ? 'on' : ''}" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${d.c || '#ffd23f'}">
+        <span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b>
+        <small>${p ? `<span>Lo lleva</span> ${esc(p.short)}` : 'Sin equipar'}</small>
+        ${kind === 'soul' ? `<small>${soulLines(d)}</small>${soulEffectHtml(d)}` : ''}</span>${icon('next')}</button>`;
     };
-    const souls = fan ? E.souls.map(x => row('soul', x)).join('') : '';
-    const items = E.items.map(x => row('item', x)).join('');
-    return `<section class="card gear-card"><div class="card-head"><h2>${fan ? '✨ Almas y objetos' : '🎒 Objetos'}</h2></div>
-      ${fan ? `<div class="group-title">Almas</div>${souls || '<p class="note">Aún no tienes almas. Aparecen en eventos y partidos especiales.</p>'}` : ''}
-      <div class="group-title">Objetos</div>${items || '<p class="note">Gana partidos especiales para conseguir objetos.</p>'}</section>`;
+    const stats = fan ? `<div class="kpis">
+      <div class="kpi"><div class="k">Almas distintas</div><div class="v">${new Set(souls.map(x => x.k)).size}</div></div>
+      <div class="kpi"><div class="k">Sin equipar</div><div class="v">${souls.length - equipped}</div></div>
+      <div class="kpi"><div class="k">Equipadas</div><div class="v">${equipped}</div></div>
+    </div>` : '';
+    return `${stats}${fan ? `<section class="card gear-card">
+      <div class="card-head"><h2>Almas</h2></div>
+      <div class="gear-filters">
+        <select data-change="gear-filter" data-k="state" aria-label="Estado del alma">
+          ${[['', 'Todas las almas'], ['free', 'Sin equipar'], ['equipped', 'Equipadas']].map(([key, label]) => `<option value="${key}" ${filters.state === key ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+        <select data-change="gear-filter" data-k="line" aria-label="Línea ideal">
+          <option value="">Todas las líneas</option>
+          ${LINES.map((label, line) => `<option value="${line}" ${filters.line === String(line) ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="gear-grid">${shown.map(x => row('soul', x)).join('')}</div>
+      ${shown.length ? '' : `<p class="note">${souls.length ? 'Ningún alma coincide con los filtros.' : 'Consigue almas en eventos, partidos especiales y fichajes.'}</p>`}</section>` : ''}
+      <section class="card gear-card"><div class="card-head"><h2>Objetos</h2></div><div class="gear-grid">
+        ${E.items.map(x => row('item', x)).join('') || '<p class="note">Gana partidos especiales para conseguir objetos.</p>'}
+      </div></section>`;
   }
-  UI.gearCard = gearCard;
+  C['gear-filter'] = el => {
+    UI.gearFilters[el.dataset.k] = el.value;
+    UI.refresh();
+    document.querySelector(`[data-change="gear-filter"][data-k="${el.dataset.k}"]`)?.focus({ preventScroll: true });
+  };
 
   /** Hoja de un alma u objeto: qué hace y a quién se lo pones. */
   A.gear = el => {
@@ -688,8 +726,9 @@
     const cands = W.squad(S, S.user).filter(p => EV.canEquip(S, kind, x.k, p))
       .sort((a, b) => (kind === 'soul' ? EV.affinity(d, b) - EV.affinity(d, a) : 0) || b.ovr - a.ovr);
     const has = p => (kind === 'soul' ? EV.soulOf(S, p.id) : EV.itemOf(S, p.id));
-    sheet(sheetHead(d.icon + ' ' + esc(d.name)) + `<div class="rw-card ${kind} flat" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div><div class="grow"><p>${esc(d.desc)}</p><div class="ev-chips">${effChips(d.eff)}</div>
+    sheet(sheetHead(d.icon + ' ' + esc(d.name)) + `<div class="rw-card ${kind} flat" style="--c1:${d.c || '#ffd23f'};--c2:${d.c2 || '#ff9f1a'}"><div class="rw-ic">${d.icon}</div><div class="grow"><p>${esc(d.desc)}</p>${soulEffectHtml(d)}
       ${kind === 'soul' && d.line ? `<p class="note" style="margin:6px 0 0"><span>Rinde entera en:</span> ${d.line.map(l => `<span>${LINES[l]}</span>`).join(', ')} <span>(en otra línea, a medias)</span></p>` : ''}${d.gk === true ? '<p class="note" style="margin:6px 0 0">Solo para porteros.</p>' : ''}</div></div>
+      ${cur && kind === 'soul' && EV.affinity(d, cur) < 1 ? '<p class="note">En su posición actual rinde a medias.</p>' : ''}
       ${cur ? `<div class="row between mt"><span><span>Lo lleva</span> <b>${esc(cur.name)}</b></span><button class="btn sm" data-act="gear-off" data-kind="${kind}" data-u="${u}">Quitar</button></div>` : ''}
       <div class="group-title">${cur ? 'Pasárselo a otro' : '¿A quién se lo pones?'}</div>
       <div class="plist">${cands.filter(p => p !== cur).map(p => playerRow(S, p, { act: 'gear-on', attrs: ` data-kind="${kind}" data-u="${u}"`, sub: `${F.POS_ES[p.pos]}${kind === 'soul' ? `<span> · ${EV.affinity(d, p) >= 1 ? 'rinde entera' : 'a medias'}</span>` : ''}${has(p) ? `<span> · ya lleva ${esc(has(p).def.name)}</span>` : ''}`, tags: false })).join('')}</div>`);
@@ -709,20 +748,27 @@
     const EV = TL.Events;
     const spx = TL.Special && TL.Special.of(S, p);
     const spBox = spx ? `<div class="gear-it soul on" style="--c1:${spx.c}"><span class="gi-ic">⚡</span><span class="grow"><b>Supertiro: ${esc(spx.name)}</b><small>${esc(spx.desc)}</small></span></div>` : '';
-    if (!EV || !S.ev || p.club !== S.user) return spBox ? `<div class="group-title">Supertiro</div><div class="gear-sec">${spBox}</div>` : '';
-    const fan = EV.fantasy(S), so = fan ? EV.soulOf(S, p.id) : null, it = EV.itemOf(S, p.id);
+    const so = EV?.soulOf(S, p.id);
+    const personal = so && so.u == null ? `<div class="gear-it soul on" style="--c1:${so.def.c}">
+      <span class="gi-ic">${so.def.icon}</span><div class="grow"><b>${esc(so.def.name)}</b><small>${esc(so.def.desc)}</small>
+        ${soulEffectHtml(so.def)}${TL.Locker.onLoan(S, p.id) ? '<small>El alma viaja con el jugador durante la cesión.</small>' :
+          p.club !== S.user ? '<small>Se incorpora a tu inventario si cierras el fichaje.</small>' : ''}
+      </div></div>` : '';
+    if (!EV || !S.ev || p.club !== S.user) return personal ? `<div class="group-title">Alma</div><div class="gear-sec">${personal}${spBox}</div>` : '';
+    const fan = EV.fantasy(S), it = EV.itemOf(S, p.id);
     const freeSouls = fan ? S.ev.souls.filter(x => x.pid == null && EV.canEquip(S, 'soul', x.k, p)) : [];
     const freeItems = S.ev.items.filter(x => x.pid == null && EV.canEquip(S, 'item', x.k, p));
     if (!so && !it && !freeSouls.length && !freeItems.length) return spBox ? `<div class="group-title">Supertiro</div><div class="gear-sec">${spBox}</div>` : '';
     const line = (kind, x) => `<button class="gear-it ${kind} on" data-act="gear" data-kind="${kind}" data-u="${x.u}" style="--c1:${x.def.c || '#ffd23f'}"><span class="gi-ic">${x.def.icon}</span><span class="grow"><b>${esc(x.def.name)}</b><small>${effList(x.def.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(x.def, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
     const pickers = [];
-    if (!so && freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ Equipar un alma (${freeSouls.length})</button>`);
+    if (freeSouls.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="soul" data-id="${p.id}">✨ <span>${so ? 'Cambiar de alma' : 'Equipar un alma'}</span> (${freeSouls.length})</button>`);
     if (!it && freeItems.length) pickers.push(`<button class="btn sm" data-act="gear-pick" data-kind="item" data-id="${p.id}">🎒 Equipar un objeto (${freeItems.length})</button>`);
-    return `<div class="group-title">${fan ? 'Alma y objeto' : 'Objeto'}</div><div class="gear-sec">${spBox}${so ? line('soul', so) : ''}${it ? line('item', it) : ''}${pickers.length ? `<div class="btn-row">${pickers.join('')}</div>` : ''}</div>`;
+    return `<div class="group-title">${fan ? 'Alma y objeto' : 'Objeto'}</div><div class="gear-sec">${spBox}${personal || (so ? line('soul', so) : '')}${it ? line('item', it) : ''}${pickers.length ? `<div class="btn-row">${pickers.join('')}</div>` : ''}</div>`;
   }
   A['gear-pick'] = el => {
     const S = G.S, kind = el.dataset.kind, p = S.players[+el.dataset.id], EV = TL.Events;
     const list = (kind === 'soul' ? S.ev.souls : S.ev.items).filter(x => x.pid == null && EV.canEquip(S, kind, x.k, p));
+    if (kind === 'soul') list.sort((a, b) => EV.affinity(gearDef(kind, b.k), p) - EV.affinity(gearDef(kind, a.k), p));
     sheet(sheetHead(kind === 'soul' ? '✨ Elige un alma' : '🎒 Elige un objeto') + `<p class="note">Para ${esc(p.name)} (${F.POS_ES[p.pos]}).</p>` + list.map(x => {
       const d = gearDef(kind, x.k);
       return `<button class="gear-it ${kind}" data-act="gear-on" data-kind="${kind}" data-u="${x.u}" data-id="${p.id}" style="--c1:${d.c || '#ffd23f'}"><span class="gi-ic">${d.icon}</span><span class="grow"><b>${esc(d.name)}</b><small>${effList(d.eff).map(effTxt).join(' · ')}${kind === 'soul' && EV.affinity(d, p) < 1 ? ' <span>(a medias: no es su línea)</span>' : ''}</small></span></button>`;
@@ -1131,6 +1177,15 @@
 
   VIEWS.squad = S => {
     const AC = TL.Academy, hasRes = AC && AC.on(S);
+    const fan = TL.Events?.fantasy(S);
+    const hasGear = S.mode !== 'tour' && S.ev && (fan || S.ev.items.length);
+    const tabs = [['first', 'Primer equipo']];
+    if (hasRes) tabs.push(['res', '🌱 Filial']);
+    if (hasGear) tabs.push(['gear', fan ? '✨ Almas y objetos' : '🎒 Objetos']);
+    const tab = tabs.some(([key]) => key === UI.squadTab) ? UI.squadTab : 'first';
+    const seg = tabs.length > 1 ? `<div class="seg sq-tabs" style="margin-bottom:12px">${tabs.map(([key, label]) =>
+      `<button class="${tab === key ? 'on' : ''}" data-act="sq-tab" data-k="${key}">${label}</button>`).join('')}</div>` : '';
+    if (tab === 'gear') return pageTitle('Plantilla', '') + seg + gearCard(S);
     const resTab = hasRes && UI.squadTab === 'res';
     const sq = resTab ? AC.reserve(S) : W.squad(S, S.user);
     const bill = W.wageBill(S, S.user);
@@ -1171,8 +1226,6 @@
         if (g.length) list += `<div class="group-title">${names[l]} · ${g.length}</div>` + g.map(row).join('');
       }
     } else list = sorted.map(row).join('');
-    const nRes = hasRes ? AC.reserve(S).length : 0;
-    const seg = hasRes ? `<div class="seg sq-tabs" style="margin-bottom:12px"><button class="${resTab ? '' : 'on'}" data-act="sq-tab" data-k="first">Primer equipo · ${W.squad(S, S.user).length}</button><button class="${resTab ? 'on' : ''}" data-act="sq-tab" data-k="res">🌱 Filial · ${nRes}</button></div>` : '';
     if (resTab) {
       const bill = U.sum(sq, p => p.wage), cap = sq.filter(p => AC.atCap(p)).length;
       return pageTitle('Plantilla', `Filial · ${sq.length}/${AC.MAX_RES} jugadores`) + seg +
@@ -1188,7 +1241,7 @@
             <span class="w-s">Edad</span><span class="w-pot">Potencial</span><span>Salario</span><span class="w-s">Fin</span></div>
           <div class="plist">${list || `<div class="empty">El filial está vacío. Llegarán ${S.gender === 'F' ? 'canteranas' : 'canteranos'} en verano.</div>`}</div></div>`;
     }
-    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + seg + (S.mode === 'tour' ? '' : lockerCard(S) + gearCard(S) + devCard(S)) +
+    return pageTitle('Plantilla', `${sq.length}/${S.mode === 'tour' ? sq.length : M.MAX_SQUAD} jugadores`) + seg + (S.mode === 'tour' ? '' : lockerCard(S) + devCard(S)) +
       `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
         <div class="kpi"><div class="k">Nivel club</div><div class="v">${S.clubs[S.user].rep.toFixed(1)}</div></div>
@@ -1604,6 +1657,8 @@
             ${[1e5, 5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7, 1e8].map(v => Math.round(v * S.econ.value)).map(v => `<option value="${v}" ${+f.maxValue === v ? 'selected' : ''}>≤ ${U.money(v)}</option>`).join('')}</select>
           <select data-change="mf" data-k="league" style="flex:2 1 160px" aria-label="Liga"><option value="">Todas las ligas</option>
             ${L.map(l => `<option value="${l.id}" ${f.league !== '' && +f.league === l.id ? 'selected' : ''}>${esc(l.name)} (${esc(l.country)})</option>`).join('')}</select>` : ''}
+          ${TL.Events?.fantasy(S) ? `<select data-change="mf" data-k="soul" style="flex:1 1 120px" aria-label="Filtro de alma">
+            <option value="">Con o sin alma</option><option value="yes" ${f.soul === 'yes' ? 'selected' : ''}>Solo con alma</option></select>` : ''}
           <select data-change="mf" data-k="sort" style="flex:1 1 120px" aria-label="Ordenar"><option value="ovr" ${f.sort === 'ovr' ? 'selected' : ''}>Por media</option>
             <option value="pot" ${f.sort === 'pot' ? 'selected' : ''}>Por potencial</option><option value="value" ${f.sort === 'value' ? 'selected' : ''}>Por valor</option>
             <option value="age" ${f.sort === 'age' ? 'selected' : ''}>Más jóvenes</option></select>
@@ -1622,7 +1677,7 @@
       q: f.q, pos: f.pos, alt: false, minOvr: +f.minOvr || 0, maxAge: +f.maxAge || 0,
       maxValue: UI.market.tab === 'search' ? (f.maxValue === 'cash' ? Math.max(1, S.clubs[S.user].cash / 1.25) : +f.maxValue || 0) : 0,
       league: UI.market.tab === 'search' ? f.league : '',
-      sort: f.sort, free: UI.market.tab === 'free'
+      sort: f.sort, free: UI.market.tab === 'free', soul: TL.Events?.fantasy(S) && f.soul === 'yes'
     });
     const shown = res.slice(0, UI.market.limit);
     const rows = shown.map(p => {
@@ -1705,6 +1760,8 @@
     const q = Q[c.name.length % Q.length];
     sheet(sheetHead(R.icon + ' ' + R.name) + `<div class="office"><div class="office-head"><p style="margin:0;line-height:1.45"><b>${esc(c.name)}</b> se incorpora al cuerpo técnico y saluda:</p></div>
       <p class="sign-quote">«${esc(q)}»</p>
+      ${so ? `<div class="gear-it soul on" style="--c1:${so.def.c}"><span class="gi-ic">${so.def.icon}</span><span class="grow">
+        <b>${esc(so.def.name)}</b><small>${loan ? 'El alma viaja con el jugador durante la cesión.' : 'Añadida al inventario y equipada.'}</small></span></div>` : ''}
       <div class="btn-row mt"><button class="btn primary" data-act="close-sheet">¡Bienvenid${a('o', 'a')}!</button></div></div>`);
     let h = 0; for (const ch of c.name) h = (h * 31 + ch.charCodeAt(0)) % 9973;
     speakEl(document.querySelector('.sheet .sign-quote'), { seed: h, fem }, 450);
@@ -2016,7 +2073,8 @@
       actions = `<div class="group-title">Su cesión</div>${loanCard(S, loan, true)}`;
     } else if (mine) actions = ownActions(S, p);
     else if (!retired) actions = transferPanel(S, p);
-    if (mine || (loan && loan.from === S.user)) actions = lockerSection(S, p) + gearSection(S, p) + actions;
+    const locker = mine || (loan && loan.from === S.user) ? lockerSection(S, p) : '';
+    actions = locker + gearSection(S, p) + actions;
     const sh = sheet(head + playerCharts(S, p, labels, stats6) + info + season + actions + newsBox, { keepScroll: UI.nego && UI.nego.pid === id });
     if (UI.nego && UI.nego.pid === id && UI.nego.focus) {
       UI.nego.focus = false;
@@ -2177,6 +2235,7 @@
   }
   function presentSigning(S, p, loan) {
     const q = welcomeQuote(S, p, loan);
+    const so = TL.Events?.soulOf(S, p.id);
     sheet(sheetHead(loan ? 'Llega cedido' : 'Presentación') + `<div class="office"><div class="office-head">${posB(p.pos)}${ovrB(p.ovr)}<p style="margin:0;line-height:1.45"><b>${esc(p.name)}</b> ${loan ? 'llega cedido' : 'posa con la camiseta'} y dice unas palabras:</p></div>
       <p class="sign-quote">«${esc(q)}»</p>
       <div class="btn-row mt"><button class="btn" data-act="player" data-id="${p.id}">Ver su ficha</button><button class="btn primary" data-act="close-sheet">¡Bienvenido!</button></div></div>`);

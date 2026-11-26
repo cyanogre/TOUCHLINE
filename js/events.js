@@ -44,6 +44,7 @@
     E.q = E.q || [];
     E.away = E.away || {};
     E.souls = E.souls || [];
+    E.rivalSouls = E.rivalSouls || {};
     E.items = E.items || [];
     E.lb = E.lb || {};
     E.uid = E.uid || 1;
@@ -62,6 +63,7 @@
     if (E.fan) {
       const k = U.pick(Object.keys(DB().souls).filter(k => DB().souls[k].starter));
       if (k) giveSoul(S, k);
+      seedRivalSouls(S);
       TL.Game.mail(S, 'Modo fantasía', 'En este mundo el fútbol tiene algo de magia: las almas de las leyendas se pueden equipar a tus jugadores y les dan poderes. Empiezas con una en tu inventario (Plantilla → Almas y objetos). Encontrarás más en eventos y partidos especiales.', 'good');
     }
   }
@@ -69,12 +71,16 @@
     const E = st(S);
     E.d = -5; E.m0 = -5; E.n = 0; E.lastStop = null; E.pend = null;
     E.q = E.q.filter(x => x.s === S.season);
+    release(S);
+    seedRivalSouls(S);
     E.away = {};
     syncAway(S);
   }
   function init(S) {
     if (S.user == null || S.mode === 'tour') return;
     st(S);
+    release(S);
+    seedRivalSouls(S);
     syncAway(S);
   }
 
@@ -187,7 +193,7 @@
     if (c.fit && !inR(p.fit, c.fit)) return false;
     if (c.boss && !inR(L.boss(S, p.id), c.boss)) return false;
     if (c.lb != null && !!st(S).lb[p.id] !== c.lb) return false;
-    if (c.soul != null && !!soulOf(S, p.id) !== c.soul) return false;
+    if (c.soul != null && (soulOf(S, p.id)?.u != null) !== c.soul) return false;
     if (c.goals && !inR((S.stats[p.id] || [0, 0])[1], c.goals)) return false;
     if (c.rating && !inR(avgRating(S, p), c.rating)) return false;
     if (c.loan && !L.loanOf(S, p.id)) return false;
@@ -445,7 +451,7 @@
       const k = fx.soul === 'k' ? inst.v.k : fx.soul === 'random' ? randomSoul(S, fx.equip ? p : null) : fx.soul;
       out.reward = fantasy(S) && DB().souls[k] ? giveSoul(S, k, fx.equip && p ? p.id : null) : giveItem(S, randomItem(S));
     }
-    if (fx.unsoul && p) { const so = soulOf(S, p.id); if (so) { equip(S, 'soul', so.u, null); chip(`${so.def.name}: al inventario`, null); } }
+    if (fx.unsoul && p) { const so = soulOf(S, p.id); if (so && so.u != null) { equip(S, 'soul', so.u, null); chip(`${so.def.name}: al inventario`, null); } }
     if (fx.play) out.match = specialMatch(S, inst, fx);
     if (fx.next) {
       const E = st(S);
@@ -526,13 +532,59 @@
     const fresh = all.filter(k => !have.has(k));
     return U.weighted(fresh.length ? fresh : all, k => DB().items[k].w || 1);
   }
+  function fitsPosition(d, p) {
+    return d.gk === undefined || d.gk === (p.pos === 'GK');
+  }
+
+  /** La IA asigna almas personales al empezar y repone algunas cada temporada. */
+  function seedRivalSouls(S) {
+    if (!fantasy(S)) return;
+    const E = st(S), defs = DB().souls;
+    if (E.rivalSoulSeason === S.season || !Object.keys(defs).length) return;
+    const first = E.rivalSoulSeason == null;
+    const occupied = new Set();
+    for (const id of Object.keys(E.rivalSouls)) {
+      const p = S.players[id];
+      if (!p || p.club < -1 || !defs[E.rivalSouls[id]]) delete E.rivalSouls[id];
+      else if (p.club >= 0) occupied.add(p.club);
+    }
+    const loans = new Set((S.lk?.loans || []).map(x => x.pid));
+    const pool = Object.keys(defs).filter(k => !defs[k].hidden);
+    for (const c of S.clubs) {
+      if (c.id === S.user || occupied.has(c.id)) continue;
+      const chance = U.clamp(0.35 + (c.rep - 60) * 0.012, 0.25, 0.68);
+      if (Math.random() >= chance * (first ? 1 : 0.45)) continue;
+      const candidates = W().squad(S, c.id).filter(p => !loans.has(p.id))
+        .sort((a, b) => b.ovr - a.ovr).slice(0, 15);
+      if (!candidates.length) continue;
+      const p = U.pick(candidates);
+      const fit = pool.filter(k => fitsPosition(defs[k], p) && affinity(defs[k], p) === 1);
+      if (fit.length) E.rivalSouls[p.id] = U.weighted(fit, k => defs[k].w || 1);
+    }
+    E.rivalSoulSeason = S.season;
+    dirtyFx(S);
+  }
+
+  /** El fichaje definitivo incorpora el alma al inventario y se la deja equipada. */
+  function recruitSoul(S, p) {
+    if (!fantasy(S) || p.club !== S.user) return null;
+    const k = S.ev.rivalSouls?.[p.id], def = DB().souls[k];
+    if (!def) return null;
+    delete S.ev.rivalSouls[p.id];
+    const reward = giveSoul(S, k, p.id);
+    return Object.assign({ def }, reward);
+  }
+
   /** Un alma al azar (mejor una que aún no tengas y, si va para alguien, de su línea del campo). */
   function randomSoul(S, p) {
     const all = Object.keys(DB().souls).filter(k => !DB().souls[k].hidden), have = new Set(st(S).souls.map(x => x.k));
     const fresh = all.filter(k => !have.has(k));
     const pool = fresh.length ? fresh : all;
-    const fit = p ? pool.filter(k => affinity(DB().souls[k], p) >= 1) : [];
-    return U.weighted(fit.length ? fit : pool, k => DB().souls[k].w || 1);
+    const compatible = p ? all.filter(k => fitsPosition(DB().souls[k], p)) : all;
+    const preferred = pool.filter(k => compatible.includes(k));
+    const choices = preferred.length ? preferred : compatible;
+    const fit = p ? choices.filter(k => affinity(DB().souls[k], p) === 1) : [];
+    return U.weighted(fit.length ? fit : choices, k => DB().souls[k].w || 1);
   }
   function giveItem(S, k) {
     const E = st(S);
@@ -547,19 +599,24 @@
     const it = { u: E.uid++, k, pid: null };
     E.souls.push(it);
     if (pid != null) equip(S, 'soul', it.u, pid);
-    return { kind: 'soul', k, u: it.u, pid: pid == null ? null : pid };
+    return { kind: 'soul', k, u: it.u, pid: it.pid };
   }
   const listOf = (S, kind) => (kind === 'soul' ? st(S).souls : st(S).items);
-  function soulOf(S, pid) { const x = S.ev && S.ev.souls.find(s => s.pid === pid); return x ? Object.assign({ def: DB().souls[x.k] }, x) : null; }
+  function soulOf(S, pid) {
+    const p = S.players[pid];
+    if (!fantasy(S) || !p || p.club < -1) return null;
+    const x = p.club === S.user && S.ev.souls.find(s => s.pid === pid);
+    if (x && DB().souls[x.k]) return Object.assign({ def: DB().souls[x.k] }, x);
+    const k = S.ev.rivalSouls?.[pid], def = DB().souls[k];
+    return def ? { def, k, pid, u: null } : null;
+  }
   function itemOf(S, pid) { const x = S.ev && S.ev.items.find(s => s.pid === pid); return x ? Object.assign({ def: DB().items[x.k] }, x) : null; }
   /** ¿Puede llevarlo? (porteros con lo de porteros, y las almas solo en modo fantasía). */
   function canEquip(S, kind, k, p) {
     const d = kind === 'soul' ? DB().souls[k] : DB().items[k];
     if (!d || !p || p.club !== S.user) return false;
     if (kind === 'soul' && !fantasy(S)) return false;
-    if (d.gk === true && p.pos !== 'GK') return false;
-    if (d.gk === false && p.pos === 'GK') return false;
-    return true;
+    return fitsPosition(d, p);
   }
   function equip(S, kind, u, pid) {
     const list = listOf(S, kind), it = list.find(x => x.u === u);
@@ -590,19 +647,38 @@
     if (!S.ev) return [];
     const out = [];
     const p = S.players[pid];
-    if (!p || p.club !== S.user) return out;
-    const so = fantasy(S) && soulOf(S, pid);
+    if (!p) return out;
+    const so = soulOf(S, pid);
     if (so && so.def) out.push(scaled(so.def.eff, affinity(so.def, p)));
-    const it = itemOf(S, pid);
+    const it = p.club === S.user && itemOf(S, pid);
     if (it && it.def) out.push(it.def.eff);
     return out;
   }
+  const SOUL_TRIGGERS = {
+    ahead: { label: 'Si vas ganando', active: (min, margin) => margin > 0 },
+    behind: { label: 'Si vas perdiendo', active: (min, margin) => margin < 0 },
+    lateDraw: { label: 'Con empate desde el minuto 75', active: (min, margin) => min >= 75 && margin === 0 },
+    lateBehind: { label: 'Si vas perdiendo desde el minuto 75', active: (min, margin) => min >= 75 && margin < 0 }
+  };
+
+  function soulShotFactor(S, pid, key, min, margin) {
+    const d = soulOf(S, pid)?.def, surge = d?.surge;
+    if (!surge || !surge.eff[key] || !SOUL_TRIGGERS[surge.when].active(min, margin)) return 1;
+    return 1 + (surge.eff[key] - 1) * affinity(d, S.players[pid]);
+  }
+
   /** Auras para el 2D: limit break (dorada) y almas (de su color). */
   function auras(S) {
     const out = {};
     if (!S.ev) return out;
     for (const id in S.ev.lb) out[id] = { c: '#ffd23f', c2: '#ff7a1a', kind: 'lb' };
-    if (fantasy(S)) for (const x of S.ev.souls) if (x.pid != null && DB().souls[x.k]) { const d = DB().souls[x.k]; out[x.pid] = out[x.pid] || { c: d.c, c2: d.c2 || d.c, kind: 'soul' }; }
+    if (!fantasy(S)) return out;
+    const ids = [...Object.keys(S.ev.rivalSouls || {}).map(Number), ...S.ev.souls.map(x => x.pid)];
+    for (const id of ids) {
+      if (id == null || out[id]) continue;
+      const d = soulOf(S, id)?.def;
+      if (d) out[id] = { c: d.c, c2: d.c2 || d.c, kind: 'soul' };
+    }
     return out;
   }
 
@@ -613,7 +689,7 @@
     if (!E) return;
     const id = v => (map.has(+v) ? map.get(+v) : null);
     const byKey = obj => { const out = {}; for (const k in obj) { const n = id(k); if (n != null) out[n] = obj[k]; } return out; };
-    E.lb = byKey(E.lb); E.away = byKey(E.away);
+    E.lb = byKey(E.lb); E.away = byKey(E.away); E.rivalSouls = byKey(E.rivalSouls);
     for (const x of E.souls.concat(E.items)) if (x.pid != null) x.pid = id(x.pid);
     E.q = E.q.map(x => Object.assign(x, { pid: x.pid == null ? null : id(x.pid), qid: x.qid == null ? null : id(x.qid) })).filter(x => x.pid !== null || x.pid === undefined);
     E.log.forEach(x => { x.pid = x.pid == null ? null : id(x.pid); });
@@ -626,7 +702,13 @@
   function release(S) {
     const E = S.ev;
     if (!E) return;
-    for (const x of E.souls.concat(E.items)) if (x.pid != null && (!S.players[x.pid] || S.players[x.pid].club !== S.user)) x.pid = null;
+    let changed = false;
+    for (const x of E.souls.concat(E.items)) {
+      if (x.pid == null || S.players[x.pid]?.club === S.user) continue;
+      x.pid = null;
+      changed = true;
+    }
+    if (changed) dirtyFx(S);
   }
   /** Para probar: fuerza un evento (desde la consola: TL.Events.force(TL.Game.S, 'limit_break', id)). */
   function force(S, id, pid, vi) {
@@ -642,7 +724,7 @@
 
   TL.Events = {
     CONFLICT, st, start, init, newSeason, matchDay, dateOf, daysLeft, step, played, roll, view, resolve, force, fantasy,
-    soulOf, itemOf, canEquip, equip, giveItem, giveSoul, affinity, effs, auras, isLB, remap, release, form, share,
+    soulOf, itemOf, canEquip, equip, giveItem, giveSoul, recruitSoul, affinity, effs, auras, soulShotFactor, SOUL_TRIGGERS, isLB, remap, release, form, share,
     DB, byId, cats: () => DB().cats
   };
 })();

@@ -333,7 +333,8 @@
     p.mor = 100;
     let extra = '';
     if (TL.Events && TL.Events.fantasy(S)) {
-      const souls = Object.keys(TL.Events.DB().souls);
+      const catalog = TL.Events.DB().souls;
+      const souls = Object.keys(catalog).filter(key => !catalog[key].hidden);
       const k = souls[Math.floor(Math.random() * souls.length)];
       const g = TL.Events.giveSoul(S, k);
       if (g && TL.Events.canEquip && TL.Events.canEquip(S, 'soul', g.u, p.id) !== false) { try { TL.Events.equip(S, 'soul', g.u, p.id); } catch (e) { /* va al inventario */ } }

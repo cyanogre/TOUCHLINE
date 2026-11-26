@@ -95,11 +95,13 @@
     S.clubs[S.user].cash -= fee;
     S.fin.buys += fee;
     p.club = S.user; p.wage = wage; p.contract = S.season + years; p.listed = false;
+    const soul = TL.Events?.recruitSoul(S, p);
     delete S.neg[p.id];
     W.dirty(S);
     TL.Commerce.refreshBudget(S);
     TL.Game.mail(S, 'Fichaje cerrado', `${p.name} (${fromName}) firma hasta ${p.contract}` +
-      (fee ? ` por ${U.money(fee)}` : '') + ` con un salario de ${U.money(wage)}/sem.`, 'market');
+      (fee ? ` por ${U.money(fee)}` : '') + ` con un salario de ${U.money(wage)}/sem.` +
+      (soul ? '\n' + soul.def.name + ' pasa a tu inventario y se queda equipada.' : ''), 'market');
     TL.News.add(S, 'fichajes', `${S.clubs[S.user].name} ficha a ${p.name}`,
       `Llega desde ${fromName}${fee ? ' por ' + U.money(fee) : ' con la carta de libertad'}. Firma hasta ${p.contract}.`, S.user, p.id, 'pos');
     p.mor = Math.max(p.mor == null ? 70 : p.mor, 78);
@@ -117,6 +119,7 @@
     const freed = fromUser ? p.wage : 0;
     if (fromUser) S.fin.sales += fee;
     p.club = toClub; p.listed = false;
+    if (fromUser) TL.Events?.release(S);
     p.contract = S.season + 1 + U.int(1, maxYears(p) === 1 ? 0 : 3);
     p.wage = Math.max(p.wage, F.wageFor(p.ovr, p.age, wealthOf(S, toClub), S.econ.wage));
     S.tactics.slots = (S.tactics.slots || []).map(id => (id === p.id ? -1 : id));
@@ -166,6 +169,7 @@
     S.clubs[S.user].cash -= cost;
     S.fin.other += cost;
     p.club = -1; p.contract = 0; p.listed = false;
+    TL.Events?.release(S);
     S.tactics.slots = S.tactics.slots.map(id => (id === p.id ? -1 : id));
     W.dirty(S);
     TL.Commerce.refreshBudget(S);
@@ -464,6 +468,7 @@
     const out = [];
     for (const p of S.players) {
       if (p.club === S.user || p.club < -1) continue;
+      if (f.soul && TL.Locker.onLoan(S, p.id)) continue;
       if (f.free ? p.club !== -1 : p.club === -1) continue;
       if (f.pos && p.pos !== f.pos && !(f.alt && p.alt.includes(f.pos))) continue;
       if (f.minOvr && p.ovr < f.minOvr) continue;
@@ -471,6 +476,7 @@
       if (f.league != null && f.league !== '' && (p.club < 0 || S.clubs[p.club].league !== +f.league)) continue;
       if (f.maxValue && W.value(S, p) > f.maxValue) continue;
       if (f.listed && !p.listed && !p.sale) continue;
+      if (f.soul && !TL.Events?.soulOf(S, p.id)) continue;
       if (q && !U.norm(p.name).includes(q)) continue;
       out.push(p);
     }

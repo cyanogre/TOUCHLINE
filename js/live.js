@@ -91,9 +91,10 @@
     if (s.d > 31) return null;
     const sc = this.st(c), r = this.role(c).role, t = P.m.teams[i];
     const tend = 1 + (sc[1] - 65) / 110 + (r === 'ST' ? 0.12 : r === 'W' || r === 'AM' ? 0.05 : r === 'CB' || r === 'FB' ? -0.12 : 0);
-    const v = s.xg * LIVE.SHOOT_V * tend * (t.desperate ? 1.2 : 1) - 0.03 + (s.d < 8 ? 0.2 : 0);
+    const shot = (TL.Events?.fantasy(P.S) && TL.Locker?.fx(P.S, c.pid)?.shot) || 1;
+    const v = s.xg * LIVE.SHOOT_V * tend * shot * (t.desperate ? 1.2 : 1) - 0.03 + (s.d < 8 ? 0.2 : 0);
     // Probabilidad de que decida tirar ahora: como una jugadora de verdad, cuanto mejor la ocasión, más seguro dispara
-    const pShoot = clamp((s.xg - LIVE.SHOOT_MIN) * LIVE.SHOOT_K * tend * (t.desperate ? 1.25 : 1), 0, 0.95);
+    const pShoot = clamp((s.xg - LIVE.SHOOT_MIN) * LIVE.SHOOT_K * tend * shot * (t.desperate ? 1.25 : 1), 0, 0.95);
     return Object.assign({ k: 'shot', v, pShoot }, s);
   };
 
@@ -155,8 +156,9 @@
     }
     const so = this.st(o), t = P.m.teams[o.team];
     const lfx = TL.Locker && P.S.lk ? (TL.Locker.fx(P.S, o.pid) || {}) : {};
+    const fouled = (TL.Events?.fantasy(P.S) && TL.Locker?.fx(P.S, c.pid)?.fouled) || 1;
     const pf = LIVE.FOUL * (1.3 - so[4] / 140) * (0.75 + so[5] / 200) * ([0.85, 1, 1.12, 1.25][t.mentality] || 1) *
-      (beaten ? 1.6 : 0.6) * (box ? 0.3 : 1) * (P.m.min > 75 ? 1.1 : 1) * (lfx.foul || 1);
+      (beaten ? 1.6 : 0.6) * (box ? 0.3 : 1) * (P.m.min > 75 ? 1.1 : 1) * (lfx.foul || 1) * fouled;
     if (Math.random() > pf) return false;
     // Cómo llega: por detrás (agarrón, empujón), lanzándose (a destiempo, zancadilla, plancha)…
     const sp = hyp(c.vx, c.vy) || 1;

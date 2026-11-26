@@ -69,6 +69,7 @@
     const mid = !S.over;
     const st = cvOpen(S, clubId);
     S.user = clubId;
+    TL.Events?.release(S);
     const sq = W.squad(S, clubId);
     const b = E.bestFormation(sq);
     S.tactics = { formation: b.formation, slots: E.autoLineup(sq, b.formation, false), mentality: 1, autoSubs: true };
