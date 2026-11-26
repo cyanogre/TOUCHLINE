@@ -62,6 +62,35 @@
   const bar = (v, hue) => `<div class="hud-bar" style="--h:${hue}"><i style="--w:${clamp(v, 0, 100)}%"></i></div>`;
   const panel = (title, code, body, cls) => `<section class="hud-card ${cls || ''}"><header><span>${esc(title)}</span><code>${esc(code)}</code></header>${body}</section>`;
 
+  // ------------------------------------------------------------ Historial de entrenador
+  const ENDW = { fired: ['Destituido', 'bad'], left: ['Se marchó', 'mid'] };
+  function story(S) {
+    const l = TL.Career ? TL.Career.cv(S) : [];
+    const bits = [];
+    l.forEach((x, k) => {
+      const pj = x.g + x.e + x.p;
+      if (k === 0) bits.push(`Empezó en ${x.name}`);
+      else bits.push(x.firedBefore ? `volvió a ${x.name}, el club que le echó` : `fichó por ${x.name}`);
+      if (x.titles) bits.push(`ganó ${x.titles === 1 ? 'una liga' : x.titles + ' ligas'}`);
+      if (x.revenge.length) bits.push(`se vengó de su antiguo club`);
+      if (x.redeemed) bits.push('y se redimió');
+      if (x.end === 'fired') bits.push(`le echaron tras ${pj} partido${pj === 1 ? '' : 's'}`);
+    });
+    const t = bits.join(', ');
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) + '.' : '';
+  }
+  function cvHtml(S) {
+    const l = TL.Career ? TL.Career.cv(S) : [];
+    const rows = l.slice().reverse().map(x => {
+      const [ew, ec] = x.end ? ENDW[x.end] : ['Actual', 'now'];
+      const tag = x.redeemed ? '<em class="cv-tag red">Redención</em>' : x.firedBefore ? '<em class="cv-tag ret">Vuelta</em>' : '';
+      const best = x.seasons.length ? Math.min(...x.seasons.map(z => z.pos)) : null;
+      return `<div class="cv-row"><div class="cv-h"><b>${esc(x.name)}</b>${tag}<span class="cv-end ${ec}">${ew}</span></div>
+        <div class="cv-d">${x.from[0]}/${String(x.from[0] + 1).slice(2)} J${x.from[1]} → ${x.to ? `${x.to[0]}/${String(x.to[0] + 1).slice(2)} J${x.to[1]}` : 'hoy'} · ${x.g}G ${x.e}E ${x.p}P${best ? ` · mejor puesto ${best}º` : ''}${x.titles ? ` · 🏆×${x.titles}` : ''}${x.revenge.length ? ` · venganzas ${x.revenge.length}` : ''}</div></div>`;
+    }).join('');
+    return `<div class="cv"><div class="group-title">Historial de entrenador</div>${rows}<p class="cv-story">${esc(story(S))}</p></div>`;
+  }
+
   // ------------------------------------------------------------ Vista
   function view(S) {
     const conf = Math.round(S.board.conf), fan = fansOpinion(S), mood = squadMood(S), ps = press(S);
@@ -117,7 +146,8 @@
       <div class="hud-row"><span>Habilidades aprendidas</span><b>${Object.values(m.skills || {}).reduce((a, b) => a + b, 0)}</b></div>
       <div class="hud-row"><span>Temporadas</span><b>${(S.history || []).length + 1}</b></div>`);
 
-    return `<div class="hud">${head}${gauges}<div class="hud-cards">${aurab}${silla}${liga}${trend}${prensa}${mule}${car}</div>
+    const cvp = panel('Expediente', 'CV.BLOCKCHAIN', cvHtml(S) + '<p class="hud-note">Registrado en 7 blockchains distintas. Nadie podrá borrarte la vergüenza ni la gloria.</p>', 'span2');
+    return `<div class="hud">${head}${gauges}<div class="hud-cards">${aurab}${silla}${liga}${trend}${prensa}${mule}${car}${cvp}</div>
       <p class="hud-foot">TOUCHLINE//OS no se hace responsable de despidos, memes ni bocadillos. Datos actualizados hace 0,0001 s.</p></div>`;
   }
 
@@ -139,5 +169,5 @@
 
   UI.VIEWS.stats = view;
   UI.VIEWS.statsAfter = after;
-  TL.Hud = { fansOpinion, squadMood };
+  TL.Hud = { fansOpinion, squadMood, cvHtml, story };
 })();
