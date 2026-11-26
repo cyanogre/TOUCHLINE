@@ -1042,6 +1042,7 @@
       e._shown = true;
       const k = this.handled.indexOf(e);
       if (k >= 0) this.handled.splice(k, 1);
+      if (this._exprEvent) { try { this._exprEvent(e); } catch (er) { /* los gestos nunca rompen el partido */ } }
       if (this.onEv) this.onEv(e);
     }
     _revealAll() { for (const e of this.handled.slice()) this._reveal(e); this.handled = []; }
@@ -1814,6 +1815,7 @@
         this.ov = { p };
         this.refOv = { x: wx + px * 3, y: wy + py * 3, run: 0.7 };
         this.wall = { until: this.t + 2.6 };
+        if (g && this.gesture) this.gesture(g.pid, 'wall', { tx: wx, ty: wy, secs: 2.4, force: true });
         this._cut(0.9, `Falta peligrosa · ${this.clubName(i)}`);
       }, end: () => { this.refOv = null; } });
       beats.push({ d: 0.6, slow: goalEv ? 0.5 : 1, start: () => { if (this.A[taker]) { this.ov.p[taker] = { x: bx, y: by, run: 0.7 }; } if (goalEv) this._focus(lerp(bx, gx, 0.5), Wd / 2, 1.45); } });
@@ -2382,6 +2384,7 @@
       this.coaches.forEach(c => this._move(c, dt));
       this.warm.forEach(ws => ws.forEach(w => { if (w.on) this._move(w, dt); }));
       this.medics.forEach(m => this._move(m, dt));
+      if (this._exprUpdate) this._exprUpdate(dt);   // mirada, cuerpo y polvillo (js/expr.js)
       this._boysStep(dt);
       this._ballUpdate(dt);
       this._openPlay(dt);
@@ -2525,6 +2528,7 @@
       }
       // Sombras y personas, de arriba abajo
       const R = Math.max(4.2, 1.5 * s);
+      if (this._exprGround) this._exprGround(X, Y, s, R);
       const people = [];
       for (const id in this.A) people.push(this.A[id]);
       for (const a of this.leaving) people.push(a);
@@ -3816,6 +3820,8 @@
         // Saltos: celebración, remate de cabeza
         if (a.state === 'celebrate') y -= Math.abs(Math.sin(this.t * 9 + a.bob)) * R * 0.7;
         if (a.jump && this.t - a.jump < 0.5) y -= Math.sin((this.t - a.jump) / 0.5 * Math.PI) * R * 1.1;
+        if (upright && this._exprBob) y -= this._exprBob(a, R);
+        if (upright && this._mood && !this.replay && this._mood(a) < 0) r *= 0.95;   // el que va tocado, algo encogido
         const sad = a.state === 'sad';
         const au = this.aura[a.pid];
         if (au && !a.leave) this._aura(a, X, Y, x, y, r, au, upright);
@@ -3826,6 +3832,7 @@
         if (a.state === 'down' || a.state === 'sit') sh.ellipse(x, y + r * 0.3, r * 1.35, r * 0.62, a.fall || 0.3, 0, 6.283);
         else if (a.state === 'slide') { const ang = Math.atan2(a.vy, a.vx); sh.ellipse(x, y, r * 1.6, r * 0.7, ang, 0, 6.283); }
         else if (a.state === 'dive') sh.ellipse(x, y, r * 0.7, r * 1.7, 0, 0, 6.283);
+        else if (this._exprShape) { const [ra, rb, an] = this._exprShape(a, sad ? r * 0.9 : r); sh.ellipse(x, y, ra, rb, an, 0, 6.283); }
         else sh.arc(x, y, sad ? r * 0.9 : r, 0, 6.283);
         c.fillStyle = col; c.fill(sh);
         if (!gk) { c.save(); c.clip(sh); this._kitPattern(this.colors[i], x, y, r); c.restore(); }
@@ -3861,6 +3868,8 @@
           c.lineCap = 'butt';
         }
         if (upright && e < 0.6) this._sweat(x, y, r, e, a.bob);
+        // Mirada, manitas y bocadillos (js/expr.js)
+        if (this._exprOver) this._exprOver(a, x, y, r, R, upright, carrier ? '#b8f53d' : (gk ? this.colors[i].gkInk : this.colors[i].ink) || '#ffffff');
         c.globalAlpha = 1;
         return;
       }

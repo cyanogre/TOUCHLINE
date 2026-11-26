@@ -83,7 +83,7 @@
     }
 
     // ------------------------------------------------------------------ Utilidades
-    say(k, d) { const P = this.P; if (P.instant || !P.onCall) return; try { P.onCall(Object.assign({ k }, d || {})); } catch (e) { /* la radio no puede romper el partido */ } }
+    say(k, d) { const P = this.P; if (P._exprSay && !P.instant) { try { P._exprSay(k, d); } catch (e) { /* nada */ } } if (P.instant || !P.onCall) return; try { P.onCall(Object.assign({ k }, d || {})); } catch (e) { /* la radio no puede romper el partido */ } }
     st(a) {
       const p = this.P.P(a.pid), st = (p && p.st) || [60, 60, 60, 60, 60, 60];
       return a.hurt ? st.map(v => v * 0.8) : st;     // lesionado que sigue en el campo: rinde menos en todo
@@ -917,6 +917,7 @@
       }
       if (!pick) { this.next = P.t + 0.4; return; }
       if (this._dbgOpts) this._dbgOpts(c, opts, pick);   // solo pruebas
+      if (P._exprDecide) { try { P._exprDecide(c, opts, pick); } catch (e) { /* nada */ } }
       switch (pick.k) {
         case 'pass': this._pass(c, pick, forced); break;
         case 'carry': this._carry(c, pick); break;
