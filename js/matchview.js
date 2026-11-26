@@ -672,6 +672,7 @@
       m.owed = { team: me, until: m.min + 15 };
       text = `Reclamas ${R.what} en la banda. La grada se pone de tu parte y el árbitro toma nota.`;
     } else text = `Reclamas ${R.what}, pero el cuarto árbitro te pide calma.`;
+    (m.protests || (m.protests = [])).push({ min: m.min, what: R.what, right: !R.truth, card });   // para la rueda de prensa
     if (card && P && P.ref) { P.ref.state = 'card'; P.ref.card = card; P.ref.until = P.t + 1.6; }
     addEvent({ min: m.min, add: m.extra, type: card === 'red' ? 'coachRed' : card ? 'coachYellow' : 'protest', team: me, text });
     clearTimeout(MV.refTimer);
@@ -965,15 +966,25 @@
     el('mv-prompt').innerHTML = '';
     // Rueda de prensa: tras los partidos que dan que hablar, siempre; si no, a veces
     const press = TL.Prensa && TL.Prensa.offered(S, m, MV.me);
-    el('mv-foot').innerHTML = (press ? `<button class="btn block" data-act="mv-press" style="margin-bottom:8px">🎤 Rueda de prensa</button>` : '') + `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
+    MV.press = press ? 'pending' : null;
+    const deleg = press && TL.Prensa.canDelegate(S);
+    el('mv-foot').innerHTML = (press ? `<div class="pr-offer"><button class="btn block" data-act="mv-press">🎤 Rueda de prensa</button>${deleg ? '<button class="btn block ghost" data-act="mv-delegate">Mandar al portavoz</button>' : ''}</div>` : '') + `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
     document.querySelectorAll('#mv-tabs button').forEach(x => { x.disabled = true; x.classList.remove('on'); });
   };
   A['mv-press'] = b => {
     if (!MV.m || !TL.Prensa) return;
-    if (b) b.remove();
+    MV.press = 'done';
+    const o = document.querySelector('#mv-foot .pr-offer'); if (o) o.remove();
     TL.Prensa.open(G.S, MV.m, MV.me, null);
   };
+  A['mv-delegate'] = () => {
+    if (!MV.m || !TL.Prensa) return;
+    MV.press = 'done';
+    const o = document.querySelector('#mv-foot .pr-offer');
+    if (o) o.outerHTML = `<p class="muted small" style="margin:0 0 8px">${U.esc(TL.Prensa.skip(G.S, MV.m, MV.me))}</p>`;
+  };
   A['mv-close'] = () => {
+    if (MV.press === 'pending' && TL.Prensa && MV.m) { MV.press = 'done'; UI.toast && UI.toast(TL.Prensa.skip(G.S, MV.m, MV.me)); }
     clearTimeout(MV.timer);
     clearInterval(MV.ballTimer);
     if (MV.pitch) { MV.pitch.destroy(); MV.pitch = null; }

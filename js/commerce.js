@@ -106,6 +106,7 @@
     if (sponsor(S, slot)) return { ok: false, msg: 'Ese espacio ya tiene patrocinador' };
     S.com.sponsors.push(o);
     delete S.com.offers[slot];
+    (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'sponsor', week: S.week, season: S.season, brand: o.brand, risky: o.style === 'risky', sector: o.sector, slot }); if (S.prensaFeed.length > 8) S.prensaFeed.shift();   // para la rueda de prensa
     if (o.style === 'risky') S.com.fans = Math.round(S.com.fans * (o.sector === 'betting' ? 0.985 : 0.99));
     if (slot === 'stadium') {
       const c = S.clubs[S.user];
@@ -152,6 +153,7 @@
     club.cash -= cost;
     S.fin.marketing = (S.fin.marketing || 0) + cost;
     S.com.campaigns.push({ id, weeksLeft: def.weeks === 99 ? S.fixtures.length - S.week : def.weeks });
+    (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'campaign', week: S.week, season: S.season, id, name: def.name }); if (S.prensaFeed.length > 8) S.prensaFeed.shift();   // para la rueda de prensa
     if (id === 'community') S.board.conf = U.clamp(S.board.conf + 4, 0, 100);
     if (id === 'stars') {
       W.squad(S, S.user).sort((a, b) => b.ovr - a.ovr).slice(0, 4).forEach(p => { p.mor = U.clamp((p.mor || 70) - 4, 0, 100); });
