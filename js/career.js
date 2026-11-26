@@ -58,6 +58,7 @@
       club: c.id, name: c.name, league: S.leagues[c.league].name, rep: Math.round(c.rep * 10) / 10,
       expect: expectation(S, c.id), cash: Math.round(c.cash), kind
     }));
+    if (kind !== 'midseason') { const r = returnOffer(S); if (r) out.unshift(r); }
     S.jobOffers = out.length ? out : null;
     return out;
   }
@@ -66,6 +67,7 @@
   function accept(S, clubId) {
     const old = S.clubs[S.user], c = S.clubs[clubId];
     const mid = !S.over;
+    const st = cvOpen(S, clubId);
     S.user = clubId;
     const sq = W.squad(S, clubId);
     const b = E.bestFormation(sq);
@@ -82,9 +84,73 @@
     TL.Game.mail(S, `Nuevo reto: ${c.name}`,
       `${S.manager} firma como entrenador de ${c.name}${mid ? ' con la temporada en marcha' : ''}. ` +
       (mid ? `Objetivo: ${S.board.text}.` : 'La directiva te comunicará el objetivo al empezar la temporada.'), 'board');
-    TL.News.add(S, 'club', `${S.manager} firma por ${c.name}`, `Deja ${old.name} para asumir un nuevo proyecto.`, clubId, null, 'pos');
+    if (st.back) S.board.conf = st.firedBefore ? 55 : 65;
+    if (st.firedBefore) TL.News.add(S, 'club', `La vuelta de ${S.manager}`, `${c.name} llama al técnico que despidió. Él coge el teléfono. Esto huele a guion de Netflix.`, clubId, null, 'pos');
+    else TL.News.add(S, 'club', `${S.manager} firma por ${c.name}`, `Deja ${old.name} para asumir un nuevo proyecto.`, clubId, null, 'pos');
     return { ok: true, msg: `¡Eres el nuevo entrenador de ${c.name}!` };
   }
 
-  TL.Career = { rep, seasonRep, makeOffers, accept, expectation };
+
+  // ------------------------------------------------------------ Historial de entrenador (CV) y redención
+  // Cada etapa en un club queda apuntada: partidos, temporadas, puesto, títulos y cómo acabó (destituido, te fuiste,
+  // sigues). Si te echan, la historia no acaba ahí: puedes vengarte ganando al club que te despidió, y con los años
+  // ese club puede volver a llamarte. Volver y cumplir es la redención.
+  function cv(S) {
+    if (!S.cv) S.cv = [];
+    if (!S.cv.length) S.cv.push(stint(S, S.user, false));
+    return S.cv;
+  }
+  function stint(S, clubId, back) {
+    const prev = (S.cv || []).filter(x => x.club === clubId);
+    return { club: clubId, name: S.clubs[clubId].name, from: [S.season, S.week], to: null, g: 0, e: 0, p: 0, seasons: [], titles: 0,
+      end: null, back: !!back || prev.length > 0, firedBefore: prev.some(x => x.end === 'fired'), redeemed: false, revenge: [] };
+  }
+  const cur = S => { const l = cv(S); const x = l[l.length - 1]; return x && !x.end ? x : null; };
+  function cvMatch(S, gf, ga, oppId) {
+    const c = cur(S); if (!c) return;
+    if (gf > ga) c.g++; else if (gf < ga) c.p++; else c.e++;
+    // Venganza: ganas al club que te echó
+    const old = S.cv.find(x => x.club === oppId && x.end === 'fired');
+    if (old && gf > ga && !c.revenge.includes(S.season + ':' + oppId)) {
+      c.revenge.push(S.season + ':' + oppId);
+      S.mgr.rep = U.clamp(rep(S) + 2, 0, 100);
+      TL.News.add(S, 'club', `La venganza de ${S.manager}`, `El técnico que despidió ${S.clubs[oppId].name} vuelve y les gana ${gf}-${ga}. En el palco hay caras largas.`, S.user, null, 'pos');
+    }
+  }
+  function cvSeason(S, sum) {
+    const c = cur(S); if (!c) return;
+    c.seasons.push({ s: S.season, pos: sum.pos, n: sum.n, target: sum.target, league: sum.league });
+    if (sum.pos === 1) c.titles++;
+    // Redención: vuelves al club que te echó y cumples
+    if (c.firedBefore && !c.redeemed && sum.pos <= sum.target) {
+      c.redeemed = true;
+      S.mgr.rep = U.clamp(rep(S) + 6, 0, 100);
+      TL.News.add(S, 'positivo', `Redención completa`, `${S.manager} vuelve a ${c.name}, el club que le echó, y cumple el objetivo. Ya hay quien habla de película.`, S.user, null, 'pos');
+    }
+  }
+  function cvClose(S, how) {
+    const c = cur(S); if (!c) return;
+    c.end = how; c.to = [S.season, S.week];
+  }
+  function cvOpen(S, clubId) {
+    cv(S); cvClose(S, S.fired ? 'fired' : 'left');
+    const st = stint(S, clubId, false);
+    S.cv.push(st);
+    return st;
+  }
+  /** ¿Te llama un club que te echó? Pasado un tiempo, si les va mal y tu reputación ha crecido. */
+  function returnOffer(S) {
+    const l = cv(S);
+    for (const x of l.slice().reverse()) {
+      if (x.end !== 'fired' || x.club === S.user || x.called) continue;
+      const gone = S.season - x.to[0];
+      if (gone < 1 || Math.random() > 0.35 + Math.min(0.3, gone * 0.08)) continue;
+      x.called = true;
+      const c = S.clubs[x.club];
+      return { club: c.id, name: c.name, league: S.leagues[c.league].name, rep: Math.round(c.rep * 10) / 10, expect: expectation(S, c.id), cash: Math.round(c.cash), kind: 'return' };
+    }
+    return null;
+  }
+
+  TL.Career = { cv, cvMatch, cvSeason, cvClose, cvOpen, returnOffer, rep, seasonRep, makeOffers, accept, expectation };
 })();

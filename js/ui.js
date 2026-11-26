@@ -2273,7 +2273,7 @@
     return `<div class="group-title">${fired ? 'Clubes interesados en ti' : 'Ofertas de trabajo'}</div>
       ${jobs.map(j => {
         const c = S.clubs[j.club];
-        return `<div class="offer job">${crest(c)}<div class="grow"><b>${esc(c.name)}</b>
+        return `<div class="offer job${j.kind === 'return' ? ' ret' : ''}">${crest(c)}<div class="grow"><b>${esc(c.name)}</b>${j.kind === 'return' ? '<div class="note" style="color:#fde68a">Te echaron… y ahora te quieren de vuelta.</div>' : ''}
           <div class="note">${esc(j.league)} · nivel ${c.rep.toFixed(1)} ${stars(c.rep)} · ${esc(j.expect)}</div>
           <div class="note">Saldo del club ${U.money(c.cash)}</div></div>
           <button class="btn sm primary" data-act="job-accept" data-id="${c.id}">Aceptar</button></div>`;
@@ -2360,6 +2360,7 @@
       <div class="card" style="max-width:460px;width:100%"><p class="muted" style="margin:0">La directiva ha perdido la confianza en tu proyecto.
         ${S.history.length ? `Temporadas dirigidas: ${S.history.length}.` : ''} Reputación de mánager: ${TL.Career.rep(S)}.</p>
         ${pendingEnd ? '<p class="note mt">Cierra la temporada para ver qué clubes te llaman.</p>' : jobsHtml(S, S.jobOffers, true)}</div>
+      ${TL.Hud ? `<div class="card" style="max-width:460px;width:100%">${TL.Hud.cvHtml(S)}</div>` : ''}
       <div class="title-actions">
         ${pendingEnd ? '<button class="btn primary" data-act="season-end">Cerrar la temporada</button>' : ''}
         <button class="btn ${pendingEnd || (S.jobOffers && S.jobOffers.length) ? 'ghost' : 'primary'}" data-act="fired-new">Empezar una partida nueva</button></div></div>`;

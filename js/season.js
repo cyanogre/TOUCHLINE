@@ -135,6 +135,7 @@
         const sq = W.squad(S, S.user), mor = sq.length ? sq.reduce((t, p) => t + (p.mor == null ? 70 : p.mor), 0) / sq.length : 70;
         (S.hud || (S.hud = [])).push({ w: S.week, s: S.season, conf: S.board.conf, fans: S.com ? S.com.fans : 0, mor: Math.round(mor), gf: mine, ga: opp });
         if (S.hud.length > 40) S.hud.shift();
+        TL.Career.cvMatch(S, mine, opp, oppId);
       }
       TL.Manager.addXp(S, (mine > opp ? 25 : mine === opp ? 10 : 4) + mine + (opp === 0 ? 5 : 0) + Math.max(0, Math.round(repGap * 2)));
       for (const r of results) {
@@ -181,6 +182,7 @@
     if (S.week >= total) S.over = true;
     if (S.board.conf <= 0 && !S.fired) {
       S.fired = true;
+      TL.Career.cv(S); TL.Career.cvClose(S, 'fired');
       // Destituido con la liga en marcha: solo llaman clubes de tu liga que van mal
       if (!S.over) TL.Career.makeOffers(S, 'midseason');
     }
@@ -293,8 +295,9 @@
       top: sum.myTop ? sum.myTop[0] + ' (' + sum.myTop[1] + ')' : '—', moved: sum.moved || ''
     });
     TL.Cups.seasonEnd(S, sum);
+    TL.Career.cv(S); TL.Career.cvSeason(S, sum);
 
-    if (S.board.conf < 15) { S.fired = true; sum.fired = true; }
+    if (S.board.conf < 15) { S.fired = true; sum.fired = true; TL.Career.cvClose(S, 'fired'); }
     // Reputación del mánager y ofertas de trabajo de otros clubes
     sum.repDelta = TL.Career.seasonRep(S, sum);
     sum.jobs = TL.Career.makeOffers(S, sum.fired ? 'fired' : 'season', sum);
