@@ -14,7 +14,7 @@
   const EV_ICON = {
     goal: '⚽', tired: '🔋', save: '🧤', miss: '💨', yellow: '🟨', red: '🟥', inj: '🚑', sub: '🔁', ht: '⏸️', ft: '🏁', ko: '📣',
     foul: '⚠️', pen: '🎯', penmiss: '❌', fk: '🎯', var: '📺', disallowed: '🚫', refmiss: '😡', controversy: '⚖️',
-    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥', added: '⏱️', ifk: '🧤', retake: '🔁', fair: '🤝'
+    heated: '🤼', crowd: '📢', talk: '🗣️', tactic: '📋', corner: '🚩', offside: '🚩', late: '🔥', added: '⏱️', ifk: '🧤', retake: '🔁', fair: '🤝', protest: '📣', coachYellow: '🟨', coachRed: '🟥'
   };
   const PAUSE_LABEL = { goal: 'Goles', red: 'Expulsiones', inj: 'Lesiones (tuyas)', pen: 'Penaltis', var: 'VAR y polémicas', crowd: 'Incidentes en la grada', ht: 'Descanso (charla)' };
 
@@ -27,7 +27,7 @@
     UI.lineupWarning(S);
     const m = G.startMatch();
     if (!m) { A['play-quick'](); return; }
-    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null, shown: [0, 0], log: [], plays: {}, noteMin: [-99, -99], live: null });
+    Object.assign(MV, { m, paused: false, tab: 'feed', htDone: false, finished: false, summary: false, subOut: null, skip: null, prompt: null, shown: [0, 0], log: [], plays: {}, noteMin: [-99, -99], live: null, refCall: null, refAnnoy: 0, refAnnoyMin: 0, coachY: 0 });
     MV.me = m.teams[0].isUser ? 0 : 1;
     const [h, a] = m.teams.map(t => S.clubs[t.club]);
     const L = W.userLeague(S);
@@ -98,7 +98,7 @@
     }
     const d = document.createElement('div');
     const big = e.type === 'ht' || e.type === 'ft' || e.type === 'ko';
-    const hot = e.controversy || ['red', 'refmiss', 'heated', 'crowd', 'disallowed'].includes(e.type);
+    const hot = e.controversy || ['red', 'refmiss', 'heated', 'crowd', 'disallowed', 'coachRed'].includes(e.type);
     d.className = `ev ${e.type === 'goal' ? 'goal' : ''} ${hot ? 'hot' : ''} ${big ? 'big' : ''} side-${e.team === MV.me ? 0 : 1}`;
     const club = e.team >= 0 ? G.S.clubs[MV.m.teams[e.team].club] : null;
     d.innerHTML = `<span class="m">${e.min ? mm(e) + "'" : ''}</span><span class="i">${evIcon(e)}</span>
@@ -181,6 +181,7 @@
   function revealEv(e) {
     if (!MV.m) return;
     addEvent(e);
+    refCall(e);
     if (MV.pitch && MV.pitch.boardMsg) MV.pitch.boardMsg(e);
     if (e.type === 'goal') { TL.FX.pop(el('mv-score')); crowdSongs([e]); }
     updateHead();
@@ -439,8 +440,9 @@
     switch (p.reason) {
       case 'ht': {
         title = `Descanso · ${m.score[0]}-${m.score[1]}`;
+        if (!t.talk && m.coachOff) m.teamTalk(MV.me, 'calm');   // desde la grada no hay charla: la da tu ayudante
         if (t.talk) {
-          body = `Charla: ${E.TALKS[t.talk.kind].name}. ${t.talk.pct >= 1.5 ? 'El equipo sale enchufado.' : t.talk.pct >= 0 ? 'El mensaje cala a medias.' : 'A los jugadores no les ha gustado.'}`;
+          body = `${m.coachOff ? 'Estás en la grada: la charla la ha dado tu ayudante. ' : ''}Charla: ${E.TALKS[t.talk.kind].name}. ${t.talk.pct >= 1.5 ? 'El equipo sale enchufado.' : t.talk.pct >= 0 ? 'El mensaje cala a medias.' : 'A los jugadores no les ha gustado.'}`;
           acts = btn('mv-resume', '▶ 2ª parte', '', true) + btn('mv-subs', 'Cambios') + btn('mv-tactic', 'Táctica');
         } else {
           body = diff > 0 ? 'Vas ganando. ¿Qué les dices en el vestuario?' : diff < 0 ? 'Vas perdiendo. Es momento de reaccionar.' : 'Empate al descanso. ¿Cómo motivas al equipo?';
@@ -594,6 +596,88 @@
     if (MV.prompt && MV.prompt.reason !== 'ht') { resume(); return; }
     renderFoot();
   };
+  // ------------------------------------------------------------ Reclamar al árbitro
+  // Tras una decisión en tu contra que se puede discutir, tu impresión (sin números: palabras y una barrita)
+  // durante unos segundos y la opción de reclamar al cuarto árbitro. Tu impresión acierta más con «Ojo arbitral»,
+  // pero nunca siempre. Reclamar no cambia la decisión (eso solo lo hace el VAR): si tenías razón, el árbitro te
+  // «debe una» (algo más blando con los tuyos en la siguiente); si no, te la juegas a una amarilla por protestar.
+  /** ¿Decisión en tu contra y discutible? Devuelve qué es y la probabilidad de que el árbitro acierte. */
+  function judge(e, me) {
+    const t = e.type, k = e.kind || '';
+    if (t === 'foul' && e.team === me && (e.hard || k === 'hand')) return { p: 0.84, what: 'la falta' };
+    if (t === 'yellow' && e.team === me) return { p: ['dive', 'distance', 'dissent', 'time'].includes(k) ? 0.92 : ['high', 'late', 'elbow'].includes(k) ? 0.85 : 0.7, what: 'la amarilla' };
+    if (t === 'red' && e.team === me) return { p: e.second ? 0.72 : ({ high: 0.86, elbow: 0.85, late: 0.8, dogso: 0.8 }[k] || 0.66), what: 'la roja' };
+    if (t === 'pen' && e.team !== me && e.team >= 0) return { p: k === 'dive' ? 0.12 : 0.78, what: 'el penalti' };
+    if (t === 'refmiss' && e.team === me) return { p: 0.1, what: 'el penalti que no pita' };
+    if (t === 'offside' && e.team === me) return { p: 0.9, what: 'el fuera de juego' };
+    if (t === 'disallowed' && e.team === me) return { p: e.viaVar ? 0.95 : 0.75, what: 'el gol anulado' };
+    return null;
+  }
+  const READS = [[0.78, 'Bien pitada', 4], [0.58, 'Parece justa', 3], [0.42, 'Dudosa', 2], [0.22, 'Yo no la pito', 1], [-1, '¡Se la ha inventado!', 0]];
+  /** Lo que te parece desde el banquillo: entre lo probable y lo que ha pasado de verdad, con algo de ruido. */
+  function perceive(p, truth) {
+    const k = TL.Manager ? TL.Manager.lvl(G.S, 'arb1') : 0;
+    const w = 0.3 + 0.15 * k, sd = 0.18 - 0.03 * k;
+    const g = (Math.random() + Math.random() + Math.random() - 1.5) / 0.5 * sd;   // ruido casi normal
+    const v = U.clamp(p + ((truth ? 0.95 : 0.05) - p) * w + g, 0, 1);
+    const r = READS.find(x => v >= x[0]);
+    return { v, word: r[1], lvl: r[2] };
+  }
+  function refCall(e) {
+    const m = MV.m;
+    if (!m || MV.skip || !m.live || m.coachOff || MV.finished) return;
+    const J = judge(e, MV.me);
+    if (!J) return;
+    if (e._truth == null) e._truth = Math.random() < J.p;
+    MV.refCall = { e, what: J.what, truth: e._truth, read: perceive(J.p, e._truth), done: false };
+    renderRefCall();
+    clearTimeout(MV.refTimer);
+    MV.refTimer = setTimeout(() => { MV.refCall = null; renderRefCall(); }, 7500);
+  }
+  function renderRefCall() {
+    const box = document.querySelector('#match .pitch-box');
+    if (!box) return;
+    let d = el('mv-ref');
+    const R = MV.refCall;
+    if (!R) { if (d) d.classList.remove('on'); return; }
+    if (!d) { d = document.createElement('div'); d.id = 'mv-ref'; d.className = 'ref-call'; box.appendChild(d); }
+    const segs = [0, 1, 2, 3, 4].map(q => `<i class="${q <= R.read.lvl ? 'on' : ''}"></i>`).join('');
+    d.title = `Tu lectura de ${R.what}`;
+    d.innerHTML = `<span class="rc-m lv${R.read.lvl}">${segs}</span><span class="rc-w lv${R.read.lvl}">${R.read.word}</span>` +
+      (R.done ? '' : `<button class="btn sm" data-act="mv-protest">Reclamar</button>`);
+    void d.offsetWidth; d.classList.add('on');
+  }
+  A['mv-protest'] = () => {
+    const R = MV.refCall, m = MV.m, me = MV.me;
+    if (!R || R.done || !m || m.coachOff) return;
+    R.done = true;
+    const dip = TL.Manager ? TL.Manager.lvl(G.S, 'arb2') : 0;
+    // La paciencia del árbitro se recupera poco a poco (y más despacio con «Mano izquierda» se gasta menos)
+    MV.refAnnoy = Math.max(0, (MV.refAnnoy || 0) - Math.max(0, m.min - (MV.refAnnoyMin || 0)) / 15 * 0.5); MV.refAnnoyMin = m.min;
+    let pc = (R.truth ? 0.28 : 0.07) + 0.12 * MV.refAnnoy - 0.06 * dip;
+    if (m.ref && m.ref.strict > 1.1) pc *= 1.2;
+    pc = U.clamp(pc, 0.02, 0.7);
+    MV.refAnnoy += (R.truth ? 1.5 : 1) * (1 - 0.2 * dip);
+    // Tu entrenador sale a la banda a protestar
+    const P = MV.pitch, c = P && P.coaches && P.coaches[me];
+    if (c) { c.state = 'wave'; c.until = P.t + 2.4; c.goTo = { x: c.base, y: -0.4 }; setTimeout(() => { if (c) c.goTo = null; }, 2600); }
+    let text, card = null;
+    if (Math.random() < pc) {
+      MV.coachY = (MV.coachY || 0) + 1;
+      if (MV.coachY >= 2) {
+        card = 'red'; m.coachOff = true; m.incidents.push({ type: 'coachRed', team: me, min: m.min });
+        text = 'Segunda amarilla por protestar: el árbitro te manda a la grada. Los cambios y la charla, para tu ayudante.';
+      } else { card = 'yellow'; text = `Amarilla para ti por protestar ${R.what}.`; }
+    } else if (!R.truth) {
+      m.owed = { team: me, until: m.min + 15 };
+      text = `Reclamas ${R.what} en la banda. La grada se pone de tu parte y el árbitro toma nota.`;
+    } else text = `Reclamas ${R.what}, pero el cuarto árbitro te pide calma.`;
+    if (card && P && P.ref) { P.ref.state = 'card'; P.ref.card = card; P.ref.until = P.t + 1.6; }
+    addEvent({ min: m.min, add: m.extra, type: card === 'red' ? 'coachRed' : card ? 'coachYellow' : 'protest', team: me, text });
+    clearTimeout(MV.refTimer);
+    MV.refCall = null; renderRefCall();
+  };
+
   A['mv-pause'] = () => pause('manual', null);
   A['mv-resume'] = () => {
     const m = MV.m;
@@ -806,7 +890,8 @@
     const rule = ht ? 'Descanso: estos cambios no gastan ninguna de tus 3 paradas.'
       : open ? `Esta parada ya está abierta: puedes hacer más cambios ahora sin gastar otra (${wins}/${E.MAX_WINDOWS} paradas usadas).`
         : `Paradas para cambios: ${wins}/${E.MAX_WINDOWS} usadas. Haz varios cambios a la vez para no gastarlas. El que sale ya no puede volver.`;
-    if (!left) html += '<div class="empty">Ya has hecho todos los cambios.</div>';
+    if (m.coachOff) html += '<div class="empty">Estás en la grada: los cambios los hace tu ayudante.</div>';
+    else if (!left) html += '<div class="empty">Ya has hecho todos los cambios.</div>';
     else if (!m.canSubNow(MV.me)) html += `<div class="empty">Ya has usado tus ${E.MAX_WINDOWS} paradas para cambios.${m.min < 45 ? ' Podrás hacer los que te quedan en el descanso.' : ''}</div>`;
     else if (MV.subOut == null) {
       html += `<p class="note sub-rule">${rule}</p>`;

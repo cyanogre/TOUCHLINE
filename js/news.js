@@ -528,6 +528,10 @@
       }
       return;
     }
+    if (inc.type === 'coachRed') {
+      if (mine) add(S, 'club', `Expulsan a ${S.manager} por protestar`, `El árbitro mandó a la grada al técnico de ${c.name} tras una segunda amarilla por protestar. Competición estudiará el acta.`, c.id, null, 'neg');
+      return;
+    }
     if (['fight', 'confront', 'refAssault'].includes(inc.type)) {
       const p = S.players[inc.pid];
       const txt = {

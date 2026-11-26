@@ -977,7 +977,10 @@
       this.stats.fouls[i]++;
       this.pl[fid].f++;
       const lfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
-      const strict = this.ref.strict * this.bonus[i].cards * (lfx(fid).card || 1);
+      // Reclamaste con razón hace poco: en la siguiente, el árbitro es algo más blando con los tuyos
+      let owed = 1;
+      if (this.owed && this.owed.team === i) { if (this.min <= this.owed.until) owed = 0.72; this.owed = null; }
+      const strict = this.ref.strict * this.bonus[i].cards * (lfx(fid).card || 1) * owed;
       const late = this.min > 75 ? 1.2 : 1;
       const kind = ctx.kind || 'trip', kfx = FOUL_CARD[kind] || 1;
       let pen = false, missed = false, card = null;
@@ -1175,7 +1178,8 @@
      *  mirando el partido (resultado rápido, saltar al final…): mientras lo ves, cambias tú y nadie gasta tus paradas. */
     _autoFor(i) {
       const t = this.teams[i];
-      return !t.isUser || (!!t.autoSubs && (!this.detail || !!this.userAway));
+      // Si te han mandado a la grada por protestar, los cambios los hace tu ayudante
+      return !t.isUser || !!this.coachOff || (!!t.autoSubs && (!this.detail || !!this.userAway));
     }
 
     _cover(i, was) {

@@ -29,6 +29,10 @@
       { id: 'neg2', name: 'Imagen pública', max: 3, desc: '+8% en ofertas de patrocinio y +10% de efecto del marketing por nivel.' },
       { id: 'neg3', name: 'Mano con la directiva', max: 3, desc: '+5% de presupuesto salarial y -0,5 puntos de interés en préstamos por nivel.' }
     ] },
+    { id: 'arb', name: 'Árbitros', icon: '⚖️', nodes: [
+      { id: 'arb1', name: 'Ojo arbitral', max: 3, desc: 'Tu impresión de las decisiones del árbitro acierta más por nivel (nunca del todo).' },
+      { id: 'arb2', name: 'Mano izquierda', max: 2, desc: 'Reclamar te cuesta menos tarjetas y el árbitro pierde la paciencia más despacio, por nivel.' }
+    ] },
     { id: 'dis', name: 'Disciplina', icon: '🟨', nodes: [
       { id: 'dis1', name: 'Juego limpio', max: 3, desc: '-8% de tarjetas por nivel.' },
       { id: 'dis2', name: 'Código de conducta', max: 3, desc: '-15% de escándalos extradeportivos por nivel.' },
