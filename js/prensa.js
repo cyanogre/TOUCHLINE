@@ -590,6 +590,8 @@
     requestAnimationFrame(() => root.classList.add('on'));
     startFx(root, c1, c2, club);
     lightInit(root);
+    requestAnimationFrame(() => fitTv(root));
+    window.addEventListener('resize', () => { const r = document.getElementById('prensa'); if (r) fitTv(r); });
     ask();
   }
 
@@ -685,6 +687,33 @@
     if (cb) cb();
   };
 
+  /** Deforma el anuncio para que case con las esquinas reales de la pantalla (máscara): el lado izquierdo es más alto. */
+  function fitTv(root) {
+    const tv = root.querySelector('.pr-tv'), ad = root.querySelector('.pr-ad');
+    if (!tv || !ad) return;
+    const w = tv.clientWidth, h = tv.clientHeight;
+    if (!w || !h) return;
+    // Esquinas destino (px dentro de la caja): arriba-izq, arriba-der, abajo-der, abajo-izq
+    const D = [[0, 0], [w, 0.071 * h], [w, 0.976 * h], [0, h]];
+    const S0 = [[0, 0], [w, 0], [w, h], [0, h]];
+    // Homografía S0 → D (8 incógnitas)
+    const A0 = [], B0 = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = S0[i], [u, v] = D[i];
+      A0.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); B0.push(u);
+      A0.push([0, 0, 0, x, y, 1, -v * x, -v * y]); B0.push(v);
+    }
+    const n = 8, M = A0.map((r, i) => r.concat(B0[i]));
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      [M[c], M[piv]] = [M[piv], M[c]];
+      for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    const H = M.map((r, i) => r[n] / r[i]);
+    const [a, b, c, d, e, f, g, hh] = H;
+    ad.style.transformOrigin = '0 0';
+    ad.style.transform = `matrix3d(${a},${d},0,${g},${b},${e},0,${hh},0,0,1,0,${c},${f},0,1)`;
+  }
   /** Luz con relieve: los flashes de las cámaras (y el foco cuando hablas) iluminan la sala según su mapa de normales. */
   const LIT = { img: null, nrm: null, cv: null, g: null, out: null, lights: [], raf: 0 };
   function lightInit(root) {
