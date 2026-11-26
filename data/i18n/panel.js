@@ -125,3 +125,7 @@ TL_I18N_ADD([
   ['La vuelta de {}', 'The return of {}', 'Le retour de {}', 'Die Rückkehr von {}', 'Il ritorno di {}'],
   ['{} llama al técnico que despidió. Él coge el teléfono. Esto huele a guion de Netflix.', '{} calls the coach they sacked. He picks up. This smells like a Netflix script.', '{} appelle l’entraîneur qu’il avait limogé. Il décroche. Ça sent le scénario Netflix.', '{} ruft den Trainer an, den man entlassen hat. Er hebt ab. Das riecht nach Netflix-Drehbuch.', 'Il {} chiama il tecnico che aveva esonerato. Lui risponde. Sa di sceneggiatura Netflix.']
 ]);
+TL_I18N_ADD([
+  ['Panel · TOUCHLINE//OS', 'Panel · TOUCHLINE//OS', 'Panneau · TOUCHLINE//OS', 'Panel · TOUCHLINE//OS', 'Pannello · TOUCHLINE//OS'],
+  ['Directiva, afición, vestuario, prensa y tu historial.', 'Board, fans, dressing room, press and your history.', 'Direction, supporters, vestiaire, presse et votre parcours.', 'Vorstand, Fans, Kabine, Presse und deine Laufbahn.', 'Dirigenza, tifosi, spogliatoio, stampa e la tua storia.']
+]);

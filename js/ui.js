@@ -28,7 +28,7 @@
 
   const TABS = [
     ['home', 'Inicio'], ['squad', 'Plantilla'], ['tactics', 'Tácticas'],
-    ['league', 'Liga'], ['market', 'Mercado'], ['club', 'Club'], ['stats', 'Panel']
+    ['league', 'Liga'], ['market', 'Mercado'], ['club', 'Club']
   ];
 
   // ------------------------------------------------------------ Estado de la UI
@@ -887,7 +887,8 @@
         <button class="btn sm primary block mt" data-act="school">${doneN ? 'Seguir aprendiendo' : 'Empezar la primera lección'}</button></section>` : '';
     const nMom = TL.Social && S.lk ? TL.Social.active(S).length : 0;
     const momNote = nMom ? `<button class="lk-office span2 home-mo" data-act="tab" data-tab="squad"><span>💬</span><span><b>${nMom === 1 ? '1 momento en el vestuario' : nMom + ' momentos en el vestuario'}</b><small>Alguien necesita una charla. Caducan pronto.</small></span><span class="go">›</span></button>` : '';
-    return `<div class="grid two three">${next}${momNote}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
+    const hudBtn = `<button class="lk-office span2 home-hud" data-act="tab" data-tab="stats"><span>📊</span><span><b>Panel · TOUCHLINE//OS</b><small>Directiva, afición, vestuario, prensa y tu historial.</small></span><span class="go">›</span></button>`;
+    return `<div class="grid two three">${next}${momNote}${hudBtn}${board}${school}${inbox}${news}${results}${mini}${fin}</div>`;
   };
   VIEWS.homeAfter = S => {
     // Lo mostrado en Inicio queda como leído
