@@ -876,7 +876,7 @@
   };
 
   // ------------------------------------------------------------ Almas (solo en modo fantasía): apodos de leyendas y héroes del anime
-  // line: líneas donde rinde entera (0 portero · 1 defensa · 2 medio · 3 delantero); fuera, a medias. c/c2: colores del aura.
+  // line: líneas donde rinde entera (0 portero · 1 defensa · 2 medio · 3 delantero); fuera, a medias. c/c2: colores del aura. surge: multiplicador extra en remates según el marcador.
   const SOULS = {
     emperador: { name: 'El alma del Káiser', icon: '👑', c: '#ffd23f', c2: '#ff9f1a', line: [1, 2], starter: true, desc: 'El líbero que defendía como un emperador y salía jugando con la cabeza alta.', eff: { def: 0.7, mid: 0.5, assist: 1.25 } },
     fantasma: { name: 'El alma del Fenómeno', icon: '💫', c: '#c9d6ff', c2: '#7c8cff', line: [3], starter: true, desc: 'Arranca y nadie le alcanza: bicicletas, recortes y gol. Eso sí, no baja a defender.', eff: { shot: 1.4, conv: 1.12, def: -0.3 } },
@@ -893,7 +893,19 @@
     pulga: { name: 'El alma de la Pulga', icon: '🐜', c: '#7fd1ff', c2: '#ff3b6b', line: [2, 3], desc: 'Pequeño, pegado al balón e imparable en el uno contra uno. Asiste tanto como marca.', eff: { conv: 1.08, assist: 1.3, fouled: 1.4 } },
     rey: { name: 'El alma del Rey', icon: '♛', c: '#ffe066', c2: '#2fd17c', line: [3], starter: true, desc: 'Mil goles y tres Mundiales. Con él en el campo, el equipo entero se cree campeón.', eff: { conv: 1.1, shot: 1.2, team: 1.005 } },
     divino: { name: 'El alma del Divino', icon: '🎗️', c: '#a0e7ff', c2: '#3a6bff', line: [2, 3], desc: 'Coleta, zurda y elegancia. Genio puro… que a veces falla el penalti que más importa.', eff: { conv: 1.08, assist: 1.2 } },
-    ibra: { name: 'El alma de Ibracadabra', icon: '🦒', c: '#ffd0a0', c2: '#ff5a00', line: [3], desc: 'Taekwondo, chilenas imposibles y un ego que no cabe en el estadio. Lo dice él: no necesita a nadie.', eff: { shot: 1.6, conv: 1.12, assist: 0.6 } }
+    ibra: { name: 'El alma de Ibracadabra', icon: '🦒', c: '#ffd0a0', c2: '#ff5a00', line: [3], desc: 'Taekwondo, chilenas imposibles y un ego que no cabe en el estadio. Lo dice él: no necesita a nadie.', eff: { shot: 1.6, conv: 1.12, assist: 0.6 } },
+    guante_frio: { name: 'El alma del Guante Frío', icon: '❄️', c: '#bdf4ff', c2: '#4c86e8', line: [0], gk: true, desc: 'Cuanto más se alarga el empate, más difícil es batirle.', eff: { save: 0.96 }, surge: { when: 'lateDraw', eff: { save: 0.79 } } },
+    centinela: { name: 'El alma de la Centinela', icon: '🗝️', c: '#79e9b6', c2: '#255e6a', line: [0], gk: true, desc: 'Cuando toca proteger una ventaja, cierra la portería.', eff: { team: 1.004 }, surge: { when: 'ahead', eff: { save: 0.84 } } },
+    rompeolas: { name: 'El alma del Rompeolas', icon: '🌊', c: '#4adbe7', c2: '#315bb1', line: [1], gk: false, desc: 'Corta la primera oleada y deja a su equipo listo para salir.', eff: { def: 0.85, mid: 0.35, foul: 0.82 } },
+    rescoldo: { name: 'El alma del Rescoldo', icon: '🪵', c: '#ffac72', c2: '#fa4b62', line: [2, 3], gk: false, desc: 'Parece apagada hasta que el marcador se pone en contra.', eff: { assist: 1.1 }, surge: { when: 'behind', eff: { conv: 1.22 } } },
+    relojera: { name: 'El alma de la Relojera', icon: '⚙️', c: '#f4d57c', c2: '#ac79ef', line: [2], gk: false, desc: 'Elige el momento justo para acelerar: hace jugar mejor al equipo y encuentra el último pase.', eff: { mid: 0.4, assist: 1.4, team: 1.005, shot: 0.85 } },
+    ultimo_tren: { name: 'El alma del Último Tren', icon: '🚆', c: '#e1caff', c2: '#fd626a', line: [3], gk: false, desc: 'Si queda poco y vais perdiendo, cada remate suyo amenaza con cambiar el partido.', eff: { shot: 1.25 }, surge: { when: 'lateBehind', eff: { conv: 1.3 } } },
+    costurera: { name: 'El alma de la Costurera', icon: '🪡', c: '#fa9ad5', c2: '#aa78f8', line: [2, 3], gk: false, desc: 'Une dos jugadas que parecían separadas. Prefiere dejar el gol hecho a marcarlo.', eff: { assist: 1.65, att: 0.25, shot: 0.75 } },
+    aguja: { name: 'El alma de la Brújula', icon: '🧭', c: '#b5e55b', c2: '#38c4a3', line: [1, 2], gk: false, desc: 'Ofrece una salida segura, orienta el juego y evita las entradas a destiempo.', eff: { mid: 0.55, def: 0.35, assist: 1.15, card: 0.82 } },
+    avispa: { name: 'El alma de la Avispa', icon: '🐝', c: '#f6df57', c2: '#e68e38', line: [2, 3], gk: false, desc: 'Entra y sale del duelo hasta que el rival acaba haciéndole falta.', eff: { fouled: 1.6, assist: 1.15, card: 0.85 } },
+    tejado: { name: 'El alma del Pararrayos', icon: '🌩️', c: '#b6b3ff', c2: '#6281fb', line: [1, 2], gk: false, desc: 'Absorbe la presión y llega al remate desde segunda línea, a costa de dejar algún hueco.', eff: { shot: 1.45, conv: 1.07, att: 0.35, def: -0.25 } },
+    niebla: { name: 'El alma de la Niebla', icon: '🌫️', c: '#c4e7ed', c2: '#9e9ac8', line: [1, 2], gk: false, desc: 'Hace difícil encontrar huecos. Defiende sin regalar faltas y sube con cautela.', eff: { def: 0.7, foul: 0.7, card: 0.85, att: -0.2 } },
+    afinadora: { name: 'El alma de la Afinadora', icon: '🎻', c: '#ffb8a3', c2: '#c96399', line: [3], gk: false, desc: 'Remata poco. Cuando por fin encuentra su ocasión, ajusta el tiro al milímetro.', eff: { shot: 0.8, conv: 1.18, assist: 1.2 } }
   };
 
   window.TL_EVENTOS = { cats: CATS, events: EVENTS, items: ITEMS, souls: SOULS };

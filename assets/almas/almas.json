@@ -1,0 +1,203 @@
+{
+  "game": "TOUCHLINE",
+  "frame_width": 32,
+  "frame_height": 32,
+  "frame_count": 8,
+  "frame_ms": [
+    110,
+    100,
+    100,
+    110,
+    110,
+    100,
+    100,
+    110
+  ],
+  "loop": true,
+  "sheet_columns": 4,
+  "sheet_rows": 2,
+  "atlas": "atlas_almas.png",
+  "atlas_order": "Una fila por alma, 8 fotogramas de izquierda a derecha.",
+  "souls": {
+    "emperador": {
+      "name": "El alma del Káiser",
+      "png": "spritesheets/emperador.png",
+      "gif": "gif/emperador.gif",
+      "atlas_row": 0
+    },
+    "fantasma": {
+      "name": "El alma del Fenómeno",
+      "png": "spritesheets/fantasma.png",
+      "gif": "gif/fantasma.gif",
+      "atlas_row": 1
+    },
+    "dragon": {
+      "name": "El alma del Tigre",
+      "png": "spritesheets/dragon.png",
+      "gif": "gif/dragon.gif",
+      "atlas_row": 2
+    },
+    "muralla": {
+      "name": "El alma de la Araña Negra",
+      "png": "spritesheets/muralla.png",
+      "gif": "gif/muralla.gif",
+      "atlas_row": 3
+    },
+    "bailarin": {
+      "name": "El alma del Pibe de Oro",
+      "png": "spritesheets/bailarin.png",
+      "gif": "gif/bailarin.gif",
+      "atlas_row": 4
+    },
+    "berserker": {
+      "name": "El alma de Ringhio",
+      "png": "spritesheets/berserker.png",
+      "gif": "gif/berserker.gif",
+      "atlas_row": 5
+    },
+    "oraculo": {
+      "name": "El alma del Arquitecto",
+      "png": "spritesheets/oraculo.png",
+      "gif": "gif/oraculo.gif",
+      "atlas_row": 6
+    },
+    "ego_absoluto": {
+      "name": "El alma del Egoísta Definitivo",
+      "png": "spritesheets/ego_absoluto.png",
+      "gif": "gif/ego_absoluto.gif",
+      "atlas_row": 7
+    },
+    "leon": {
+      "name": "El alma de la Saeta Rubia",
+      "png": "spritesheets/leon.png",
+      "gif": "gif/leon.gif",
+      "atlas_row": 8
+    },
+    "relampago": {
+      "name": "El alma del Flaco",
+      "png": "spritesheets/relampago.png",
+      "gif": "gif/relampago.gif",
+      "atlas_row": 9
+    },
+    "gato": {
+      "name": "El alma del Portero Imbatible",
+      "png": "spritesheets/gato.png",
+      "gif": "gif/gato.gif",
+      "atlas_row": 10
+    },
+    "general": {
+      "name": "El alma de Tarzán",
+      "png": "spritesheets/general.png",
+      "gif": "gif/general.gif",
+      "atlas_row": 11
+    },
+    "pulga": {
+      "name": "El alma de la Pulga",
+      "png": "spritesheets/pulga.png",
+      "gif": "gif/pulga.gif",
+      "atlas_row": 12
+    },
+    "rey": {
+      "name": "El alma del Rey",
+      "png": "spritesheets/rey.png",
+      "gif": "gif/rey.gif",
+      "atlas_row": 13
+    },
+    "divino": {
+      "name": "El alma del Divino",
+      "png": "spritesheets/divino.png",
+      "gif": "gif/divino.gif",
+      "atlas_row": 14
+    },
+    "ibra": {
+      "name": "El alma de Ibracadabra",
+      "png": "spritesheets/ibra.png",
+      "gif": "gif/ibra.gif",
+      "atlas_row": 15
+    },
+    "guante_frio": {
+      "name": "El alma del Guante Frío",
+      "png": "spritesheets/guante_frio.png",
+      "gif": "gif/guante_frio.gif",
+      "atlas_row": 16
+    },
+    "centinela": {
+      "name": "El alma de la Centinela",
+      "png": "spritesheets/centinela.png",
+      "gif": "gif/centinela.gif",
+      "atlas_row": 17
+    },
+    "rompeolas": {
+      "name": "El alma del Rompeolas",
+      "png": "spritesheets/rompeolas.png",
+      "gif": "gif/rompeolas.gif",
+      "atlas_row": 18
+    },
+    "rescoldo": {
+      "name": "El alma del Rescoldo",
+      "png": "spritesheets/rescoldo.png",
+      "gif": "gif/rescoldo.gif",
+      "atlas_row": 19
+    },
+    "relojera": {
+      "name": "El alma de la Relojera",
+      "png": "spritesheets/relojera.png",
+      "gif": "gif/relojera.gif",
+      "atlas_row": 20
+    },
+    "ultimo_tren": {
+      "name": "El alma del Último Tren",
+      "png": "spritesheets/ultimo_tren.png",
+      "gif": "gif/ultimo_tren.gif",
+      "atlas_row": 21
+    },
+    "costurera": {
+      "name": "El alma de la Costurera",
+      "png": "spritesheets/costurera.png",
+      "gif": "gif/costurera.gif",
+      "atlas_row": 22
+    },
+    "aguja": {
+      "name": "El alma de la Brújula",
+      "png": "spritesheets/aguja.png",
+      "gif": "gif/aguja.gif",
+      "atlas_row": 23
+    },
+    "avispa": {
+      "name": "El alma de la Avispa",
+      "png": "spritesheets/avispa.png",
+      "gif": "gif/avispa.gif",
+      "atlas_row": 24
+    },
+    "tejado": {
+      "name": "El alma del Pararrayos",
+      "png": "spritesheets/tejado.png",
+      "gif": "gif/tejado.gif",
+      "atlas_row": 25
+    },
+    "niebla": {
+      "name": "El alma de la Niebla",
+      "png": "spritesheets/niebla.png",
+      "gif": "gif/niebla.gif",
+      "atlas_row": 26
+    },
+    "afinadora": {
+      "name": "El alma de la Afinadora",
+      "png": "spritesheets/afinadora.png",
+      "gif": "gif/afinadora.gif",
+      "atlas_row": 27
+    }
+  },
+  "art_only": {
+    "flechazo": {
+      "name": "Flechazo",
+      "png": "spritesheets/flechazo.png",
+      "gif": "gif/flechazo.gif"
+    },
+    "pacto_secreto": {
+      "name": "Pacto Secreto",
+      "png": "spritesheets/pacto_secreto.png",
+      "gif": "gif/pacto_secreto.gif"
+    }
+  }
+}

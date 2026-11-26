@@ -701,6 +701,14 @@
       this._ev('goal', i, def.id, null, this.detail ? say('og', { p: def.short }) : '', Object.assign({ kind: 'og', og: true, late: this.min >= 88 }, sx || {}));
     }
 
+    _soulShot(i, shooter, gk, minute = this.min) {
+      const events = TL.Events;
+      if (!events?.fantasy(this.S)) return 1;
+      const margin = this.score[i] - this.score[1 - i];
+      const attack = events.soulShotFactor(this.S, shooter.id, 'conv', minute, margin);
+      return attack * (gk ? events.soulShotFactor(this.S, gk.id, 'save', minute, -margin) : 1);
+    }
+
     _shot(i) {
       const M = TL.EventsData.MATCH;
       const t = this.teams[i];
@@ -713,7 +721,7 @@
       const gkv = gk ? eff(gk, 'GK') : 30;
       const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
       // Rasgos: el que remata y el portero rival
-      let pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
+      let pGoal = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1) * this._soulShot(i, shooter, gk), 0.03, 0.42);
       this.stats.shots[i]++;
       // De dónde nace la ocasión (la vista 2D la dibuja así)
       const desp = t.desperate, line = F.LINE[o.slot];
@@ -813,7 +821,7 @@
       const gk = this._gk(1 - i), gkv = gk ? eff(gk, 'GK') : 30;
       const tfx = pid => (TL.Locker && this.S.lk ? TL.Locker.fx(this.S, pid) : null) || {};
       const sho = shooter.pos === 'GK' ? 30 : shooter.st[1];
-      let p = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1), 0.03, 0.42);
+      let p = U.clamp(0.105 * Math.pow(sho / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(shooter.id).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1) * this._soulShot(i, shooter, gk, e.min ?? this.min), 0.03, 0.42);
       if (e.re.sp) p = Math.min(0.62, p * 1.6);
       const c = ctx || {};
       const q = U.clamp((c.d != null ? 1.45 - c.d / 30 : 1) * (1 - Math.min(2, c.press || 0) * 0.12) * (c.angle != null ? 0.8 + c.angle * 0.3 : 1), 0.6, 1.4);
@@ -929,7 +937,7 @@
       const skill = head ? (shooter.st[1] * 0.5 + shooter.st[5] * 0.5) : sho;
       const sp0 = TL.Special && !head && ctx.kind !== 'fk' && TL.Special.of(this.S, shooter);
       const sp = sp0 && Math.random() < U.clamp(0.05 + (shooter.st[1] - 74) * 0.006, 0.04, 0.12) ? sp0 : null;
-      let p = ctx.xg * (L.CONV || 1.9) * Math.pow(skill / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(sPid).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1);
+      let p = ctx.xg * (L.CONV || 1.9) * Math.pow(skill / 70, 0.9) * Math.pow(72 / Math.max(30, gkv), 0.8) * (tfx(sPid).conv || 1) * (gk ? tfx(gk.id).save || 1 : 1) * this._soulShot(i, shooter, gk);
       if (sp) p *= 1.6;
       p = U.clamp(p, 0.01, sp ? 0.8 : 0.9);
       this.stats.shots[i]++;

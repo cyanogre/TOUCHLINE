@@ -360,6 +360,7 @@
     TL.Market.logMove(S, p, S.user, dest.id, fee, 'loan');
     state(S).loans.push({ pid: p.id, from: S.user, to: dest.id, s: S.season, w: S.week, o0: p.ovr, a0: statSnap(S, p) });
     p.club = dest.id; p.listed = false;
+    TL.Events?.release(S);
     S.clubs[S.user].cash += fee; dest.cash -= fee;
     S.tactics.slots = (S.tactics.slots || []).map(id => (id === p.id ? -1 : id));
     delete S.lk.mentor[p.id];
@@ -560,6 +561,7 @@
       TL.Game.mail(S, `${p.short} vuelve de su cesión`, `${p.name} regresa del ${S.clubs[l.to].name}${early ? ' antes de tiempo' : ''}: ${apps} partidos${apps ? `, nota media ${avg.toFixed(1)}` : ''}${st[1] ? `, ${st[1]} goles` : ''}.`, 'club');
     } else {
       p.club = l.from;
+      TL.Events?.release(S);
       S.tactics.slots = (S.tactics.slots || []).map(id => (id === p.id ? -1 : id));
     }
     W().dirty(S);
@@ -1033,6 +1035,7 @@
         const c = S.clubs[S.user];
         TL.Market.logMove(S, p, -1, S.user, fee);
         p.club = S.user; p.contract = S.season + 4; p.wage = F.wageFor(p.ovr, p.age, S.leagues[c.league].wealth, S.econ.wage);
+        TL.Events?.recruitSoul(S, p);
         c.cash -= fee; S.fin.buys += fee; p.mor = 82;
         W().dirty(S); TL.Commerce.refreshBudget(S);
         TL.News.add(S, 'fichajes', `${c.name} ficha a la promesa ${p.name}`, `Llega con ${p.age} años y fama de ${gx(S, 'jugador', 'jugadora')} especial.`, S.user, p.id, 'pos');

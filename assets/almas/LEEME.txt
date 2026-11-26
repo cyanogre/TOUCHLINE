@@ -1,0 +1,9 @@
+TOUCHLINE · ALMAS ANIMADAS
+28 almas del juego y dos sprites adicionales. 8 fotogramas por alma. Bucle continuo.
+GIF: 32 × 32 px y fondo transparente.
+PNG: 128 × 64 px, cuadrícula 4 × 2 de 32 × 32 px. Orden de lectura por filas.
+Atlas: 256 × 896 px, un alma por fila. almas.json indica el orden y los tiempos.
+Renderiza con filtro de vecino más cercano para conservar el píxel.
+Los nombres de archivo coinciden con las claves del juego.
+
+Flechazo (flechazo) y Pacto Secreto (pacto_secreto) son solo arte. Tienen sus propios GIF y PNG y no forman parte del atlas del juego.

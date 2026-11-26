@@ -1002,7 +1002,10 @@
       if (P.live) {
         v += LV.PASS_FWD * Math.max(0, td - k.cd) / 20;
         if (td < k.cd - 3 && k.cd > 50) v -= 0.06;
-        if (td > 84 && Math.abs(ty - CY) < 18) v += 0.03;      // balón al área
+        if (td > 84 && Math.abs(ty - CY) < 18) {
+          const assist = (TL.Events?.fantasy(P.S) && TL.Locker?.fx(P.S, c.pid)?.assist) || 1;
+          v += 0.03 * assist;
+        }
       }
       if (ag && ag.team === i) {
         v += 0.05 * Math.max(0, td - k.cd) / 20;
