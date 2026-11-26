@@ -298,12 +298,13 @@
   }
   function qText(q, c) {
     const b = BANK()[bankKey(q, c)];
-    return b && b.q && Math.random() < 0.65 ? fill(pick(b.q), q, c) : q.q(c);
+    c._qb = !!(b && b.q && b.q.length && Math.random() < 0.65);
+    return c._qb ? fill(pick(b.q), q, c) : q.q(c);
   }
   function bankVary(all, q, c) {
     const b = BANK()[bankKey(q, c)];
     if (!b || !b.o) return;
-    all.forEach((o, k) => { const v = b.o[k]; if (v && v.length && Math.random() < 0.8) o.t = fill(pick(v), q, c); });
+    all.forEach((o, k) => { const v = b.o[k]; if (v && v.length && (c._qb || Math.random() < 0.8)) o.t = fill(pick(v), q, c); });
   }
   /** Las opciones que puedes dar: las de tus habilidades sustituyen a la peor; las bloqueadas se enseñan. */
   function options(S, q, c) {
