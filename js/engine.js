@@ -626,7 +626,7 @@
         if (Math.random() < 0.22 / 90 * this.bonus[i].injury * this.wfx.injury * this._tiredRisk(i)) this._injury(i);
         // Rayo: rarísimo, solo con temporal (?rayo=1 lo fuerza en las pruebas)
         if (this.weather === 'temporal' && !this.bolt && (Math.random() < 1 / 4000 / 180 || (this.forceBolt && m === 20 && i === 1))) this._lightning(i);
-        if (t.autoSubs && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
+        if (this._autoFor(i) && m >= 58 && m <= 85 && t.subs < 4 && Math.random() < 0.09) this._fatigueSub(i);
       }
       if (m % 5 === 0) this._str = null; // el cansancio va pesando
       if (t0reorg(this, m)) this._str = null;
@@ -1164,7 +1164,14 @@
       const was = t.onPitch.find(o => o.pid === p.id);
       this._remove(i, p.id);
       // El entrenador tapa el hueco: portero suplente o un defensa por un delantero
-      if (was && (!t.isUser || (t.autoSubs && !this.detail))) this._cover(i, was);
+      if (was && this._autoFor(i)) this._cover(i, was);
+    }
+
+    /** ¿Hace los cambios el asistente? Los rivales, siempre; los tuyos, solo con «cambios automáticos» y si no estás
+     *  mirando el partido (resultado rápido, saltar al final…): mientras lo ves, cambias tú y nadie gasta tus paradas. */
+    _autoFor(i) {
+      const t = this.teams[i];
+      return !t.isUser || (!!t.autoSubs && (!this.detail || !!this.userAway));
     }
 
     _cover(i, was) {
@@ -1250,7 +1257,7 @@
       this.bolt = { team: i, pid: p.id, min: this.min };
       rec.inj = 999; rec.dead = true;
       this._ev('inj', i, p.id, null, `¡Un rayo cae sobre el campo y alcanza a ${p.short}! Las asistencias entran corriendo… El partido se detiene. Silencio absoluto en el estadio.`, { bolt: true });
-      if (t.subs < t.maxSubs && (t.autoSubs || !t.isUser)) { if (!this._bestSub(i, o)) o.hurt = true; } else o.hurt = true;
+      if (t.subs < t.maxSubs && this._autoFor(i)) { if (!this._bestSub(i, o)) o.hurt = true; } else o.hurt = true;
       this._str = null;
     }
 
@@ -1265,7 +1272,7 @@
       rec.inj = Math.max(1, Math.round(weeks * this.bonus[i].injDur));
       this._ev('inj', i, p.id, null, this.detail ? say('inj', { p: p.short }) : '');
       if (this.detail && Math.random() < 0.55) this._ev('fair', 1 - i, p.id, null, say('fair', { p: p.short }));
-      if (t.subs < t.maxSubs && (t.autoSubs || !t.isUser)) {
+      if (t.subs < t.maxSubs && this._autoFor(i)) {
         if (!this._bestSub(i, o)) o.hurt = true;
       } else o.hurt = true;
       this._str = null;
@@ -1471,7 +1478,7 @@
       if (this.detail) this._ev('ft', -1, null, null, `¡Final del partido! ${this.score[0]}-${this.score[1]}.`);
     }
 
-    simulate() { this.live = false; this.livePoss = null; while (!this.done) this.step(); return this; }
+    simulate() { this.live = false; this.livePoss = null; this.userAway = true; while (!this.done) this.step(); return this; }
 
     /** Valoración (rating) de cada jugador que participó. */
     ratings() {

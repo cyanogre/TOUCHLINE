@@ -306,6 +306,7 @@
     // Partido completo: motor en vivo. El campo decide lo que pasa y los minutos avanzan con el juego que se ve
     const live = !!(MV.pitch && !narr && !MV.skip && MV.pitch.onEv);
     m.live = live;
+    m.userAway = !!MV.skip;   // al saltar, el asistente hace tus cambios (si los tienes en automático)
     if (MV.pitch) MV.pitch.live = live;
     if (live) {
       if (MV.pitch.loading() || !MV.pitch.liveReady()) { schedule(40); return; }
@@ -528,9 +529,9 @@
   }
 
   /** Barra de energía de un jugador en el partido (verde → amarillo → rojo). */
-  function enBar(en) {
+  function enBar(en, big) {
     const v = Math.round(en), c = v >= 70 ? 'ok' : v >= 50 ? 'mid' : 'low';
-    return `<i class="lu-en ${c}" title="Energía ${v}%"><i style="width:${v}%"></i></i>`;
+    return `<i class="lu-en ${c}${big ? ' big' : ''}" title="Energía"><i style="width:${v}%"></i></i>`;
   }
   /** Muestra de la camiseta que lleva cada equipo en el campo (para reconocer los puntitos). */
   function kitSwatch(i) {
@@ -715,7 +716,7 @@
     if (k === 'end') {
       clearTimeout(MV.timer);
       // Lo que queda se juega con el motor por minutos (sin campo): si se quedara en «en vivo», nadie tiraría
-      m.live = false; m.livePoss = null;
+      m.live = false; m.livePoss = null; m.userAway = true;
       if (MV.pitch) MV.pitch.live = false;
       while (!m.done) {
         const evs = m.step();
@@ -802,13 +803,13 @@
       html += `<p class="note sub-rule">${rule}</p>`;
       html += '<p class="note">¿Quién sale? Los lesionados y los más cansados, primero.</p>' + t.onPitch.slice().sort((a, b) => (b.hurt ? 1 : 0) - (a.hurt ? 1 : 0) || m.energy(a.pid) - m.energy(b.pid)).map(o => {
         const p = S.players[o.pid], r = m.pl[o.pid];
-        return UI.playerRow(S, p, { act: 'mv-sub-out', sub: `${F.POS_ES[o.slot]} · ${TL.Feel.fit(S, m.energy(o.pid)).word.toLowerCase()}${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
+        return UI.playerRow(S, p, { act: 'mv-sub-out', right: enBar(m.energy(o.pid), true), sub: `${F.POS_ES[o.slot]} · ${TL.Feel.fit(S, m.energy(o.pid)).word.toLowerCase()}${o.hurt ? ' · 🚑 lesionado' : ''}${r && r.y ? ' · 🟨 amonestado' : ''}` });
       }).join('');
     } else {
       const o = t.onPitch.find(x => x.pid === MV.subOut);
       html += `<p class="note">Sale ${esc(S.players[MV.subOut].short)} (${F.POS_ES[o.slot]})${o.hurt ? ' · 🚑 lesionado' : ''}. ¿Quién entra? <button class="btn sm ghost" data-act="mv-sub-other">Que salga otro</button></p>` +
         (t.bench.length ? t.bench.map(id => S.players[id]).sort((a, b) => E.eff(b, o.slot) - E.eff(a, o.slot)).map(p =>
-          UI.playerRow(S, p, { act: 'mv-sub-in', sub: `${TL.Feel.posFit(S, E.fit(p, o.slot)).word} · ${TL.Feel.fit(S, p.fit).word.toLowerCase()}` })).join('')
+          UI.playerRow(S, p, { act: 'mv-sub-in', right: enBar(p.fit, true), sub: `${TL.Feel.posFit(S, E.fit(p, o.slot)).word} · ${TL.Feel.fit(S, p.fit).word.toLowerCase()}` })).join('')
           : '<div class="empty">No quedan suplentes.</div>');
     }
     UI.sheet(html, { onClose: done });
