@@ -1879,3 +1879,19 @@ body.shake-s { animation: shake-s .35s; }
 @keyframes soulIn{to{opacity:1;transform:translate(-50%,0) scale(1)}}
 @keyframes soulOut{to{opacity:0;transform:translate(-50%,-20px) scale(.9)}}
 .pr-gif{width:40px;height:40px;image-rendering:pixelated;float:right;margin-left:6px}
+/* Ambiente de la sala de prensa */
+.pr-crowd{position:absolute;left:0;right:0;bottom:-3%;height:20%;pointer-events:none;z-index:3}
+.pr-crowd i{position:absolute;bottom:0;left:var(--x);width:9%;aspect-ratio:1;border-radius:50% 50% 40% 40%;transform:scale(var(--s));transform-origin:50% 100%;
+  background:radial-gradient(circle at 50% 35%,hsl(var(--h) 18% 26%),hsl(var(--h) 20% 10%));box-shadow:0 -2px 6px rgba(0,0,0,.4);transition:transform .25s}
+.pr-crowd i::before{content:'✋';position:absolute;left:62%;top:-40%;font-size:min(3.2vw,22px);opacity:0;transform:translateY(60%) rotate(-10deg);transition:.2s}
+.pr-crowd i.hand::before{opacity:1;transform:none}
+.pr-crowd i.pick{transform:scale(calc(var(--s) * 1.08)) translateY(-6%)}
+.pr-crowd i.bob{animation:prBob .45s ease}
+@keyframes prBob{40%{transform:scale(var(--s)) translateY(-10%)}}
+.pr-rx{position:absolute;left:50%;bottom:90%;transform:translateX(-50%);white-space:nowrap;font:700 min(2.6vw,14px)/1 var(--font-c,sans-serif);color:#111;background:#fff;padding:3px 7px;border-radius:10px;box-shadow:0 3px 8px rgba(0,0,0,.35);animation:prRx 1.7s ease-out forwards}
+@keyframes prRx{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}15%{opacity:1;transform:translate(-50%,0) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-26px)}}
+.pr-fl{position:absolute;width:9%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:4;
+  background:radial-gradient(circle,#fff 0,#fff 12%,rgba(255,255,255,.7) 25%,rgba(200,220,255,.25) 45%,transparent 70%);animation:prFl .38s ease-out forwards}
+.pr-fl.sm{width:4.5%}
+@keyframes prFl{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.25)}100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+.pr-head::before{content:'«'}.pr-head::after{content:'»'}
