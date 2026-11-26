@@ -31,7 +31,8 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; }
+html { min-height: 100%; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -133,9 +134,11 @@ h1, h2, h3 { font-family: var(--font-c); letter-spacing: 0.01em; margin: 0; line
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   height: calc(var(--nav-h) + var(--safe-b)); padding-bottom: var(--safe-b);
   display: grid; grid-template-columns: repeat(6, 1fr);
-  background: rgb(10 20 15 / 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: rgb(10 20 15); 
   border-top: 1px solid var(--line);
 }
+/* Si el navegador del móvil deja un hueco por debajo (barra de direcciones que aparece y desaparece), se rellena */
+.nav::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 40vh; background: rgb(10 20 15); pointer-events: none; }
 .nav button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   color: var(--faint); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
