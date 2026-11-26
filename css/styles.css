@@ -1622,3 +1622,18 @@ body.shake-s { animation: shake-s .35s; }
 #preload .pl-num { margin: 8px 0 0; font-variant-numeric: tabular-nums; color: #d9ead0; font-weight: 700; }
 #preload .pl-note { margin: 14px 0 0; font-size: 13px; color: #7f9a8a; }
 #preload .pl-skip { margin-top: 14px; opacity: .7; }
+
+/* Reclamar al árbitro: tu lectura de la jugada (discreta, abajo a la izquierda del campo) */
+.ref-call { position: absolute; left: calc(var(--crt-x, 0px) + 16px); top: calc(var(--crt-y, 0px) + var(--crt-h, 220px) - 46px); z-index: 4; display: flex; align-items: center; gap: 7px;
+  flex-wrap: nowrap; white-space: nowrap; max-width: calc(var(--crt-w, 100%) - 32px); overflow: hidden;
+  padding: 5px 6px 5px 9px; border-radius: 10px; background: rgb(8 14 11 / 0.86); border: 1px solid rgb(255 255 255 / 0.12); font-size: 12.5px;
+  opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; pointer-events: none; }
+.ref-call.on { opacity: 1; transform: none; pointer-events: auto; }
+.ref-call .rc-k { color: var(--muted, #9fb0a6); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.ref-call .rc-w { font-weight: 800; }
+.ref-call .rc-m { display: inline-flex; gap: 2px; }
+.ref-call .rc-m i { width: 9px; height: 6px; border-radius: 2px; background: rgb(255 255 255 / 0.14); }
+.ref-call .lv4 i.on, .ref-call .lv3 i.on { background: #6fd36a; } .ref-call .rc-w.lv4, .ref-call .rc-w.lv3 { color: #8fe08a; }
+.ref-call .lv2 i.on { background: #ffc247; } .ref-call .rc-w.lv2 { color: #ffd27a; }
+.ref-call .lv1 i.on, .ref-call .lv0 i.on { background: #ff6b5d; } .ref-call .rc-w.lv1, .ref-call .rc-w.lv0 { color: #ff8b7f; }
+.ref-call .btn { padding: 3px 9px; min-height: 0; font-size: 12px; }
