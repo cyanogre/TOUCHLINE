@@ -67,6 +67,7 @@
     state(S).push({ name: c.name, role: c.role, q: c.q, wage: c.wage, s: S.season });
     S.staffMarket.list = S.staffMarket.list.filter(x => x.id !== id);
     TL.News.add(S, 'club', `${S.clubs[S.user].name} incorpora a ${c.name}`, `Nuevo ${ROLES[c.role].name.toLowerCase()} del primer equipo.`, S.user, null, 'pos');
+    (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'staff', week: S.week, season: S.season, name: c.name, role: c.role }); if (S.prensaFeed.length > 8) S.prensaFeed.shift();   // para la rueda de prensa
     return { ok: true, msg: `${c.name} se incorpora como ${ROLES[c.role].name.toLowerCase()}${comp ? ` · indemnización a ${old.name}: ${U.money(comp)}` : ''}.` };
   }
 
