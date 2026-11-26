@@ -258,6 +258,9 @@
     crowd_objects: ['Lanzamiento de objetos al césped desde la grada. El partido se detiene un momento.'],
     crowd_pyro: ['Bengalas en la grada. El humo obliga a parar el juego.'],
     crowd_invader: ['Un aficionado salta al césped y corre hacia los jugadores. Los de seguridad lo sacan.'],
+    crowd_fight: ['Tangana en la grada: varios aficionados se enzarzan y los de seguridad tienen que separarlos.'],
+    crowd_pyroParty: ['¡La grada lo celebra con bengalas! El humo cubre un momento la portería.'],
+    crowd_invaderParty: ['¡Un aficionado salta al césped para abrazar a {p}! Los de seguridad se lo llevan entre aplausos.'],
     inj: ['{p} se duele y pide el cambio.', '{p} cae lesionado. Entran las asistencias.'],
     sub: ['Cambio: entra {p}, sale {a}.'],
     // Tipos de falta (reglamento, regla 12)
@@ -636,6 +639,7 @@
         if (this.detail) this._ev('ht', -1, null, null, `Descanso. ${this.score[0]}-${this.score[1]}.`);
       }
       if (m >= 90 && this.extra >= (this.addedNow || 0)) this._end();
+      if (this.detail) this._crowdReact();
       return this.events.slice(start);
     }
 
@@ -1189,6 +1193,61 @@
       this._str = null;
     }
 
+    /**
+     * La grada reacciona a lo que pasa (solo en el partido que se ve): una decisión polémica en contra, una
+     * expulsión, un gol anulado, un penalti en contra o un gol en contra al final la encienden (insultos,
+     * objetos, bengalas, peleas); un gol propio, a veces, se celebra con bengalas o con un espontáneo.
+     * Como mucho dos incidentes por partido y separados.
+     */
+    _crowdReact() {
+      const from = this._crowdIdx || 0;
+      this._crowdIdx = this.events.length;
+      if (this.done || this.crowdN >= 2 || (this.crowdLast != null && this.min - this.crowdLast < 10)) return;
+      const fem = this.S.gender === 'F' ? 0.35 : 1;
+      const heat = [0, 0];
+      let party = null;
+      for (let k = from; k < this.events.length; k++) {
+        const e = this.events[k], i = e.team;
+        if (i == null || i < 0) continue;
+        const late = this.min >= 75;
+        switch (e.type) {
+          case 'refmiss': heat[i] += 1; break;                           // les han negado un penalti
+          case 'red': heat[i] += 0.7; break;                             // expulsado uno de los suyos
+          case 'disallowed': heat[i] += 0.8; break;                      // les anulan un gol
+          case 'pen': heat[1 - i] += 0.5; break;                         // penalti en contra
+          case 'goal': {
+            const [g0, g1] = this.score, mine = i === 0 ? g0 : g1, opp = i === 0 ? g1 : g0;
+            if (late && mine >= opp) heat[1 - i] += 0.6;                 // empate o remontada en contra al final
+            if (mine - opp >= 3) heat[1 - i] += 0.4;                     // goleada en contra
+            if (!e.og) party = { team: i, pid: e.pid };
+            break;
+          }
+        }
+      }
+      // La afición local es casi todo el estadio; la visitante, un rincón
+      for (const i of [0, 1]) {
+        const p = heat[i] * 0.22 * (i === 0 ? 1 : 0.6) * fem;
+        if (!(p > 0) || Math.random() >= p) continue;
+        const r = Math.random(), hot = heat[i] >= 1;
+        const type = hot ? (r < 0.3 ? 'objects' : r < 0.55 ? 'fight' : r < 0.75 ? 'insults' : 'pyro') : (r < 0.55 ? 'insults' : r < 0.75 ? 'pyro' : r < 0.9 ? 'objects' : 'fight');
+        this._crowdIncident(i, type, false);
+        return;
+      }
+      if (party) {
+        const pr = Math.random(), base = (party.team === 0 ? 1 : 0.6) * fem;
+        if (pr < 0.06 * base) this._crowdIncident(party.team, 'pyro', true);
+        else if (pr < 0.075 * base) this._crowdIncident(party.team, 'invader', true, party.pid);
+      }
+    }
+    _crowdIncident(i, type, party, pid) {
+      this.crowdN = (this.crowdN || 0) + 1; this.crowdLast = this.min;
+      const key = 'crowd_' + type, club = this.S.clubs[this.teams[i].club], rival = this.S.clubs[this.teams[1 - i].club];
+      this.incidents.push({ type: key, team: i, min: this.min });
+      const tk = party && type === 'pyro' ? 'crowd_pyroParty' : party && type === 'invader' ? 'crowd_invaderParty' : key;
+      const txt = say(tk, { t: rival.name, p: pid != null ? this.P(pid).short : '' });
+      this._ev('crowd', i, pid != null ? pid : null, null, `${txt} (afición de ${U.esc(club.name)})`, { kind: key, party: !!party });
+    }
+
     _heated() {
       if (this.detail) this._ev('heated', -1, null, null, say('heated', {}));
       for (const i of [0, 1]) {
@@ -1210,6 +1269,7 @@
         const rival = this.S.clubs[this.teams[1 - i].club];
         this.incidents.push({ type: ev.type, team: i, min: this.min });
         if (!TXT[ev.type]) return; // p. ej. pelea de ultras fuera del estadio: solo noticia
+        this.crowdN = (this.crowdN || 0) + 1; this.crowdLast = this.min;
         const txt = say(ev.type, { t: rival.name });
         this._ev('crowd', i, null, null, this.detail ? `${txt} (afición de ${U.esc(club.name)})` : '', { kind: ev.type });
         return;

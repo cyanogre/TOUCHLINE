@@ -29,12 +29,15 @@
     heatedPerFoul: 0.0025,      // tangana tras una entrada dura
 
     // Incidentes (probabilidad por partido)
+    // Lo que pasa «porque sí» en cualquier partido. En el partido que se ve, además, la grada reacciona a lo que
+    // ocurre en el campo (Match._crowdReact): por eso aquí la parte suelta es menor que la cifra real total
     crowd: {
-      insults: 0.10,      // insultos/cánticos violentos denunciados (LaLiga: 50–99 denuncias/temporada)
+      insults: 0.06,      // insultos/cánticos violentos denunciados (LaLiga: 50–99 denuncias/temporada)
       racism: 0.015,      // insultos racistas con protocolo (≈ 6 por temporada y liga)
-      objects: 0.04,      // lanzamiento de objetos
-      pyro: 0.05,         // bengalas / pirotecnia
-      invader: 0.03,      // invasión de campo
+      objects: 0.02,      // lanzamiento de objetos
+      pyro: 0.035,        // bengalas / pirotecnia
+      invader: 0.02,      // invasión de campo
+      fight: 0.01,        // pelea en la grada
       ultrasFight: 0.008  // pelea de ultras en los alrededores
     },
     player: {

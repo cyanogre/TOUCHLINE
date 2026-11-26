@@ -1193,6 +1193,7 @@
         }
         case 'late': this._banner('¡ASEDIO FINAL!', '#ff9a3d', 1.8, true); this._sparkStand(i); break;
         case 'crowd':
+          if (this._gradaStage) { this._gradaStage(e); break; }
           this._seq([{ d: 2.0, start: () => { this._banner('Partido detenido', '#ff9a3d', 1.8); sfx && sfx.whistle(false); this.ov = { all: 'stay' }; this.flare = { team: i, until: this.t + 2.5 }; }, end: () => { this.ov = null; } }]);
           break;
         case 'controversy': this._protest(1 - i, 1.6); break;
@@ -2385,6 +2386,7 @@
       this.warm.forEach(ws => ws.forEach(w => { if (w.on) this._move(w, dt); }));
       this.medics.forEach(m => this._move(m, dt));
       if (this._exprUpdate) this._exprUpdate(dt);   // mirada, cuerpo y polvillo (js/expr.js)
+      if (this._gradaUpdate) this._gradaUpdate(dt);   // incidentes de grada (js/grada.js)
       this._boysStep(dt);
       this._ballUpdate(dt);
       this._openPlay(dt);
@@ -2407,7 +2409,10 @@
         tx += this.pan.x; ty += this.pan.y;
         if (zoom < 1.05) tz = Math.min(tz, zoom);
       }
-      const k = Math.min(1, real * 3.2);
+      // Realización: en un incidente de grada la cámara corta a la grada (o sigue al espontáneo) y luego vuelve
+      const H = this.camHold && this.camHold.until > this.t ? this.camHold : null;
+      if (H) { const f = H.follow && !H.follow.gone ? H.follow : H; tx = f.x; ty = f.y; tz = H.z; }
+      const k = Math.min(1, real * (H ? 2.2 : 3.2));
       c.z += (tz - c.z) * k; c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
       if (c.tx != null && this.ball) { c.tx = lerp(c.tx, this.ball.x, Math.min(1, real * 1.5)); c.ty = lerp(c.ty, this.ball.y, Math.min(1, real * 1.5)); }
     }
@@ -2529,6 +2534,7 @@
       // Sombras y personas, de arriba abajo
       const R = Math.max(4.2, 1.5 * s);
       if (this._exprGround) this._exprGround(X, Y, s, R);
+      if (this._gradaGround) this._gradaGround(X, Y, s);
       const people = [];
       for (const id in this.A) people.push(this.A[id]);
       for (const a of this.leaving) people.push(a);
@@ -2539,6 +2545,7 @@
       people.sort((a, b) => a.y - b.y);
       c.textAlign = 'center'; c.textBaseline = 'middle';
       for (const a of people) this._person(a, X, Y, R, s);
+      if (this._gradaTop) this._gradaTop(X, Y, s, R);
       // Aura del supertiro alrededor del que lo lanza (y chispas de sus colores)
       const SA = this.superAura && this.superAura.until > this.t ? this.superAura : null;
       if (SA && this.A[SA.pid]) {
@@ -2724,22 +2731,27 @@
       const c = this.cx, z = Math.max(1, 0.42 * s), t = this.t;
       const dt = Math.min(0.1, Math.max(0, t - (this._fanT || t))); this._fanT = t;
       const party = this.sparkUntil && this.sparkUntil > t;
-      // Goles: salta la afición del que marca; con goleada o partido loco, la grada hace la ola
+      // Goles: salta la afición del que marca. La ola solo cuando se la merece el partido: la hace el estadio (la
+      // afición local), así que solo con el local ganando con holgura (ver _waveOk)
       const sc = this.m.score || [0, 0], last = this._fanSc || (this._fanSc = sc.slice());
       for (const i of [0, 1]) if (sc[i] > last[i]) {
         this.cheer = { team: i, until: t + 7 };
-        const tot = sc[0] + sc[1], lead = Math.abs(sc[0] - sc[1]);
-        if ((lead >= 2 || tot >= 3) && !(this.wave && this.wave.end > t)) this.wave = { start: t + 6, end: t + 20, dir: Math.random() < 0.5 ? 1 : -1 };
+        if (i === 0 && sc[0] - sc[1] >= 2 && this._waveOk()) this._waveGo(6);   // gol que da una ventaja cómoda
       }
       this._fanSc = sc.slice();
-      // Ánimo de la grada: más goles, ventaja local y final de partido → más gente botando y alguna ola espontánea
+      // Ánimo de la grada: más goles, ventaja local y final de partido → más gente botando
       const excite = Math.min(1, (sc[0] + sc[1]) * 0.15 + Math.max(0, sc[0] - sc[1]) * 0.15 + ((this.m.min || 0) > 75 ? 0.15 : 0));
-      if (!(this.wave && this.wave.end > t) && Math.random() < dt * (0.004 + excite * 0.03)) this.wave = { start: t, end: t + 14, dir: Math.random() < 0.5 ? 1 : -1 };
+      // Ola espontánea: ganando de 3, o de 2 en la última media hora (fiesta en la grada); nunca porque sí
+      const lead0 = sc[0] - sc[1], min = this.m.min || 0;
+      if ((lead0 >= 3 || (lead0 >= 2 && min >= 60)) && this._waveOk() && Math.random() < dt * 0.02) this._waveGo(0);
       const W8 = this.wave && t >= this.wave.start && t < this.wave.end ? this.wave : null;
       const front = W8 ? (((t - W8.start) * 1.7 * W8.dir) % 6.283 + 6.283) % 6.283 - Math.PI : 0;
       const ch = this.cheer && this.cheer.until > t ? this.cheer : null;
       const sc0 = TL.SFX && TL.SFX.crowd, crAge = sc0 ? (performance.now() - sc0.at) / 1000 : 99;
       let cr = crAge < ({ chant: 6, ovation: 5, applause: 3.5, whistles: 3, boo: 3, groan: 1.8, chance: 1.5, crowdSwell: 2 }[sc0 && sc0.kind] || 0) ? sc0.kind : null;
+      // Incidente en la grada (js/grada.js): esa afición protesta aunque no suene nada
+      const gm = this.crowdMood && this.crowdMood.until > t ? this.crowdMood : null;
+      if (gm) cr = gm.kind;
       // ¿Qué afición reacciona? Se decide una vez por sonido, según la jugada en ese momento:
       // ocasión y lamento → la del equipo que ataca; aplausos (parada) → la del que defiende; pitos y abucheos →
       // la contraria al que tiene el balón; ovación → la del que va ganando; cánticos → sobre todo la local
@@ -2747,7 +2759,8 @@
         this._crEv = sc0; const at = this.poss != null ? this.poss : 0, sc1 = this.m.score || [0, 0];
         this._crTeam = { chance: at, groan: at, applause: 1 - at, whistles: 1 - at, boo: 1 - at, ovation: sc1[0] >= sc1[1] ? 0 : 1, chant: 0, crowdSwell: at }[cr];
       }
-      const crTeam = this._crTeam;
+      const crTeam = gm ? gm.team : this._crTeam;
+      const FG = this.grada && this.grada.fight && this.grada.fight.until > t ? this.grada.fight : null;
       // Mismo desplazamiento que el sombreador del estadio: uv' = uv + tilt·0,022·altura
       const g = this.tilt || { x: 0, y: 0 }, VW = ART_VIEW.x1 - ART_VIEW.x0, VH = ART_VIEW.y1 - ART_VIEW.y0;
       const px = g.x * 0.022 * VW, py = g.y * 0.022 * (VH / VW) * VH;
@@ -2773,7 +2786,12 @@
           const a = Math.exp(-d * d / 0.05);
           if (a > 0.05) { j = Math.max(j, a * 0.75); if (a > 0.45) arms = 1; }
         }
-        const x = X(f.x + px * f.h), y = Y(f.y + py * f.h - j);
+        // Pelea en la grada: los de ese corro se empujan
+        let jx = 0;
+        if (FG && Math.abs(f.x - FG.x) < FG.r && Math.abs(f.y - FG.y) < FG.r && Math.hypot(f.x - FG.x, f.y - FG.y) < FG.r) {
+          jx = Math.sin(t * 23 + f.ph * 7) * 0.35; j = Math.sin(t * 19 + f.ph * 5) * 0.3; arms = Math.sin(t * 13 + f.ph) > 0 ? 1 : 0;
+        }
+        const x = X(f.x + jx + px * f.h), y = Y(f.y + py * f.h - j);
         if (nightK) c.globalAlpha = 1 - nightK * (1 - Math.max(0.18, Math.min(1, f.lum * 1.6)));
         c.fillStyle = f.c; c.fillRect(x, y, z, z);
         if (arms) { c.fillStyle = 'rgb(255 236 214 / 0.85)'; c.fillRect(x, y - z, z, z); }   // brazos arriba

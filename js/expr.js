@@ -311,7 +311,8 @@
         if (o && Math.random() < (this._persona(d.o).hot ? 0.75 : 0.35)) { this.gesture(d.o, 'protest', { secs: 1.2, delay: 0.25 }); if (this._persona(d.o).hot) this.bubble(d.o, 'anger'); }
         break;
       }
-      case 'keep': {   // muchos pases seguidos: alguien lo jalea
+      case 'keep': {   // muchos pases seguidos: alguien lo jalea (y si el local gana, la grada hace la ola)
+        if (this._gradaKeep) this._gradaKeep(d);
         const lead = this.team(d.team).find(a => this._persona(a.pid).leader && !this.isGK(a));
         if (lead) this.gesture(lead.pid, 'clap');
         break;
