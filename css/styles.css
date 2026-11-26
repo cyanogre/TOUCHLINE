@@ -1045,6 +1045,7 @@ button .ic, .btn .ic { margin-right: 0.15em; }
 .lu-en.mid > i { background: var(--warn); }
 .lu-en.low > i { background: var(--danger); }
 .lu-key .lu-en { margin: 0 4px; }
+.lu-en.big { width: 46px; height: 7px; margin: 0 10px 0 6px; align-self: center; }
 
 /* Selector de idioma */
 .lang-pick { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }

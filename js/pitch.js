@@ -614,8 +614,9 @@
     _atBall(r) {
       const b = this.ball;
       r = r || 1.6;
-      for (const id in this.A) { const a = this.A[id]; if (Math.hypot(a.x - b.x, a.y - b.y) < r) return a; }
-      return null;
+      let best = null, bd = r;
+      for (const id in this.A) { const a = this.A[id], d = Math.hypot(a.x - b.x, a.y - b.y); if (d < bd) { bd = d; best = a; } }
+      return best;
     }
     /** Un jugador va a por el balón parado; cuando llega, es suyo (y entonces, si hace falta, chuta). */
     _fetch(pid, then) {
@@ -646,13 +647,16 @@
       const b = this.ball;
       // Un balón parado no sale disparado solo: antes llega alguien a golpearlo
       const byA = o.by != null ? this.A[o.by] : null;
-      if (!o.free && !b.path && !this._atBall() && !(byA && Math.hypot(byA.x - b.x, byA.y - b.y) < 3)) {
+      const byNear = !!byA && Math.hypot(byA.x - b.x, byA.y - b.y) < 3;
+      // Si se sabe quién chuta (el lanzador de la falta, el que remata), es él quien golpea: aunque otro esté
+      // pegado al balón, el lanzador va antes a por él. Así el que se ve chutar es al que el motor da el gol.
+      if (!o.free && !b.path && (byA ? !byNear : !this._atBall())) {
         const team = o.team != null ? o.team : this.poss;
         const cand = this.team(team);
         const k = (o.by != null && this.A[o.by]) || this.nearest(cand.length ? cand : Object.values(this.A), b);
         if (k) { this._fetch(k.pid, () => this._kick(tx, ty, Object.assign({}, o, { free: true }))); return; }
       }
-      const kicker = b.owner != null ? this.A[b.owner] : this._atBall(2);
+      const kicker = byNear || (byA && o.free && Math.hypot(byA.x - b.x, byA.y - b.y) < 4) ? byA : b.owner != null ? this.A[b.owner] : this._atBall(2);
       if (kicker) { this.brain.kickTeam = kicker.team; this.brain.lastTouch = kicker.team; }
       if (kicker) this._lastKick = { pid: kicker.pid, team: kicker.team, t: this.t };
       const dist = Math.hypot(tx - b.x, ty - b.y);
@@ -1791,6 +1795,13 @@
         const atts = this.team(i).filter(a => a.pid !== taker && !this.isGK(a));
         atts.slice(0, 4).forEach((a, k) => { const [x, y] = this.world(i, 92 + (k % 2) * 3, Wd / 2 + (k - 1.5) * 5); p[a.pid] = { x, y, run: 0.6, jit: 0.3 }; });
         defs.slice(4, 8).forEach((d, k) => { const [x, y] = this.world(1 - i, 7 + (k % 2) * 3, Wd / 2 + (k - 1.5) * 5); p[d.pid] = { x, y, run: 0.6, jit: 0.3 }; });
+        // Junto al balón solo queda el lanzador: el que recibió la falta y el que la hizo se apartan
+        for (const id in this.A) {
+          const a = this.A[id];
+          if (a.kind !== 'pl' || +id === +taker || p[id]) continue;
+          const dx = a.x - bx, dy = a.y - by, dd = Math.hypot(dx, dy);
+          if (dd < 4.5) { const ux = dd > 0.2 ? dx / dd : -dir, uy = dd > 0.2 ? dy / dd : 0; p[id] = { x: clamp(bx + ux * 6, 1, L - 1), y: clamp(by + uy * 6, 1, Wd - 1), run: 0.5 }; }
+        }
         this.ov = { p };
         this.refOv = { x: wx + px * 3, y: wy + py * 3, run: 0.7 };
         this.wall = { until: this.t + 2.6 };
@@ -1803,9 +1814,9 @@
         const gkSave = e.live && e.type === 'save' && this.gkOf(1 - i);
         beats.push({ d: 0.05, ball: true, start: () => {
           if (this.A[taker]) this._receive(taker);
-          if (gkSave) { const g = this.gkOf(1 - i); const ty = Wd / 2 + U.rand(-2.5, 2.5); if (g) { g.state = 'dive'; g.dive = (ty > Wd / 2 ? 1 : -1) * dir; g.until = this.t + 1; this.ov.p[g.pid] = { x: gx - dir * 0.8, y: ty, run: 1 }; } this._kick(gx - dir * 0.9, ty, { h: 1.6, tz: 1.2, T: 0.8, curve: 1.6, done: () => { this._reveal(e); if (g) { this._receive(g.pid, true); g.held = true; } } }); }
-          else if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { h: 0.8, tz: 1.5, T: 0.3, done: () => { this._reveal(e); } }); }
-          else this._kick(gx + dir * 2, Wd / 2 + U.rand(-5, 5), { h: 2.2, tz: 3.2, T: 0.85, curve: 2, done: () => { this._reveal(e); } });
+          if (gkSave) { const g = this.gkOf(1 - i); const ty = Wd / 2 + U.rand(-2.5, 2.5); if (g) { g.state = 'dive'; g.dive = (ty > Wd / 2 ? 1 : -1) * dir; g.until = this.t + 1; this.ov.p[g.pid] = { x: gx - dir * 0.8, y: ty, run: 1 }; } this._kick(gx - dir * 0.9, ty, { by: taker, team: i, h: 1.6, tz: 1.2, T: 0.8, curve: 1.6, done: () => { this._reveal(e); if (g) { this._receive(g.pid, true); g.held = true; } } }); }
+          else if (intoWall) { const w = this.team(1 - i).filter(a => !this.isGK(a)).sort((a, c) => d2(a, this.ball) - d2(c, this.ball))[1]; this._kick(w ? w.x : bx, w ? w.y : by, { by: taker, team: i, h: 0.8, tz: 1.5, T: 0.3, done: () => { this._reveal(e); } }); }
+          else this._kick(gx + dir * 2, Wd / 2 + U.rand(-5, 5), { by: taker, team: i, h: 2.2, tz: 3.2, T: 0.85, curve: 2, done: () => { this._reveal(e); } });
         } });
         beats.push({ d: 0.8, start: () => {
           if (!this.instant && TL.SFX) TL.SFX.groan();
