@@ -580,6 +580,7 @@
         <div class="pr-dot pr-c me" title="${esc(S.manager)}"><i></i><b>Tú</b></div>
         ${right ? `<div class="pr-dot pr-r" title="${esc(right.name)}"><i></i><b>${esc(right.short)}</b></div>` : ''}
         <img class="pr-table" src="assets/prensa/mesa.webp" alt="">
+        <canvas class="pr-light"></canvas>
         <div class="pr-say"></div>
         <div class="pr-flash"></div>
         <div class="pr-live"><i></i>EN DIRECTO</div>
@@ -588,6 +589,7 @@
     document.body.appendChild(root);
     requestAnimationFrame(() => root.classList.add('on'));
     startFx(root, c1, c2, club);
+    lightInit(root);
     ask();
   }
 
@@ -646,6 +648,7 @@
     const say = document.querySelector('#prensa .pr-say'), me = document.querySelector('#prensa .pr-c');
     if (say) { say.textContent = a.t; say.classList.remove('on'); void say.offsetWidth; say.classList.add('on'); }
     if (me) { me.classList.remove('talk'); void me.offsetWidth; me.classList.add('talk'); }
+    lightPulse(0.5, 0.25, 0.5, 0.35, 1400, [255, 236, 200]);
     const gg = document.querySelector('#prensa .pr-r');
     if (gg && a.fx && a.fx.pl && a.fx.pl[0] === R.c.guest) { const k = a.fx.pl[1] > 0 ? 'happy' : 'sad'; gg.classList.remove('happy', 'sad'); void gg.offsetWidth; gg.classList.add(k); }
     // La sala reacciona: el de prensa asiente con las buenas y se lleva la mano a la frente con las malas
@@ -682,14 +685,62 @@
     if (cb) cb();
   };
 
+  /** Luz con relieve: los flashes de las cámaras (y el foco cuando hablas) iluminan la sala según su mapa de normales. */
+  const LIT = { img: null, nrm: null, cv: null, g: null, out: null, lights: [], raf: 0 };
+  function lightInit(root) {
+    const cv = root.querySelector('.pr-light');
+    if (!cv) return;
+    LIT.cv = cv; LIT.g = cv.getContext('2d'); LIT.lights = [];
+    const W0 = 344, H0 = 192; cv.width = W0; cv.height = H0;
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = W0; c.height = H0;
+      const g = c.getContext('2d'); g.drawImage(im, 0, 0, W0, H0);
+      const d = g.getImageData(0, 0, W0, H0).data, n = new Float32Array(W0 * H0 * 3);
+      for (let i = 0, j = 0; i < d.length; i += 4, j += 3) { n[j] = d[i] / 127.5 - 1; n[j + 1] = -(d[i + 1] / 127.5 - 1); n[j + 2] = d[i + 2] / 127.5 - 1; }
+      LIT.nrm = n; LIT.out = LIT.g.createImageData(W0, H0);
+    };
+    im.src = 'assets/prensa/normales.webp';
+  }
+  /** x, y en 0..1 de la sala; z: lo cerca que está la luz; str: fuerza; ms: lo que dura. */
+  function lightPulse(x, y, z, str, ms, col) {
+    LIT.lights.push({ x, y, z, str, ms, t0: performance.now(), col: col || [255, 255, 255] });
+    if (!LIT.raf) LIT.raf = requestAnimationFrame(lightFrame);
+  }
+  function lightFrame(now) {
+    LIT.raf = 0;
+    if (!LIT.cv || !document.body.contains(LIT.cv)) { LIT.lights = []; return; }
+    LIT.lights = LIT.lights.filter(l => now - l.t0 < l.ms);
+    const g = LIT.g, W0 = LIT.cv.width, H0 = LIT.cv.height;
+    if (!LIT.nrm || !LIT.lights.length) { g.clearRect(0, 0, W0, H0); if (LIT.lights.length) LIT.raf = requestAnimationFrame(lightFrame); return; }
+    const n = LIT.nrm, o = LIT.out.data;
+    const Ls = LIT.lights.map(l => { const k = (now - l.t0) / l.ms; return { x: l.x * W0, y: l.y * H0, z: l.z * W0, a: l.str * (k < 0.15 ? k / 0.15 : Math.pow(1 - (k - 0.15) / 0.85, 2)), c: l.col }; });
+    for (let y = 0, i = 0, j = 0; y < H0; y++) for (let x = 0; x < W0; x++, i += 4, j += 3) {
+      let r = 0, gg = 0, b = 0;
+      for (const L of Ls) {
+        let dx = L.x - x, dy = L.y - y, dz = L.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz); dx /= dist; dy /= dist; dz /= dist;
+        const lam = n[j] * dx + n[j + 1] * -dy + n[j + 2] * dz;
+        if (lam <= 0) continue;
+        const v = lam * L.a * Math.min(1, (W0 * 0.55) / dist);
+        r += v * L.c[0]; gg += v * L.c[1]; b += v * L.c[2];
+      }
+      o[i] = r; o[i + 1] = gg; o[i + 2] = b; o[i + 3] = Math.min(255, Math.max(r, gg, b));
+    }
+    g.putImageData(LIT.out, 0, 0);
+    LIT.raf = requestAnimationFrame(lightFrame);
+  }
+
   /** Flashes de las cámaras al preguntar. */
   function flash() {
     const f = document.querySelector('#prensa .pr-flash');
     if (!f) return;
     for (let k = 0; k < 2 + Math.floor(Math.random() * 3); k++) {
       R.timers.push(setTimeout(() => {
-        f.style.left = (Math.random() < 0.5 ? 2 + Math.random() * 14 : 84 + Math.random() * 14) + '%';
+        const lx = Math.random() < 0.5 ? 2 + Math.random() * 14 : 84 + Math.random() * 14;
+        f.style.left = lx + '%';
         f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+        lightPulse((lx + 7) / 100, 0.8, 0.3, 1.5, 420);
       }, k * 260 + Math.random() * 200));
     }
   }
