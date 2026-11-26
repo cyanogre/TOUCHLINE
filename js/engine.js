@@ -380,6 +380,16 @@
   }
 
   // ------------------------------------------------------------ Partido
+  /** Lo que dijiste en rueda de prensa calienta al rival: en el próximo partido contra ti sale algo más
+   *  motivado (una vez; luego se olvida). */
+  function prensaBoost(S, clubId, isUser) {
+    const r = S.prensaRival;
+    if (isUser || !r || r.club !== clubId) return 1;
+    if (S.season !== r.season) { delete S.prensaRival; return 1; }
+    delete S.prensaRival;
+    return 1.025;
+  }
+
   class Match {
     constructor(S, homeId, awayId, opts) {
       opts = opts || {};
@@ -447,7 +457,7 @@
       const bench = pickBench(players, ids, 9);
       return {
         club: clubId, idx, isUser, formation, onPitch, bench, mentality, baseMent: mentality,
-        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: 1, talk: null,
+        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: prensaBoost(S, clubId, isUser), talk: null,
         coach: TL.Coach.of(S, clubId), day: TL.Coach.dayFactor(S, clubId), scouted,
         start: { formation, ids: ids.slice(), mentality }, log: [], tchanges: 0, desperate: false
       };

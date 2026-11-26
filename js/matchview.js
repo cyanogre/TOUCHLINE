@@ -963,8 +963,15 @@
         ${S.fixtures[S.week - 1].map(x => UI.fixtureHtml(S, x)).join('')}</div>`}`;
     UI.mountFaces(body);
     el('mv-prompt').innerHTML = '';
-    el('mv-foot').innerHTML = `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
+    // Rueda de prensa: tras los partidos que dan que hablar, siempre; si no, a veces
+    const press = TL.Prensa && TL.Prensa.offered(S, m, MV.me);
+    el('mv-foot').innerHTML = (press ? `<button class="btn block" data-act="mv-press" style="margin-bottom:8px">🎤 Rueda de prensa</button>` : '') + `<button class="btn primary block" data-act="mv-close">Continuar</button>`;
     document.querySelectorAll('#mv-tabs button').forEach(x => { x.disabled = true; x.classList.remove('on'); });
+  };
+  A['mv-press'] = b => {
+    if (!MV.m || !TL.Prensa) return;
+    if (b) b.remove();
+    TL.Prensa.open(G.S, MV.m, MV.me, null);
   };
   A['mv-close'] = () => {
     clearTimeout(MV.timer);
