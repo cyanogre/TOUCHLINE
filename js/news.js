@@ -601,5 +601,5 @@
     return m >= 85 ? ['Eufórico', '😄'] : m >= 70 ? ['Contento', '🙂'] : m >= 50 ? ['Normal', '😐'] : m >= 30 ? ['Descontento', '😕'] : ['Muy molesto', '😠'];
   }
 
-  TL.News = { add, CAT, LABEL, EV, risk, weekly, decide, afterRound, morale, moraleLabel, seasonProb };
+  TL.News = { add, CAT, LABEL, EV, risk, weekly, decide, afterRound, morale, moraleLabel, seasonProb, fx: { fans, board, teamMor, mor, fineClub } };
 })();

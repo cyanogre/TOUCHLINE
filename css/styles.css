@@ -1637,3 +1637,53 @@ body.shake-s { animation: shake-s .35s; }
 .ref-call .lv2 i.on { background: #ffc247; } .ref-call .rc-w.lv2 { color: #ffd27a; }
 .ref-call .lv1 i.on, .ref-call .lv0 i.on { background: #ff6b5d; } .ref-call .rc-w.lv1, .ref-call .rc-w.lv0 { color: #ff8b7f; }
 .ref-call .btn { padding: 3px 9px; min-height: 0; font-size: 12px; }
+
+/* Rueda de prensa */
+.prensa { position: fixed; inset: 0; z-index: 70; background: #07100c; display: flex; flex-direction: column; align-items: center; overflow-y: auto;
+  opacity: 0; transition: opacity .3s; padding-bottom: env(safe-area-inset-bottom); }
+.prensa.on { opacity: 1; }
+.pr-stage { position: relative; width: min(100%, 980px); aspect-ratio: 1376 / 768; flex: none; overflow: hidden; }
+.pr-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pr-wall { position: absolute; left: 22.4%; top: 13.7%; width: 56.3%; height: 40.8%; mix-blend-mode: screen; opacity: .55; }
+.pr-tv { position: absolute; left: 0.6%; top: 25.2%; width: 17.6%; height: 21.6%; overflow: hidden; border-radius: 2px; }
+.pr-ad { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4%; }
+.pr-ad b { font: italic 900 clamp(12px, 3.4vw, 30px)/1 var(--font-c), sans-serif; letter-spacing: .02em; }
+.pr-ad span { font-size: clamp(7px, 1.2vw, 12px); opacity: .85; margin-top: 3%; }
+.pr-ad.in { animation: prAd .45s ease-out; }
+@keyframes prAd { from { transform: translateX(100%); } to { transform: none; } }
+.pr-dot { position: absolute; top: 57.5%; width: 11.5%; aspect-ratio: 1; transform: translate(-50%, -50%); }
+.pr-dot i { position: absolute; inset: 0; border-radius: 50%; background: var(--c2); box-shadow: 0 0 0 3px var(--c1), 0 4px 10px rgb(0 0 0 / .45); }
+.pr-dot.me i { background: var(--c1); box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--accent), 0 4px 10px rgb(0 0 0 / .45); }
+.pr-dot b { position: absolute; left: 50%; bottom: 104%; transform: translateX(-50%); font: 800 clamp(9px, 1.5vw, 14px) var(--font-c), sans-serif; color: #fff;
+  background: rgb(8 14 11 / .72); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+.pr-dot.talk i { animation: prTalk .9s ease-in-out 2; }
+@keyframes prTalk { 0%, 100% { transform: none; } 25% { transform: scale(1.06, .95); } 50% { transform: scale(.97, 1.04); } 75% { transform: scale(1.05, .96); } }
+.pr-l { left: 32%; } .pr-c { left: 50%; } .pr-r { left: 67.6%; }
+.pr-table { position: absolute; left: 12.35%; top: 53.3%; width: 75.8%; pointer-events: none; }
+.pr-say { position: absolute; left: 50%; top: 22%; transform: translate(-50%, 6px); max-width: 62%; padding: 6px 10px; border-radius: 10px; background: #fff; color: #111;
+  font-size: clamp(10px, 1.7vw, 15px); line-height: 1.25; text-align: center; opacity: 0; box-shadow: 0 6px 18px rgb(0 0 0 / .35); pointer-events: none; }
+.pr-say::after { content: ''; position: absolute; left: 50%; bottom: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; transform: translateX(-50%); }
+.pr-say.on { animation: prSay 2.2s ease-out forwards; }
+@keyframes prSay { 0% { opacity: 0; transform: translate(-50%, 6px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.pr-flash { position: absolute; bottom: 4%; width: 14%; aspect-ratio: 1; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle, #fff 0%, rgb(255 255 255 / .6) 25%, rgb(255 255 255 / 0) 70%); }
+.pr-flash.on { animation: prFlash .25s ease-out; }
+@keyframes prFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+.pr-panel { width: min(100%, 980px); padding: 12px 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.pr-q { font: 800 clamp(16px, 2.6vw, 22px)/1.25 var(--font-c), sans-serif; }
+.pr-q small { display: block; font: 700 11px var(--font-b, sans-serif); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.pr-as { display: flex; flex-direction: column; gap: 8px; }
+.pr-a { text-align: left; white-space: normal; line-height: 1.3; text-transform: none; font: 600 15px/1.3 var(--font-b, 'Barlow', sans-serif); letter-spacing: 0; padding: 11px 14px; }
+.pr-a:disabled { opacity: .45; }
+.pr-n { float: right; color: var(--faint); }
+.pr-dot.happy i { animation: prHappy .5s ease-out 3; } .pr-dot.sad i { animation: prSad 1.6s ease-in-out forwards; } .pr-dot.nod i { animation: prNod .5s ease-in-out 2; }
+@keyframes prHappy { 50% { transform: translateY(-14%); } }
+@keyframes prSad { 30%, 80% { transform: translateY(10%) scale(.96); } 100% { transform: none; } }
+@keyframes prNod { 50% { transform: translateY(5%); } }
+.pr-sum { margin: 0 0 6px; padding-left: 18px; color: var(--text, #e8f0ea); }
+.pr-sum li { margin: 4px 0; }
+.pr-live { position: absolute; right: 2%; top: 3%; display: flex; align-items: center; gap: 5px; font: 800 clamp(9px, 1.4vw, 13px) var(--font-c), sans-serif; letter-spacing: .08em;
+  color: #fff; background: rgb(0 0 0 / .55); padding: 3px 8px; border-radius: 6px; }
+.pr-live i { width: 7px; height: 7px; border-radius: 50%; background: #ff3b3b; animation: prBlink 1.2s steps(2) infinite; }
+@keyframes prBlink { 50% { opacity: .2; } }
+.pr-l i { background: #2b3540; box-shadow: 0 0 0 3px #11181f, 0 4px 10px rgb(0 0 0 / .45); }
