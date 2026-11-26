@@ -1231,7 +1231,7 @@
       }
       // La afición local es casi todo el estadio; la visitante, un rincón
       for (const i of [0, 1]) {
-        const p = heat[i] * 0.04 * (i === 0 ? 1 : 0.6) * fem;
+        const p = heat[i] * 0.011 * (i === 0 ? 1 : 0.6) * fem;
         if (!(p > 0) || Math.random() >= p) continue;
         const r = Math.random(), hot = heat[i] >= 1;
         const type = hot ? (r < 0.3 ? 'objects' : r < 0.55 ? 'fight' : r < 0.75 ? 'insults' : 'pyro') : (r < 0.55 ? 'insults' : r < 0.75 ? 'pyro' : r < 0.9 ? 'objects' : 'fight');
@@ -1240,8 +1240,8 @@
       }
       if (party) {
         const pr = Math.random(), base = (party.team === 0 ? 1 : 0.6) * fem;
-        if (pr < 0.012 * base) this._crowdIncident(party.team, 'pyro', true);
-        else if (pr < 0.014 * base) this._crowdIncident(party.team, 'invader', true, party.pid);
+        if (pr < 0.005 * base) this._crowdIncident(party.team, 'pyro', true);
+        else if (pr < 0.0065 * base) this._crowdIncident(party.team, 'invader', true, party.pid);
       }
     }
     _crowdIncident(i, type, party, pid) {
