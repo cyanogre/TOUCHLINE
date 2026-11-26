@@ -9,6 +9,8 @@
   const { U, World: W, UI } = TL;
   const esc = U.esc;
   const pick = a => a[Math.floor(Math.random() * a.length)];
+  const tr = x => (TL.t ? TL.t(x) : x);
+
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   const TICK = [
@@ -38,7 +40,8 @@
   }
   const press = S => S.prensaStats || { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 };
 
-  const word = v => v >= 85 ? 'Nivel dios' : v >= 70 ? 'On fire' : v >= 55 ? 'Bien' : v >= 40 ? 'Regulinchi' : v >= 25 ? 'Tenso' : 'Alarma roja';
+  const word = v => tr(word0(v));
+  const word0 = v => v >= 85 ? 'Nivel dios' : v >= 70 ? 'On fire' : v >= 55 ? 'Bien' : v >= 40 ? 'Regulinchi' : v >= 25 ? 'Tenso' : 'Alarma roja';
   const chair = c => c >= 75 ? ['Congelada', 'Ni con un soplete te mueven.'] : c >= 55 ? ['Templada', 'Puedes ir al cine tranquilo.']
     : c >= 35 ? ['Calentita', 'El presidente ya ha guardado el número de otro.'] : c >= 18 ? ['Ardiendo', 'Hay un mánager en paro mirando vuelos.'] : ['Fundida', 'Ve dejando el despacho recogido.'];
 
@@ -69,12 +72,12 @@
     const bits = [];
     l.forEach((x, k) => {
       const pj = x.g + x.e + x.p;
-      if (k === 0) bits.push(`Empezó en ${x.name}`);
-      else bits.push(x.firedBefore ? `volvió a ${x.name}, el club que le echó` : `fichó por ${x.name}`);
-      if (x.titles) bits.push(`ganó ${x.titles === 1 ? 'una liga' : x.titles + ' ligas'}`);
-      if (x.revenge.length) bits.push(`se vengó de su antiguo club`);
-      if (x.redeemed) bits.push('y se redimió');
-      if (x.end === 'fired') bits.push(`le echaron tras ${pj} partido${pj === 1 ? '' : 's'}`);
+      if (k === 0) bits.push(tr(`Empezó en ${x.name}`));
+      else bits.push(tr(x.firedBefore ? `volvió a ${x.name}, el club que le echó` : `fichó por ${x.name}`));
+      if (x.titles) bits.push(tr(x.titles === 1 ? 'ganó una liga' : `ganó ${x.titles} ligas`));
+      if (x.revenge.length) bits.push(tr('se vengó de su antiguo club'));
+      if (x.redeemed) bits.push(tr('y se redimió'));
+      if (x.end === 'fired') bits.push(tr(pj === 1 ? 'le echaron tras 1 partido' : `le echaron tras ${pj} partidos`));
     });
     const t = bits.join(', ');
     return t ? t.charAt(0).toUpperCase() + t.slice(1) + '.' : '';
@@ -86,7 +89,7 @@
       const tag = x.redeemed ? '<em class="cv-tag red">Redención</em>' : x.firedBefore ? '<em class="cv-tag ret">Vuelta</em>' : '';
       const best = x.seasons.length ? Math.min(...x.seasons.map(z => z.pos)) : null;
       return `<div class="cv-row"><div class="cv-h"><b>${esc(x.name)}</b>${tag}<span class="cv-end ${ec}">${ew}</span></div>
-        <div class="cv-d">${x.from[0]}/${String(x.from[0] + 1).slice(2)} J${x.from[1]} → ${x.to ? `${x.to[0]}/${String(x.to[0] + 1).slice(2)} J${x.to[1]}` : 'hoy'} · ${x.g}G ${x.e}E ${x.p}P${best ? ` · mejor puesto ${best}º` : ''}${x.titles ? ` · 🏆×${x.titles}` : ''}${x.revenge.length ? ` · venganzas ${x.revenge.length}` : ''}</div></div>`;
+        <div class="cv-d">${x.from[0]}/${String(x.from[0] + 1).slice(2)} J${x.from[1]} → ${x.to ? `${x.to[0]}/${String(x.to[0] + 1).slice(2)} J${x.to[1]}` : tr('hoy')} · ${x.g}G ${x.e}E ${x.p}P${best ? ` · mejor puesto ${best}º` : ''}${x.titles ? ` · 🏆×${x.titles}` : ''}${x.revenge.length ? ` · venganzas ${x.revenge.length}` : ''}</div></div>`;
     }).join('');
     return `<div class="cv"><div class="group-title">Historial de entrenador</div>${rows}<p class="cv-story">${esc(story(S))}</p></div>`;
   }
@@ -99,7 +102,7 @@
     const tired = sq.filter(p => p.fit < 70 && !(p.inj > 0));
     const conf = S.board.conf, cash = S.clubs[S.user].cash;
     if (conf < 35) out.push(['🔥', `La directiva está más mosca que un portero en una tanda. Gana el próximo o ve actualizando el LinkedIn.`, 'league', 'Ver liga']);
-    if (sad.length) out.push(['😤', `${sad.length} jugador${sad.length > 1 ? 'es están' : ' está'} de morros (${sad.slice(0, 3).map(p => p.short).join(', ')}). Recomendación de la IA: charla, minutos o barbacoa. La IA prefiere barbacoa.`, 'squad', 'Vestuario']);
+    if (sad.length) out.push(['😤', `${sad.length > 1 ? `${sad.length} jugadores están` : '1 jugador está'} de morros (${sad.slice(0, 3).map(p => p.short).join(', ')}). Recomendación de la IA: charla, minutos o barbacoa. La IA prefiere barbacoa.`, 'squad', 'Vestuario']);
     if (inj.length) out.push(['🩹', `${inj.length} en la enfermería. La IA ha calculado que con un fisio mejor volverían antes. La IA también cobra comisión.`, 'club', 'Personal']);
     if (tired.length >= 3) out.push(['🥵', `${tired.length} jugadores con las piernas de gelatina. Rota antes de que se rompan.`, 'tactics', 'Tácticas']);
     if (cash < 0) out.push(['💸', 'Números rojos. La IA sugiere vender a alguien o empezar un OnlyFans del club. Lo primero es más legal.', 'market', 'Mercado']);
@@ -151,7 +154,7 @@
     const head = `<div class="hud-top">
       <div class="hud-logo">TOUCHLINE<span>//OS</span></div>
       <div class="hud-sys"><span class="dot"></span>NÚCLEO CUÁNTICO 9.3 · 14 SAT · PING 0,0003 ms</div>
-      <div class="hud-boot"><p>&gt; Arrancando módulos de vigilancia…</p><p>&gt; Usuario: <b>${esc(S.manager)}</b> · ${esc(S.clubs[S.user].name)} · T${S.season} J${S.week}</p><p class="hud-tick">&gt; ${esc(pick(TICK))}</p></div>
+      <div class="hud-boot"><p>&gt; Arrancando módulos de vigilancia…</p><p>&gt; Usuario: <b>${esc(S.manager)}</b> · ${esc(S.clubs[S.user].name)} · T${S.season} J${S.week}</p><p class="hud-tick">&gt; ${esc(tr(pick(TICK)))}</p></div>
     </div>`;
 
     const gauges = `<div class="hud-gauges">
@@ -165,8 +168,8 @@
       <div class="hud-row"><span>Probabilidad de despido<small>calculada por 3 IAs y un tarot</small></span><b>${fire}%</b></div>${bar(fire, 0)}
       <div class="hud-row"><span>Objetivo</span><b>${esc((S.board && S.board.text) || '—')}</b></div>`);
 
-    const liga = panel('Competición', 'LIGA.LIVE', me ? `<div class="hud-big"><b>${pos + 1}º</b><span>de ${L.length}</span></div>
-      <div class="hud-grid4"><div><b>${me.g}</b><small>G</small></div><div><b>${me.e}</b><small>E</small></div><div><b>${me.p}</b><small>P</small></div><div><b>${me.pts}</b><small>PTS</small></div></div>
+    const liga = panel('Competición', 'LIGA.LIVE', me ? `<div class="hud-big"><b>${pos + 1}º</b><span>/ ${L.length}</span></div>
+      <div class="hud-grid4"><div><b>${me.g}</b><small>Victorias</small></div><div><b>${me.e}</b><small>Empates</small></div><div><b>${me.p}</b><small>Derrotas</small></div><div><b>${me.pts}</b><small>Puntos</small></div></div>
       <div class="hud-row"><span>Goles</span><b>${me.gf} · ${me.gc}</b></div>
       <div class="hud-form">${me.form.slice(-8).map(f => `<i class="${f}">${f}</i>`).join('') || '<i>—</i>'}</div>` : '<p class="hud-note">Torneo en curso. La IA está mirando el cuadro.</p>');
 
@@ -176,7 +179,7 @@
     const prensa = panel('Sala de prensa', 'PRESS.LOG', `<div class="hud-grid4"><div><b>${ps.n}</b><small>Ruedas</small></div><div><b>${ps.wins}</b><small>Redondas</small></div><div><b>${ps.bestStreak}</b><small>Mejor racha</small></div><div><b>${ps.skipped}</b><small>Plantadas</small></div></div>
       <div class="hud-row"><span>Titulares retorcidos</span><b>${ps.twists}</b></div>
       <div class="hud-row"><span>…que no colaron</span><b>${ps.twistOk}</b></div>
-      <p class="hud-note">${ps.twists - ps.twistOk > 0 ? `Hay ${ps.twists - ps.twistOk} titular${ps.twists - ps.twistOk > 1 ? 'es' : ''} tuyo${ps.twists - ps.twistOk > 1 ? 's' : ''} circulando por ahí. La IA recomienda no leer los comentarios.` : 'Tu reputación digital está limpia. De momento.'}</p>`);
+      <p class="hud-note">${ps.twists - ps.twistOk > 0 ? (ps.twists - ps.twistOk > 1 ? `Hay ${ps.twists - ps.twistOk} titulares tuyos circulando por ahí. La IA recomienda no leer los comentarios.` : 'Hay 1 titular tuyo circulando por ahí. La IA recomienda no leer los comentarios.') : 'Tu reputación digital está limpia. De momento.'}</p>`);
 
     const mule = panel('Muletilla', 'CATCHPHRASE.SYS', mu ? `<p class="hud-mule">«${esc(mu.t)}»</p>
       <div class="hud-row"><span>Fama</span><b>${(S.mule.fame || 0).toFixed(1)}${nextStep ? ` / ${nextStep.at}` : ''}</b></div>${bar(nextStep ? (S.mule.fame / nextStep.at) * 100 : 100, 50)}
@@ -184,7 +187,7 @@
       ${S.mule.memed ? '<p class="hud-note warn">Estado: meme nacional. Se pasará. O no.</p>' : ''}`
       : '<p class="hud-note">Aún no tienes frase propia. Suéltala en una rueda de prensa y la IA se encargará de hacerla viral (o no).</p>');
 
-    const car = panel('Tu carrera', 'COACH.CORE', `<div class="hud-big"><b>Nv ${m.level}</b><span>${esc(S.manager)}</span></div>
+    const car = panel('Tu carrera', 'COACH.CORE', `<div class="hud-big"><b>${tr(`Nv ${m.level}`)}</b><span>${esc(S.manager)}</span></div>
       <div class="hud-row"><span>Experiencia</span><b>${Math.round(m.xp)} / ${need}</b></div>${bar(m.xp / need * 100, 260)}
       <div class="hud-row"><span>Habilidades aprendidas</span><b>${Object.values(m.skills || {}).reduce((a, b) => a + b, 0)}</b></div>
       <div class="hud-row"><span>Temporadas</span><b>${(S.history || []).length + 1}</b></div>`);
@@ -208,7 +211,7 @@
     requestAnimationFrame(() => root.classList.add('on'));
     // La consola va soltando tonterías
     const tick = root.querySelector('.hud-tick');
-    const loop = () => { if (!document.body.contains(tick)) return; tick.textContent = '> ' + pick(TICK); tick.classList.remove('ty'); void tick.offsetWidth; tick.classList.add('ty'); setTimeout(loop, 3600); };
+    const loop = () => { if (!document.body.contains(tick)) return; tick.textContent = '> ' + tr(pick(TICK)); tick.classList.remove('ty'); void tick.offsetWidth; tick.classList.add('ty'); setTimeout(loop, 3600); };
     setTimeout(loop, 3600);
   }
 

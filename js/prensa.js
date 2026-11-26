@@ -280,7 +280,9 @@
     return out;
   }
   // Frases de base (data/game/prensa-frases-*.js): otras formas de preguntar y de responder cada cosa.
-  const BANK = () => window.TL_PRENSA || {};
+  const ES = () => !TL.I18N || TL.I18N.lang === 'es';
+  // Las frases extra del banco y las coletillas solo existen en castellano: en otros idiomas, las básicas (traducidas)
+  const BANK = () => (ES() ? window.TL_PRENSA || {} : {});
   const bankKey = (q, c) => (q.id === 'sponsor' && c.feed.sponsor && c.feed.sponsor.risky ? 'sponsorR' : q.id);
   function jugOf(id, c) {
     const f = c.feed;
@@ -390,13 +392,14 @@
     0: ['Y el que se pique, ajos come.', 'Tal cual.', 'Que se escuche bien.', 'Y no me arrepiento.', 'Clip para TikTok, de nada.', 'Pónganlo en grande.', 'Lo he dicho y lo repito.']
   };
   function dress(t, g) {
+    if (!ES()) return t;
     const k = g >= 2 ? 2 : g === 1 ? 1 : 0;
     let out = t;
     if (Math.random() < 0.35) out = pick(IN[k]) + ' ' + out;
     if (Math.random() < 0.3 && /[.!?»]$/.test(out)) out = out + ' ' + pick(OUT[k]);
     return out;
   }
-  const dressQ = q => (Math.random() < 0.45 ? pick(Q_IN) + ' ' + q.charAt(0).toLowerCase() + q.slice(1) : q);
+  const dressQ = q => (ES() && Math.random() < 0.45 ? pick(Q_IN) + ' ' + q.charAt(0).toLowerCase() + q.slice(1) : q);
 
   // ------------------------------------------------------------ Efectos
   function apply(S, fx, log) {
@@ -530,7 +533,7 @@
     R.twisted = head;
     const panel = document.querySelector('#prensa .pr-panel');
     panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(SLY))} · ${esc(pick(TABLOIDS))} <span class="pr-n">repregunta</span></small>`
-      + `<span class="pr-head">«${esc(head)}»</span> Así titularemos mañana. ¿Algo que añadir?`;
+      + `<span class="pr-head">${esc(head)}</span> Así titularemos mañana. ¿Algo que añadir?`;
     const calm = lv(S, 'pre1') >= 1 || lv(S, 'dis3') >= 1;
     const opts = [
       { t: 'Lo tienen grabado. Pongan la frase entera y que la gente juzgue.', g: calm ? 2 : 1, kill: calm ? 0.8 : 0.45, fx: { board: 0.3 } },
@@ -545,7 +548,7 @@
       + (open ? '' : `<button class="btn block pr-a locked" disabled><span>${esc(pro.t)}</span><small>Requiere: ${esc(skillName('pre2'))} 1</small></button>`);
     const stage = document.querySelector('#prensa .pr-stage');
     if (stage) { stage.classList.remove('murmur'); void stage.offsetWidth; stage.classList.add('murmur'); }
-    flash();
+    burst(9); react(RX.scoop, 4);
   }
   function settleTwist(S, a) {
     const club = S.clubs[S.user];
@@ -581,6 +584,7 @@
         ${right ? `<div class="pr-dot pr-r" title="${esc(right.name)}"><i></i><b>${esc(right.short)}</b></div>` : ''}
         <img class="pr-table" src="assets/prensa/mesa.webp" alt="">
         <canvas class="pr-light"></canvas>
+        <div class="pr-crowd">${Array.from({ length: 9 }, (_, k) => `<i style="--h:${(k * 47) % 360};--x:${4 + k * 11.5}%;--s:${0.85 + ((k * 37) % 30) / 100}"></i>`).join('')}</div>
         <div class="pr-say"></div>
         <div class="pr-flash"></div>
         <div class="pr-live"><i></i>EN DIRECTO</div>
@@ -591,6 +595,7 @@
     startFx(root, c1, c2, club);
     lightInit(root);
     requestAnimationFrame(() => fitTv(root));
+    R.timers.push(setTimeout(ambient, 900));
     window.addEventListener('resize', () => { const r = document.getElementById('prensa'); if (r) fitTv(r); });
     ask();
   }
@@ -608,12 +613,13 @@
     if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${q.id.startsWith('rom') ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(dressQ(qText(q, c)))}`;
+    hands();
     const { shown, locked } = options(c.S, q, c);
     R.cur = shown;
     panel.querySelector('.pr-as').innerHTML = shown.map((a, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(a.t)}</button>`).join('')
       + (R.muleUsed ? '' : muleOf(c.S) ? `<button class="btn block pr-a mule" data-act="pr-mule">«${esc(muleOf(c.S).t)}»<small>Tu frase</small></button>`
         : (!c.S.mule && R.k === R.qs.length - 1 - (R.qs.length > 3 ? 1 : 0) ? `<button class="btn block pr-a mule" data-act="pr-mule-new">Soltar una frase propia…<small>Puede hacerse famosa</small></button>` : ''))
-      + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
+      + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(TL.t ? TL.t(skillName(a.need[0])) : skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
     flash();
   }
   A['pr-mule'] = () => {
@@ -656,7 +662,10 @@
     // La sala reacciona: el de prensa asiente con las buenas y se lleva la mano a la frente con las malas
     const l = document.querySelector('#prensa .pr-l');
     if (l) { const k = a.g === 0 ? 'sad' : 'nod'; l.classList.remove('nod', 'sad'); void l.offsetWidth; l.classList.add(k); }
-    if (a.g === 2) flash();
+    if (a.react && /TikTok|ríe|Sonrisas|risa/.test(a.react)) { burst(4); react(RX.funny, 3); }
+    else if (a.g === 2) { burst(3); react(RX.good, 2); }
+    else if (a.g === 1) react(RX.meh, 1);
+    else { burst(7); react(RX.bad, 4); }
     const stage = document.querySelector('#prensa .pr-stage');
     if (stage) { stage.classList.remove('murmur'); if (a.g === 0) { void stage.offsetWidth; stage.classList.add('murmur'); } }
     meter();
@@ -758,6 +767,70 @@
     }
     g.putImageData(LIT.out, 0, 0);
     LIT.raf = requestAnimationFrame(lightFrame);
+  }
+
+  // ------------------------------------------------------------ Ambiente: periodistas, flashes y reacciones
+  let AC = null;
+  /** Clic de obturador (sintetizado, muy corto). */
+  function shutter(vol) {
+    if (!TL.SFX || !TL.SFX.on || !TL.SFX.on()) return;
+    try {
+      AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+      const n = AC.createBuffer(1, Math.floor(AC.sampleRate * 0.05), AC.sampleRate), d = n.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3) * (i < d.length * 0.3 || i > d.length * 0.55 ? 1 : 0.2);
+      const src = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+      f.type = 'highpass'; f.frequency.value = 1800; g.gain.value = (vol || 0.25) * (0.7 + Math.random() * 0.6);
+      src.buffer = n; src.connect(f); f.connect(g); g.connect(AC.destination); src.start();
+    } catch (e) { /* sin audio */ }
+  }
+  /** Un flash suelto: cámara de un lateral o móvil de un periodista de la primera fila. */
+  function oneFlash(big) {
+    const st = document.querySelector('#prensa .pr-stage');
+    if (!st) return;
+    const f = document.createElement('i');
+    const side = Math.random() < 0.65;
+    const lx = side ? (Math.random() < 0.5 ? 2 + Math.random() * 14 : 84 + Math.random() * 14) : 8 + Math.random() * 84;
+    const ly = side ? 62 + Math.random() * 12 : 86 + Math.random() * 10;
+    f.className = 'pr-fl' + (side ? '' : ' sm');
+    f.style.left = lx + '%'; f.style.top = ly + '%';
+    st.appendChild(f);
+    setTimeout(() => f.remove(), 420);
+    lightPulse((lx + 2) / 100, ly / 100, side ? 0.3 : 0.45, side ? (big ? 1.7 : 1.3) : 0.6, side ? 420 : 300);
+    shutter(side ? 0.28 : 0.15);
+  }
+  /** Ráfaga de fotos: n flashes muy seguidos (las grandes frases y las meteduras de pata). */
+  function burst(n) { for (let k = 0; k < n; k++) R.timers.push(setTimeout(() => oneFlash(k % 3 === 0), k * (70 + Math.random() * 90))); }
+  /** Reacción de la sala: un bocadillo que sube desde un periodista de la primera fila. */
+  function react(list, n) {
+    const row = document.querySelectorAll('#prensa .pr-crowd i');
+    if (!row.length) return;
+    for (let k = 0; k < (n || 1); k++) R.timers.push(setTimeout(() => {
+      const h = row[Math.floor(Math.random() * row.length)];
+      const b = document.createElement('span');
+      b.className = 'pr-rx'; b.textContent = TL.t ? TL.t(pick(list)) : pick(list);
+      h.appendChild(b); h.classList.remove('bob'); void h.offsetWidth; h.classList.add('bob');
+      setTimeout(() => b.remove(), 1700);
+    }, k * 220 + Math.random() * 150));
+  }
+  /** Manos arriba al empezar cada pregunta; elige a uno. */
+  function hands() {
+    const row = Array.from(document.querySelectorAll('#prensa .pr-crowd i'));
+    row.forEach(h => h.classList.toggle('hand', Math.random() < 0.55));
+    R.timers.push(setTimeout(() => { row.forEach(h => h.classList.remove('hand')); const w = pick(row); if (w) { w.classList.add('hand', 'pick'); R.timers.push(setTimeout(() => w.classList.remove('hand', 'pick'), 1400)); } }, 700));
+  }
+  const RX = {
+    good: ['👏', '📸', '¡Titular!', '🔥', 'Bien dicho', '✍️', '¡Eso es!'],
+    meh: ['Hmm…', '📝', '…', '🤔', 'Ya…', '¿Y ya?'],
+    bad: ['¡Uuuh!', '¿Perdón?', '😱', '¡Polémica!', '📸📸', 'Murmullos…', '¡Toma ya!', '🫢'],
+    funny: ['JAJAJA', '😂', '¡Viral!', '🤣', 'Clip', 'jajaja'],
+    scoop: ['¡Exclusiva!', '📸📸📸', '🔥', '¡Bombazo!', '😳']
+  };
+  function ambient() {
+    if (!document.getElementById('prensa')) return;
+    oneFlash(false);
+    if (Math.random() < 0.35) R.timers.push(setTimeout(() => oneFlash(false), 140));
+    if (Math.random() < 0.12) react(['📝', '📸', '✍️', '🎙️', '…'], 1);
+    R.timers.push(setTimeout(ambient, 1100 + Math.random() * 2600));
   }
 
   /** Flashes de las cámaras al preguntar. */

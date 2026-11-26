@@ -54,7 +54,7 @@
       const el = document.createElement('div');
       el.className = 'mv-day';
       const d = TL.Events ? TL.Events.dateOf(S, day(S) + 1) : null;
-      el.innerHTML = `<div class="mv-day-in"><div class="mv-day-date">${d ? d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}</div>
+      el.innerHTML = `<div class="mv-day-in"><div class="mv-day-date">${d ? d.toLocaleDateString(TL.I18N ? TL.I18N.locale() : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}</div>
         <div class="mv-day-scene"><i class="mv-dot" style="--c:${c1}"></i><span class="mv-prop">${icon}</span></div>
         <div class="mv-day-l">${esc(label)}</div><div class="mv-day-bar"><i></i></div></div>`;
       document.body.appendChild(el);
@@ -267,7 +267,7 @@
     } else if (cur.screen === 'meet') {
       const cs = contacts(S);
       const rows = cs.filter(c => MEET[c.id]).map(c => [c.id, MEET[c.id]]);
-      cs.filter(c => c.staff).forEach(c => rows.push([c.id, ['☕', 'Café con ' + c.name + ' (' + TL.Staff.ROLES[c.staff.role].name.toLowerCase() + ')']]));
+      cs.filter(c => c.staff).forEach(c => rows.push([c.id, ['☕', 'Café con ' + c.name]]));
       if (m.lover) rows.push(['loverQ', MEET.loverQ], ['loverC', MEET.loverC]);
       body = `<header>${back}<b>Quedar</b></header><div class="mv-list">${rows.map(([k, mt]) => `<button class="mv-row${k.startsWith('lover') ? ' hot' : ''}" data-act="movil-meet" data-k="${k}"><i>${mt[0]}</i><span><b>${esc(mt[1])}</b><small>${k === 'loverC' ? 'Más intenso… y más fácil que te pillen' : k === 'loverQ' ? 'Discreto. Pero nada es secreto para siempre' : 'Gasta un día'}</small></span></button>`).join('')}</div>`;
     } else if (cur.screen === 'bank') {
@@ -286,7 +286,7 @@
 
   // El móvil vive en la pantalla de inicio (modo fantasía)
   const home0 = UI.VIEWS.home;
-  UI.VIEWS.home = S => home0(S) + (fan(S) && S.mode !== 'tour' ? `<button class="mv-fab" data-act="movil-open" aria-label="Tu móvil">📱${me(S).unknown ? '<b class="mv-badge">1</b>' : ''}</button>` : '');
+  UI.VIEWS.home = S => home0(S) + (fan(S) && S.mode !== 'tour' ? `<button class="mv-fab" data-act="movil-open" aria-label="Tu móvil" title="Tu móvil">📱${me(S).unknown ? '<b class="mv-badge">1</b>' : ''}</button>` : '');
 
   TL.Movil = { me, weekly, dayAnim, expose, render, STATS };
 })();
