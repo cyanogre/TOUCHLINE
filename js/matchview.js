@@ -178,9 +178,28 @@
     trimFeed(feed);
   }
   /** Un evento del motor se cuenta cuando se ve en el campo (el gol, cuando entra). */
+  /** Modo fantasía: cuando el portador de un alma marca, para o se luce, el alma despierta (su GIF animado). */
+  function soulPop(e) {
+    const S = G.S, EV = TL.Events;
+    if (!EV || !EV.fantasy(S) || MV.skip || e.pid == null || !EV.soulOf) return;
+    const big = e.type === 'goal' || (e.type === 'save' && Math.random() < 0.5) || (['tackle', 'chance', 'miss'].includes(e.type) && Math.random() < 0.15);
+    if (!big) return;
+    const so = EV.soulOf(S, e.pid);
+    if (!so || !so.def) return;
+    MV.soulSeen = MV.soulSeen || {};
+    if (e.type !== 'goal' && MV.soulSeen[e.pid] >= 2) return;
+    MV.soulSeen[e.pid] = (MV.soulSeen[e.pid] || 0) + 1;
+    const p = S.players[e.pid], d = document.createElement('div');
+    d.className = 'soul-pop'; d.style.setProperty('--c1', so.def.c || '#ffd23f');
+    d.innerHTML = `<img src="assets/almas/gif/${so.k}.gif" alt="" onerror="this.remove()"><div><small>¡Despierta el alma!</small><b>${U.esc(so.def.name)}</b><span>${U.esc(p ? p.short : '')}</span></div>`;
+    (el('match') || document.body).appendChild(d);
+    setTimeout(() => d.classList.add('out'), 2200);
+    setTimeout(() => d.remove(), 2600);
+  }
   function revealEv(e) {
     if (!MV.m) return;
     addEvent(e);
+    soulPop(e);
     refCall(e);
     if (MV.pitch && MV.pitch.boardMsg) MV.pitch.boardMsg(e);
     if (e.type === 'goal') { TL.FX.pop(el('mv-score')); crowdSongs([e]); }
@@ -364,7 +383,8 @@
       const sk = MV.skip;
       MV.skip = null;
       // Si saltabas al descanso, o la pausa del descanso está activada, el partido se para aquí: los cambios son gratis
-      if (settings().pause.ht || (sk && (sk.type === 'event' || sk.min <= 45))) { pause('ht', null); return; }
+      // Si el salto iba más allá del descanso, no se para aquí (aunque tengas la pausa del descanso activada)
+      if (sk ? (sk.type === 'event' || sk.min <= 45) : settings().pause.ht) { pause('ht', null); return; }
       m.teamTalk(MV.me, 'calm');
       MV.skip = sk;   // si el salto iba más allá del descanso, sigue
     }
@@ -373,7 +393,11 @@
     if (MV.skip) {
       const hit = evs.map(e => [e, pauseReason(e)]).find(([, r]) => r);
       if (MV.skip.type === 'event' && hit) { MV.skip = null; pause(hit[1], hit[0]); return; }
-      if (MV.skip.type === 'min' && m.min >= MV.skip.min) { MV.skip = null; pause('skip', null); return; }
+      if (MV.skip.type === 'min' && m.min >= MV.skip.min) { MV.skip = null; MV.burst = 0; pause('skip', null); return; }
+      // Al saltar, varios minutos de golpe (sin esperar al campo): el salto es casi instantáneo
+      MV.burst = (MV.burst || 0) + 1;
+      if (MV.burst < 12) { tick(); return; }
+      MV.burst = 0;
       schedule(0);
       return;
     }
@@ -1001,5 +1025,5 @@
   };
 
   A['play-live'] = () => (UI.advance ? UI.advance(open) : open());
-  TL.MatchView = { open, MV, _tick: () => tick() };   // _tick: solo para las pruebas automáticas
+  TL.MatchView = { open, MV, _tick: () => tick(), _soulPop: soulPop };   // _tick: solo para las pruebas automáticas
 })();

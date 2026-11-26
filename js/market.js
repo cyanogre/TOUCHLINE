@@ -115,7 +115,7 @@
     S.clubs[toClub].cash -= fee;
     S.clubs[p.club].cash += fee;
     const fromUser = p.club === S.user;
-    if (fromUser) (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'sale', week: S.week, season: S.season, pid: p.id, fee, to: toClub }); if (S.prensaFeed.length > 8) S.prensaFeed.shift();   // para la rueda de prensa
+    if (fromUser) { (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'sale', week: S.week, season: S.season, pid: p.id, fee, to: toClub }); if (S.prensaFeed.length > 8) S.prensaFeed.shift(); }   // para la rueda de prensa
     const freed = fromUser ? p.wage : 0;
     if (fromUser) S.fin.sales += fee;
     p.club = toClub; p.listed = false;

@@ -2664,11 +2664,17 @@
     if (TL.Cups.pendingUser(S)) {
       TL.SFX.whistle(false);
       const r = G.quickCup();
+      if (r && r.m) { try { r.m.lastRatings = r.m.ratings(); } catch (e) { /* sin notas */ } UI.pressPending = { m: r.m, me: r.m.teams[0].club === S.user ? 0 : 1 }; }
       showCupResult(S, r);
       return;
     }
     TL.SFX.whistle(false);
-    G.completeRound(null);
+    // El partido del usuario se simula aquí para poder ir luego a la sala de prensa
+    const fx = S.fixtures[S.week] && S.fixtures[S.week].find(f => f[0] === S.user || f[1] === S.user);
+    let um = null;
+    if (fx) { um = new TL.Engine.Match(S, fx[0], fx[1]).simulate(); try { um.lastRatings = um.ratings(); } catch (e) { /* sin notas */ } }
+    G.completeRound(um);
+    if (um) UI.pressPending = { m: um, me: um.teams[0].club === S.user ? 0 : 1 };
     const m = S.fixtures[S.week - 1].find(m => m[0] === S.user || m[1] === S.user) || null;
     showRoundResults(S, S.week - 1, m);
   }
@@ -2843,7 +2849,7 @@
         <div class="nm-team">${crest(S.clubs[m.teams[1].club], 'lg')}<span class="nm-name">${esc(S.clubs[m.teams[1].club].name)}</span></div></div>
         <p class="center" style="margin:0;font-weight:700;color:${res === 'V' ? 'var(--accent2)' : res === 'D' ? 'var(--danger)' : 'var(--muted)'}">${res === 'V' ? 'Victoria' : res === 'D' ? 'Derrota' : 'Empate'}${decided ? (through ? ' · ¡Pasamos de ronda!' : ' · Eliminados') : ''}</p></div>
       <div class="card" style="padding:6px 10px">${round.ties.map(x => tieHtml(S, p.cup, x, round)).join('')}</div>
-      <button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { render(false); celebrate(S); } });
+      ${pressBtns(S)}<button class="btn primary block mt" data-act="close-sheet">Continuar</button>`, { onClose: () => { pressSkipCheck(S); render(false); celebrate(S); } });
     setTimeout(() => { if (res === 'V' || through) { TL.FX.confetti({ palette: through && p.cup.champ === S.user ? 'gold' : 'green' }); TL.SFX.goal(true); } else if (res === 'D') TL.SFX.groan(); }, 150);
   }
   UI.showCupResult = showCupResult;
@@ -2862,6 +2868,30 @@
   }
   UI.celebrate = celebrate;
 
+  /** Botones de la sala de prensa tras un resultado rápido. Irte sin pasar por ella tiene castigo (salvo con Portavoz). */
+  function pressBtns(S) {
+    if (!UI.pressPending || !TL.Prensa) return '';
+    return `<div class="pr-offer mt"><button class="btn block" data-act="qp-press">🎤 Rueda de prensa</button>${TL.Prensa.canDelegate(S) ? '<button class="btn block ghost" data-act="qp-delegate">Mandar al portavoz</button>' : ''}</div>`;
+  }
+  function pressSkipCheck(S) {
+    const pp = UI.pressPending;
+    UI.pressPending = null;
+    if (pp && TL.Prensa) toast(TL.Prensa.skip(S, pp.m, pp.me), !TL.Prensa.canDelegate(S));
+  }
+  A['qp-press'] = () => {
+    const pp = UI.pressPending, S = G.S;
+    if (!pp) return;
+    UI.pressPending = null;
+    const box = document.querySelector('.sheet .pr-offer'); if (box) box.remove();
+    TL.Prensa.open(S, pp.m, pp.me, () => { G.save(); });
+  };
+  A['qp-delegate'] = () => {
+    const pp = UI.pressPending, S = G.S;
+    if (!pp) return;
+    UI.pressPending = null;
+    const box = document.querySelector('.sheet .pr-offer');
+    if (box) box.outerHTML = `<p class="note mt">${esc(TL.Prensa.skip(S, pp.m, pp.me))}</p>`;
+  };
   function showRoundResults(S, r, my) {
     const L = W.userLeague(S);
     let head = '';
@@ -2876,7 +2906,7 @@
     }
     const rv = my && S.reviews && S.reviews[0] && S.reviews[0].w === r && S.reviews[0].s === S.season;
     sheet(sheetHead(`Jornada ${r + 1}`) + head + `<div class="card" style="padding:6px 10px">${S.fixtures[r].map(m => fixtureHtml(S, m)).join('')}</div>
-      <div class="btn-row mt">${rv ? `<button class="btn" data-act="review-open">${profeIc()} Repaso del Profe</button>` : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { render(false); celebrate(S); } });
+      ${pressBtns(S)}<div class="btn-row mt">${rv ? `<button class="btn" data-act="review-open">${profeIc()} Repaso del Profe</button>` : ''}<button class="btn primary" data-act="close-sheet">Continuar</button></div>`, { onClose: () => { pressSkipCheck(S); render(false); celebrate(S); } });
     mountFaces(document.querySelector('.sheet'));
     if (my) {
       const res = resultLetter(S, my);

@@ -603,7 +603,7 @@
     const panel = document.querySelector('#prensa .pr-panel');
     if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
     meter();
-    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${esc(dressQ(qText(q, c)))}`;
+    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${q.id.startsWith('rom') ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(dressQ(qText(q, c)))}`;
     const { shown, locked } = options(c.S, q, c);
     R.cur = shown;
     panel.querySelector('.pr-as').innerHTML = shown.map((a, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(a.t)}</button>`).join('')
@@ -747,12 +747,8 @@
   }
 
   /** ¿Hay rueda de prensa hoy? Tras los partidos que dan que hablar, siempre; si no, a veces. */
-  function offered(S, m, me) {
-    const c = context(S, m, me);
-    if (c.coachRed || c.reds.length || c.refMine.length || c.protests.length || c.crowd || c.bolt != null || Math.abs(c.diff) >= 3 || c.cup || c.comeback || c.lateWin != null || c.lateLost) return true;
-    if (Object.keys(c.feed).length) return Math.random() < 0.7;
-    return Math.random() < 0.45;
-  }
+  function offered() { return true; }   // después de cada partido hay rueda de prensa (no ir tiene castigo)
+
   /** No ir: con «Portavoz» va el jefe de prensa y no pasa nada; si no, a la directiva y a la prensa no les gusta. */
   function skip(S, m, me) {
     const club = S.clubs[S.user];
