@@ -151,7 +151,7 @@
     const steps = TL.Prensa ? TL.Prensa.STEPS : [];
     const nextStep = mu ? steps.find(st => !(S.mule.got || []).includes(st.id)) : null;
 
-    const head = `<div class="hud-top">
+    const head = `<button class="hud-back" data-act="tab" data-tab="home">‹ Inicio</button><div class="hud-top">
       <div class="hud-logo">TOUCHLINE<span>//OS</span></div>
       <div class="hud-sys"><span class="dot"></span>NÚCLEO CUÁNTICO 9.3 · 14 SAT · PING 0,0003 ms</div>
       <div class="hud-boot"><p>&gt; Arrancando módulos de vigilancia…</p><p>&gt; Usuario: <b>${esc(S.manager)}</b> · ${esc(S.clubs[S.user].name)} · T${S.season} J${S.week}</p><p class="hud-tick">&gt; ${esc(tr(pick(TICK)))}</p></div>

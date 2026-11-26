@@ -1730,14 +1730,12 @@ body.shake-s { animation: shake-s .35s; }
 .pr-fame{color:#fde68a}
 .pr-head{display:block;color:#fca5a5;font-style:italic;margin:2px 0 4px}
 /* ---------- TOUCHLINE//OS (panel de control) ---------- */
-.hud{--cy:#3ef0ff;--mono:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;position:relative;margin:-4px -4px 0;padding:14px 12px 18px;border-radius:16px;
+.hud{contain:paint;isolation:isolate;--cy:#3ef0ff;--mono:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;position:relative;margin:-4px -4px 0;padding:14px 12px 18px;border-radius:16px;
   background:radial-gradient(120% 60% at 50% 0%,rgba(62,240,255,.14),transparent 60%),linear-gradient(180deg,#050c14,#03070c);
   border:1px solid rgba(62,240,255,.25);box-shadow:0 0 40px rgba(62,240,255,.08) inset;overflow:hidden;color:#d7f9ff}
 .hud::before{content:'';position:absolute;inset:0;pointer-events:none;background:
   repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),
   linear-gradient(rgba(62,240,255,.06) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(62,240,255,.06) 1px,transparent 1px) 0 0/22px 22px;}
-.hud::after{content:'';position:absolute;left:0;right:0;height:80px;top:-80px;background:linear-gradient(180deg,transparent,rgba(62,240,255,.08),transparent);animation:hudScan 5s linear infinite;pointer-events:none}
-@keyframes hudScan{to{top:110%}}
 .hud-top{position:relative;margin-bottom:12px}
 .hud-logo{font:800 24px/1 var(--font-c);letter-spacing:.08em;color:#fff;text-shadow:0 0 12px var(--cy)}
 .hud-logo span{color:var(--cy)}
@@ -1895,3 +1893,5 @@ body.shake-s { animation: shake-s .35s; }
 .pr-fl.sm{width:4.5%}
 @keyframes prFl{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.25)}100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
 .pr-head::before{content:'«'}.pr-head::after{content:'»'}
+
+.hud-back{position:relative;z-index:1;background:none;border:1px solid rgba(62,240,255,.35);color:#9ff6ff;border-radius:8px;font:700 12px var(--font-c);padding:5px 10px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
