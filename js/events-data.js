@@ -31,14 +31,15 @@
     // Incidentes (probabilidad por partido)
     // Lo que pasa «porque sí» en cualquier partido. En el partido que se ve, además, la grada reacciona a lo que
     // ocurre en el campo (Match._crowdReact): por eso aquí la parte suelta es menor que la cifra real total
-    // Son guiños: bajos a propósito para que no sean el centro del juego (en torno a 1 de cada 10 partidos)
+    // Lo que de verdad se ve en la tele es raro: entre lo suelto y lo que provoca el partido, algo en la grada en
+    // torno a 1 de cada 20–25 partidos (un par de veces por temporada); lo grave, muy de vez en cuando
     crowd: {
-      insults: 0.03,      // insultos/cánticos violentos denunciados (LaLiga: 50–99 denuncias/temporada)
-      racism: 0.008,      // insultos racistas con protocolo
-      objects: 0.007,     // lanzamiento de objetos
-      pyro: 0.012,        // bengalas / pirotecnia
-      invader: 0.006,     // invasión de campo
-      fight: 0.004,       // pelea en la grada
+      insults: 0.012,     // insultos/cánticos que recoge el acta (la mayoría no se ven en la tele)
+      racism: 0.004,      // protocolo antirracista (pocos por temporada en toda la liga)
+      objects: 0.004,     // lanzamiento de objetos
+      pyro: 0.004,        // bengalas / pirotecnia que obliga a parar
+      invader: 0.004,     // invasión de campo
+      fight: 0.002,       // pelea en la grada
       ultrasFight: 0.008  // pelea de ultras en los alrededores (solo noticia)
     },
     player: {
