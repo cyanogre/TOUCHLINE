@@ -23,7 +23,8 @@
     { id: 'monstruo', name: 'Gambeta del Monstruo', c: '#ffcc33', c2: '#1a1a1a', fx: 'toxico', curve: -2, line: [3, 2], desc: 'Regatea a todos guiado por el monstruo que lleva dentro y define de rosca.' },
     { id: 'halcon', name: 'Picado del Halcón', c: '#d9e6ff', c2: '#7f8ca8', fx: 'hielo', jump: true, line: [3, 2], desc: 'Se eleva más que nadie y se lanza en picado sobre el balón.' },
     { id: 'galaxia', name: 'Disparo Galáctico', c: '#8a5cff', c2: '#ffd6ff', fx: 'galaxia', curve: 2, line: [2, 3], desc: 'Un tiro de otro planeta que deja un rastro de estrellas.' },
-    { id: 'arcoiris', name: 'Arcoíris Imposible', c: '#ff4fa3', c2: '#4fffb0', fx: 'arcoiris', curve: -3, line: [2, 3, 1], desc: 'Una comba que dibuja todos los colores antes de besar la escuadra.' }
+    { id: 'arcoiris', name: 'Arcoíris Imposible', c: '#ff4fa3', c2: '#4fffb0', fx: 'arcoiris', curve: -3, line: [2, 3, 1], desc: 'Una comba que dibuja todos los colores antes de besar la escuadra.' },
+    { id: 'flechazo', name: 'Disparo del Flechazo', c: '#ff4f8b', c2: '#ffd1e1', fx: 'arcoiris', curve: 2.4, line: [], desc: 'Un tiro con forma de corazón que el portero no se atreve a parar. Nació de una rueda de prensa.' }
   ];
   const BY = {}; SHOTS.forEach(s => { BY[s.id] = s; });
 
@@ -33,6 +34,7 @@
   /** Supertiro de un jugador (o null): rematadores buenos, y quien lleve un alma de ataque. Siempre el mismo. */
   function of(S, p) {
     if (!p || !fan(S) || p.pos === 'GK') return null;
+    if (S.romance && S.romance.done && S.romance.win && S.romance.pid === p.id) return BY.flechazo;
     const sho = (p.st && p.st[1]) || 0, line = lineOf(p);
     const soul = TL.Events.soulOf && TL.Events.soulOf(S, p.id);
     const good = sho >= 78 || (line === 3 && sho >= 72) || (soul && soul.def && (soul.def.line || []).includes(3));

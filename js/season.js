@@ -131,6 +131,11 @@
       let delta = mine > opp ? 2 + Math.max(0, repGap) : mine < opp ? -2.5 + Math.max(0, repGap * 0.5) : Math.max(-1, repGap * 0.5);
       if (delta < 0) delta *= fb.boardLoss;
       S.board.conf = U.clamp(Math.round((S.board.conf + delta) * 10) / 10, 0, 100);
+      { // Histórico para el panel de control
+        const sq = W.squad(S, S.user), mor = sq.length ? sq.reduce((t, p) => t + (p.mor == null ? 70 : p.mor), 0) / sq.length : 70;
+        (S.hud || (S.hud = [])).push({ w: S.week, s: S.season, conf: S.board.conf, fans: S.com ? S.com.fans : 0, mor: Math.round(mor), gf: mine, ga: opp });
+        if (S.hud.length > 40) S.hud.shift();
+      }
       TL.Manager.addXp(S, (mine > opp ? 25 : mine === opp ? 10 : 4) + mine + (opp === 0 ? 5 : 0) + Math.max(0, Math.round(repGap * 2)));
       for (const r of results) {
         for (const [pid, weeks] of r.injuries || []) {
