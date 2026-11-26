@@ -1206,7 +1206,8 @@
     _crowdReact() {
       const from = this._crowdIdx || 0;
       this._crowdIdx = this.events.length;
-      if (this.done || this.crowdN >= 2 || (this.crowdLast != null && this.min - this.crowdLast < 10)) return;
+      // Son guiños, no el centro del partido: como mucho uno por partido y con probabilidades bajas
+      if (this.done || this.crowdN >= 1) return;
       const fem = this.S.gender === 'F' ? 0.35 : 1;
       const heat = [0, 0];
       let party = null;
@@ -1230,7 +1231,7 @@
       }
       // La afición local es casi todo el estadio; la visitante, un rincón
       for (const i of [0, 1]) {
-        const p = heat[i] * 0.22 * (i === 0 ? 1 : 0.6) * fem;
+        const p = heat[i] * 0.04 * (i === 0 ? 1 : 0.6) * fem;
         if (!(p > 0) || Math.random() >= p) continue;
         const r = Math.random(), hot = heat[i] >= 1;
         const type = hot ? (r < 0.3 ? 'objects' : r < 0.55 ? 'fight' : r < 0.75 ? 'insults' : 'pyro') : (r < 0.55 ? 'insults' : r < 0.75 ? 'pyro' : r < 0.9 ? 'objects' : 'fight');
@@ -1239,8 +1240,8 @@
       }
       if (party) {
         const pr = Math.random(), base = (party.team === 0 ? 1 : 0.6) * fem;
-        if (pr < 0.06 * base) this._crowdIncident(party.team, 'pyro', true);
-        else if (pr < 0.075 * base) this._crowdIncident(party.team, 'invader', true, party.pid);
+        if (pr < 0.012 * base) this._crowdIncident(party.team, 'pyro', true);
+        else if (pr < 0.014 * base) this._crowdIncident(party.team, 'invader', true, party.pid);
       }
     }
     _crowdIncident(i, type, party, pid) {
@@ -1271,6 +1272,7 @@
       if (ev.type.startsWith('crowd_')) {
         // Los incidentes de grada se atribuyen a la afición del equipo i
         const rival = this.S.clubs[this.teams[1 - i].club];
+        if (TXT[ev.type] && this.crowdN >= 1) return;   // ya hubo uno en este partido: con uno basta
         this.incidents.push({ type: ev.type, team: i, min: this.min });
         if (!TXT[ev.type]) return; // p. ej. pelea de ultras fuera del estadio: solo noticia
         this.crowdN = (this.crowdN || 0) + 1; this.crowdLast = this.min;
