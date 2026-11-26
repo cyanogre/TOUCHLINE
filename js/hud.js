@@ -201,7 +201,15 @@
   function after(S) {
     const root = document.querySelector('.hud');
     if (!root) return;
-    if (!introShown) { introShown = true; const first = !S.hudLore; S.hudLore = true; intro(first); }
+    // La historia del centro de mando sale una sola vez (y nunca más, ni la secuencia de arranque)
+    let seen = !!S.hudLore;
+    try { seen = seen || localStorage.getItem('touchline.hudLore') === '1'; } catch (e) { /* sin almacenamiento */ }
+    if (!introShown && !seen) {
+      introShown = true; S.hudLore = true;
+      try { localStorage.setItem('touchline.hudLore', '1'); } catch (e) { /* nada */ }
+      if (TL.Game && TL.Game.save) TL.Game.save();
+      intro(true);
+    }
     // Contadores que suben y anillos que se llenan
     root.querySelectorAll('[data-count]').forEach(el => {
       const to = +el.dataset.count, t0 = performance.now();
