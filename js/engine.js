@@ -382,8 +382,9 @@
   // ------------------------------------------------------------ Partido
   /** Lo que dijiste en rueda de prensa calienta al rival: en el próximo partido contra ti sale algo más
    *  motivado (una vez; luego se olvida). */
-  function prensaBoost(S, clubId, isUser) {
-    let k = 1;
+  function prensaBoost(S, clubId, isUser, oppId) {
+    // El plan de partido y las operaciones del Panel (js/intel.js)
+    let k = TL.Intel ? TL.Intel.boost(S, clubId, isUser, oppId) : 1;
     // La rueda de prensa previa (partidos grandes): los tuyos salen enchufados o con dudas, y el rival, picado o no.
     // Vale para el partido que tocaba esa jornada y se gasta al usarlo.
     const pr = S.prensaPre;
@@ -434,7 +435,8 @@
         if (!t.isUser) {
           // Su entrenador decide según su estilo, el nivel de ambos, el campo y un punto de azar
           const d = (mine.attack + mine.defense) - (opp.attack + opp.defense);
-          t.mentality = TL.Coach.mentality(S, t.club, d, i === 0);
+          const lk = TL.Intel && TL.Intel.locked(S, t.club, this.teams[1 - i].club);
+          t.mentality = lk ? lk.mentality : TL.Coach.mentality(S, t.club, d, i === 0);
           t.baseMent = t.mentality;
         }
         t.start.mentality = t.mentality;
@@ -454,8 +456,8 @@
         const l = userLineup(S);
         formation = l.formation; ids = l.ids; mentality = S.tactics.mentality;
       } else {
-        // El entrenador rival elige su plan: no se conoce hasta que empieza el partido
-        const b = TL.Coach.lineup(S, clubId, oppId);
+        // El entrenador rival elige su plan: no se conoce hasta que empieza el partido (salvo que lo hayas espiado)
+        const b = (TL.Intel && TL.Intel.locked(S, clubId, oppId)) || TL.Coach.lineup(S, clubId, oppId);
         formation = b.formation; ids = b.ids; scouted = b.scouted;
       }
       const slots = FORMATIONS[formation];
@@ -469,7 +471,7 @@
       const bench = pickBench(players, ids, 9);
       return {
         club: clubId, idx, isUser, formation, onPitch, bench, mentality, baseMent: mentality,
-        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: prensaBoost(S, clubId, isUser), talk: null,
+        subs: 0, maxSubs: 5, autoSubs: isUser ? S.tactics.autoSubs : true, boost: prensaBoost(S, clubId, isUser, oppId), talk: null,
         coach: TL.Coach.of(S, clubId), day: TL.Coach.dayFactor(S, clubId), scouted,
         start: { formation, ids: ids.slice(), mentality }, log: [], tchanges: 0, desperate: false
       };

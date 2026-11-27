@@ -605,6 +605,25 @@
   };
   const AUD = { vest: 'el vestuario', dir: 'la directiva', afi: 'la afición', sala: 'la prensa' };
   const AUD_T = { vest: 'Vestuario', dir: 'Directiva', afi: 'Afición', sala: 'Prensa' };
+  // Lo que aún no conoces está oculto: el estilo de cada respuesta y el carácter de cada acompañante se aprenden
+  // usándolos (la primera vez que contestas con un estilo, o tras ir a la sala con alguien).
+  const knownSt = S => S.pressKnown || (S.pressKnown = { cat: {}, pl: {} });
+  const styleKnown = (S, cat) => !!knownSt(S).cat[cat];
+  const persKnown = (S, pid) => !!knownSt(S).pl[pid] || !!(TL.Social && TL.Social.known && TL.Social.known(S, pid) >= 2);
+  function learnStyle(S, cat) {
+    if (!CATS[cat] || styleKnown(S, cat)) return null;
+    knownSt(S).cat[cat] = true;
+    const C = CATS[cat], up = [], dn = [];
+    for (const k in C.aud) { if (C.aud[k] > 0.4) up.push(AUD[k]); else if (C.aud[k] < -0.4) dn.push(AUD[k]); }
+    const a = x => ('a ' + x).replace(/^a el /, 'al ');
+    const list = (l, y) => (l.length > 1 ? l.slice(0, -1).join(', ') + ` ${y} ` + l[l.length - 1] : l[0]);
+    return `Descubres el estilo ${C.ic} ${C.n}${up.length ? `: gusta ${list(up.map(a), 'y')}` : ''}${dn.length ? `${up.length ? ';' : ':'} no gusta ${list(dn.map(a), 'ni')}` : ''}.`;
+  }
+  function learnPers(S, comp) {
+    if (!comp || knownSt(S).pl[comp.p.id]) return null;
+    knownSt(S).pl[comp.p.id] = comp.pers;
+    return `Ahora sabes que ${comp.p.short} es ${PERS[comp.pers].n.toLowerCase()} ante la prensa.`;
+  }
   function catOf(o) {
     if (o.cat) return o.cat;
     const fx = o.fx || {}, t = (o.t || '').toLowerCase();
@@ -774,8 +793,8 @@
     panel.querySelector('.pr-meter').innerHTML = '';
     panel.querySelector('.pr-q').innerHTML = `<small>${R.pre ? esc('Previa · ' + R.pre.big.label) : 'Antes de salir'}</small>¿Quién te acompaña en la sala?
       <span class="pr-prio">Esta semana te conviene contentar a <b>${esc(AUD[R.prio])}</b>.</span>`;
-    panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => { const no = x.times >= lim; return `<button class="btn block pr-a pr-comp ${no ? 'tired' : ''}" data-act="pr-comp" data-k="${k}" ${no ? 'disabled' : ''}>
-        <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers">${esc(PERS[x.pers].n)}</i></span><small>${esc(no ? 'Se niega a volver: está harto de micrófonos.' : x.times >= lim - 1 ? 'Ya ha venido mucho: saldrá quemado y de mal humor.' : x.times >= 1 ? 'Repite: se desgastará más que la última vez.' : PERS[x.pers].d)}</small></button>`; }).join('')
+    panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => { const no = x.times >= lim, kn = persKnown(S, x.p.id); return `<button class="btn block pr-a pr-comp ${no ? 'tired' : ''}" data-act="pr-comp" data-k="${k}" ${no ? 'disabled' : ''}>
+        <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers ${kn ? '' : 'unk'}">${kn ? esc(PERS[x.pers].n) : 'carácter: ???'}</i></span><small>${esc(no ? 'Se niega a volver: está harto de micrófonos.' : x.times >= lim - 1 ? 'Ya ha venido mucho: saldrá quemado y de mal humor.' : x.times >= 1 ? 'Repite: se desgastará más que la última vez.' : kn ? PERS[x.pers].d : 'Aún no sabes cómo se maneja ante los micros.')}</small></button>`; }).join('')
       + '<button class="btn block ghost pr-a" data-act="pr-comp" data-k="-1">Voy solo</button>';
   }
   A['pr-comp'] = b => {
@@ -837,7 +856,7 @@
     const cat = a.cat, C = CATS[cat], used = R.uses[cat] || 0, cost = costOf(cat, extra);
     const out = used >= capOf(cat), poor = R.en < cost;
     return `<button class="btn block pr-a ${out || poor ? 'tired' : ''}" data-act="pr-answer" data-k="${k}" ${out || poor ? 'disabled' : ''}>
-      <span>${esc(a.t)}</span><small class="pr-cat c-${cat}">${C.ic} ${C.n}${satOf(cat) >= 3 && !out && !poor ? ' · muy vista' : ''}${out ? ' · ya no te sale' : poor ? ' · sin fuerzas' : ` · ${'●'.repeat(Math.max(1, Math.round(cost / 8)))}`}</small></button>`;
+      <span>${esc(a.t)}</span><small class="pr-cat ${styleKnown(R.c.S, cat) ? 'c-' + cat : 'c-unk'}">${styleKnown(R.c.S, cat) ? `${C.ic} ${C.n}` : '❔ Sin probar'}${styleKnown(R.c.S, cat) && satOf(cat) >= 3 && !out && !poor ? ' · muy vista' : ''}${out ? ' · ya no te sale' : poor ? ' · sin fuerzas' : ` · ${'●'.repeat(Math.max(1, Math.round(cost / 8)))}`}</small></button>`;
   }
   /** Quién pregunta: un periodista con carácter y memoria (si le dejaste mal, viene a por ti). */
   function reporter(forced) {
@@ -889,7 +908,7 @@
     hands();
     panel.querySelector('.pr-as').innerHTML = R.cur.map((a, k) => btnHtml(a, k, extra)).join('')
       + (!S.mule && !R.muleUsed && R.k === Math.max(2, R.qs.length - 1) ? `<button class="btn block pr-a mule" data-act="pr-mule-new">Soltar una frase propia…<small>Puede hacerse famosa</small></button>` : '')
-      + (R.joker && R.comp ? `<button class="btn block pr-a joker" data-act="pr-joker">🃏 Que conteste ${esc(R.comp.p.short)}<small>${esc(PERS[R.comp.pers].n)}</small></button>` : '')
+      + (R.joker && R.comp ? `<button class="btn block pr-a joker" data-act="pr-joker">🃏 Que conteste ${esc(R.comp.p.short)}<small>${persKnown(S, R.comp.p.id) ? esc(PERS[R.comp.pers].n) : '¿Qué hará? Ni idea'}</small></button>` : '')
       + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(TL.t ? TL.t(skillName(a.need[0])) : skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
     // Sin fuerzas para nada: te quedas en blanco
     if (!R.cur.some(a => (R.uses[a.cat] || 0) < capOf(a.cat) && R.en >= costOf(a.cat, extra))) {
@@ -908,6 +927,8 @@
     }
   }
   function companionLine(text, fx) {
+    const lp = R.comp && R.c && /bloque|conteste el míster|sin que nadie le pregunte/.test(text) ? learnPers(R.c.S, R.comp) : null;
+    if (lp) R.timers.push(setTimeout(() => { const q = document.querySelector('#prensa .pr-q'); if (q) q.insertAdjacentHTML('beforeend', `<em class="pr-learn">💡 ${esc(lp)}</em>`); }, 600));
     if (!document.getElementById('prensa')) return;
     const say = document.querySelector('#prensa .pr-say');
     if (say) { say.textContent = text; say.classList.remove('on'); void say.offsetWidth; say.classList.add('on'); }
@@ -922,6 +943,8 @@
     R.joker--; R.jokerUsed = true; stopClock();
     const P = R.comp.pers, p = R.comp.p, rep = R.rep;
     if (TL.Persona) TL.Persona.signal(R.c.S, { comodin: 1, ['comodin_' + P]: 1 });
+    const lpj = learnPers(R.c.S, R.comp);
+    if (lpj) R.timers.push(setTimeout(() => { const q = document.querySelector('#prensa .pr-q'); if (q) q.insertAdjacentHTML('beforeend', `<em class="pr-learn">💡 ${esc(lpj)}</em>`); }, 700));
     const L = {
       lider: [`${p.short}: «Esto lo arreglamos dentro y lo demostramos el domingo. Todos a una.»`, { temp: -15, aud: { vest: 1.5, dir: 0.5 } }, 2],
       profesional: [`${p.short}: «Hemos hablado mucho de esto. Sabemos qué corregir y lo vamos a corregir.»`, { temp: -8, aud: { dir: 0.8, sala: 0.5 } }, 1],
@@ -975,6 +998,7 @@
     if (a.mule) { R.muleUsed = true; const u = useMule(S, R.c); a.g = u.g; a.react = u.react; }
     const cat = a.cat || 'eva', C = CATS[cat];
     const soc = R.q && R.q.id === 'soc';
+    const learnedSt = a.silence ? null : learnStyle(S, cat);
     let fx = a.fx || {};
     // Tu sello: Puño de hierro (exigir duele la mitad) · La causa (la sociedad suma el doble de afición)
     if (cat === 'dur' && lv(S, 'se_puno')) { fx = Object.assign({}, fx); if (fx.team < 0) fx.team /= 2; if (fx.pl && fx.pl[1] < 0) fx.pl = [fx.pl[0], fx.pl[1] / 2]; }
@@ -1019,6 +1043,7 @@
     document.querySelectorAll('#prensa .pr-a').forEach(x => { x.disabled = true; });
     if (TL.SFX && TL.SFX.click) TL.SFX.click();
     if (a.react) { const q = document.querySelector('#prensa .pr-q'); if (q) q.insertAdjacentHTML('beforeend', `<em class="pr-react">${esc(a.react)}</em>`); }
+    if (learnedSt) { const q = document.querySelector('#prensa .pr-q'); if (q) q.insertAdjacentHTML('beforeend', `<em class="pr-learn">💡 ${esc(learnedSt)}</em>`); }
     // La sala se desborda: te levantas y te vas (o te echan)
     if (R.temp >= 100) { R.walk = true; R.timers.push(setTimeout(end, 1900)); return; }
     // Titular retorcido (los sensacionalistas, sobre todo)
@@ -1102,6 +1127,8 @@
       fame.push(wear >= 22 ? `${p.short} sale de la sala exprimido: le costará rendir en los próximos días.` : `${p.short} acaba cansado de tanto micrófono.`);
     }
     if (R.log.merch) fame.push(`Las camisetas con tu frase vuelan: +${U.money(R.log.merch)}.`);
+    const lp = R.comp && learnPers(S, R.comp);
+    if (lp) fame.push('💡 ' + lp);
     if (R.pre && !S.fired) fame.push(...preSettle(S, v));
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>Fin de la rueda de prensa</small><span class="pr-v ${v.win ? 'win' : 'lose'}">${esc(v.title)}</span> ${esc(v.text)}`;
@@ -1403,5 +1430,6 @@
   });
 
   TL.Prensa = { MULES, STEPS, open, preview, bigMatch, offered, skip, canDelegate, _options: options, _verdict: verdict, _questions: questions, _context: context,
+    styleKnown, learnStyle, persKnown, CATS,
     _preContext: preContext, _preQuestions: preQuestions, _R: R, _meter: () => meter(), _qText: qText, _bagPick: bagPick };
 })();
