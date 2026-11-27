@@ -1940,3 +1940,4 @@ body.shake-s { animation: shake-s .35s; }
 .pp-cols{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-top:8px;border-top:1px solid #1a1a1a;padding-top:6px;font:11px Georgia,serif}
 .pp-cols .up{color:#166534;font-weight:700}.pp-cols .dn{color:#991b1b;font-weight:700}
 .pr-dot.me.happy i{filter:brightness(1.2)}.pr-dot.me.sad i{filter:brightness(.7) saturate(.6)}
+.pr-stage.fired{filter:grayscale(.85) brightness(.8)}

@@ -30,8 +30,11 @@
       { id: 'neg3', name: 'Mano con la directiva', max: 3, desc: '+5% de presupuesto salarial y -0,5 puntos de interés en préstamos por nivel.' }
     ] },
     { id: 'pre', name: 'Medios', icon: '🎤', nodes: [
-      { id: 'pre1', name: 'Don de gentes', max: 3, desc: 'En rueda de prensa, la sala te perdona una respuesta regular por nivel sin cortar tu racha.' },
-      { id: 'pre2', name: 'Portavoz', max: 1, desc: 'Puedes mandar al jefe de prensa a la rueda de prensa y saltártela sin consecuencias.' }
+      { id: 'pre1', name: 'Don de gentes', max: 3, desc: 'En rueda de prensa tienes más cabeza y más tiempo para contestar, por nivel.' },
+      { id: 'pre2', name: 'Portavoz', max: 1, desc: 'Puedes mandar al jefe de prensa a la rueda de prensa y saltártela sin consecuencias.' },
+      { id: 'pre3', name: 'Rotación mediática', max: 3, desc: 'Los jugadores que te acompañan a la prensa se desgastan menos y se hartan más despacio de repetir, por nivel.' },
+      { id: 'pre4', name: 'Mente fría', max: 3, desc: 'Repetir el mismo estilo de respuesta te agota menos y se te gasta más tarde, por nivel.' },
+      { id: 'pre5', name: 'Discurso renovado', max: 2, desc: 'La prensa tarda más en cansarse de tus estilos de siempre entre una rueda de prensa y otra, por nivel.' }
     ] },
     { id: 'arb', name: 'Árbitros', icon: '⚖️', nodes: [
       { id: 'arb1', name: 'Ojo arbitral', max: 3, desc: 'Tu impresión de las decisiones del árbitro acierta más por nivel (nunca del todo).' },
