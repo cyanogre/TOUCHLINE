@@ -745,7 +745,7 @@
     R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null;
     R.muleUsed = false; R.twisted = null; R.inTwist = false; R.fu = 0; R.follow = null;
     R.en = 100 + 15 * lv(S, 'pre1'); R.uses = {}; R.temp = 25; R.aud = { vest: 0, dir: 0, afi: 0, sala: 0 };
-    R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
+    R.bigForce = null; R.nuked = null; R.ban = false; R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
     // Lo que más necesitas esta semana: lo que peor está
     const conf = S.board.conf, fan = TL.Hud ? TL.Hud.fansOpinion(S) : 50, mood = TL.Hud ? TL.Hud.squadMood(S) : 60;
     R.prio = conf <= fan && conf <= mood ? 'dir' : fan <= mood ? 'afi' : 'vest';
@@ -790,13 +790,16 @@
     add(sq.slice().sort((a, b) => b.ovr - a.ovr)[0], 'Estrella');
     add(sq.filter(p => notes[p.id] != null).sort((a, b) => notes[a.id] - notes[b.id])[0], 'Ha tenido un mal día');
     add(pick(sq), 'Le apetecía venir');
-    R.cand = cand.slice(0, 4).map(x => ({ ...x, pers: persOf(S, x.p) }));
+    const H = S.pressComp || (S.pressComp = {}), now = S.season * 60 + S.week;
+    const tired = p => { const h = H[p.id]; return h ? Math.max(0, h.n - Math.floor((now - h.last) / 2)) : 0; };
+    R.cand = cand.slice(0, 4).map(x => ({ ...x, pers: persOf(S, x.p), times: tired(x.p) }));
+    const lim = 3 + lv(S, 'pre3');
     const panel = document.querySelector('#prensa .pr-panel');
     panel.querySelector('.pr-meter').innerHTML = '';
     panel.querySelector('.pr-q').innerHTML = `<small>Antes de salir</small>¿Quién te acompaña en la sala?
       <span class="pr-prio">Esta semana te conviene contentar a <b>${esc(AUD[R.prio])}</b>.</span>`;
-    panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => `<button class="btn block pr-a pr-comp" data-act="pr-comp" data-k="${k}">
-        <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers">${esc(PERS[x.pers].n)}</i></span><small>${esc(PERS[x.pers].d)}</small></button>`).join('')
+    panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => { const no = x.times >= lim; return `<button class="btn block pr-a pr-comp ${no ? 'tired' : ''}" data-act="pr-comp" data-k="${k}" ${no ? 'disabled' : ''}>
+        <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers">${esc(PERS[x.pers].n)}</i></span><small>${esc(no ? 'Se niega a volver: está harto de micrófonos.' : x.times >= lim - 1 ? 'Ya ha venido mucho: saldrá quemado y de mal humor.' : x.times >= 1 ? 'Repite: se desgastará más que la última vez.' : PERS[x.pers].d)}</small></button>`; }).join('')
       + '<button class="btn block ghost pr-a" data-act="pr-comp" data-k="-1">Voy solo</button>';
   }
   A['pr-comp'] = b => {
@@ -809,6 +812,9 @@
       const tb = st.querySelector('.pr-table'); if (tb) st.appendChild(tb); const lt = st.querySelector('.pr-light'); if (lt) st.appendChild(lt);
       const cw = st.querySelector('.pr-crowd'); if (cw) st.appendChild(cw); const sy = st.querySelector('.pr-say'); if (sy) st.appendChild(sy);
       R.c.guest = R.comp.p.id;
+      const H = S.pressComp || (S.pressComp = {}), h = H[R.comp.p.id] || { n: 0, last: 0 };
+      H[R.comp.p.id] = { n: (R.comp.times || 0) + 1, last: S.season * 60 + S.week };
+      if (R.comp.times >= 2 + lv(S, 'pre3') - 1) R.comp.grumpy = true;
       if (R.comp.pers === 'timido') R.joker = 0;
     } else R.joker = 0;
     ask();
@@ -842,12 +848,14 @@
     }, 100);
   }
 
-  function costOf(cat, extra) { return CATS[cat].cost + 6 * (R.uses[cat] || 0) + (extra || 0); }
+  const satOf = cat => Math.floor(((R.c && R.c.S.pressStyle) || {})[cat] || 0);
+  function capOf(cat) { return CATS[cat].cap + (lv(R.c.S, 'pre4') >= 2 ? 1 : 0) - (satOf(cat) >= 4 ? 1 : 0); }
+  function costOf(cat, extra) { return CATS[cat].cost + (6 - 1.5 * lv(R.c.S, 'pre4')) * (R.uses[cat] || 0) + 3 * satOf(cat) + (extra || 0); }
   function btnHtml(a, k, extra) {
     const cat = a.cat, C = CATS[cat], used = R.uses[cat] || 0, cost = costOf(cat, extra);
-    const out = used >= C.cap, poor = R.en < cost;
+    const out = used >= capOf(cat), poor = R.en < cost;
     return `<button class="btn block pr-a ${out || poor ? 'tired' : ''}" data-act="pr-answer" data-k="${k}" ${out || poor ? 'disabled' : ''}>
-      <span>${esc(a.t)}</span><small class="pr-cat c-${cat}">${C.ic} ${C.n}${out ? ' · ya no te sale' : poor ? ' · sin fuerzas' : ` · ${'●'.repeat(Math.max(1, Math.round(cost / 8)))}`}</small></button>`;
+      <span>${esc(a.t)}</span><small class="pr-cat c-${cat}">${C.ic} ${C.n}${satOf(cat) >= 3 && !out && !poor ? ' · muy vista' : ''}${out ? ' · ya no te sale' : poor ? ' · sin fuerzas' : ` · ${'●'.repeat(Math.max(1, Math.round(cost / 8)))}`}</small></button>`;
   }
   /** Quién pregunta: un periodista con carácter y memoria (si le dejaste mal, viene a por ti). */
   function reporter(forced) {
@@ -886,6 +894,11 @@
     const mu = muleOf(S);
     R.cur = opts.slice();
     if (!R.muleUsed && mu) R.cur.push({ t: '«' + mu.t + '»', cat: 'hu', g: 1, mule: true, fx: {} });
+    // Con la sala ardiendo, aparecen las salidas de tono: liarla muy parda (y que te echen)
+    if (R.temp >= 70 && !R.nuked) R.cur.push(
+      { t: 'Pues ya que estamos: el presidente no tiene ni idea de fútbol. Ni de nada.', cat: 'pol', g: 0, nuke: 'pres', fx: {} },
+      { t: 'Me levanto, tiro el micro y me voy. Que pregunten a la pared.', cat: 'pol', g: 0, nuke: 'walk', fx: {} },
+      { t: 'Ustedes y el árbitro van en el mismo autobús. Y yo sé quién conduce.', cat: 'pol', g: 0, nuke: 'ref', fx: {} });
     const extra = rep.g >= 2 ? 6 : 0;
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>${esc(rep.n)} · ${esc(rep.m)} <i class="pr-rt t-${rep.t}">${esc(REP_T[rep.t])}</i>${rep.g >= 2 ? ' <i class="pr-grudge">🎯 viene a por ti</i>' : ''} <span class="pr-n">${esc(tag)}</span></small>${(q && (q.id.startsWith('rom') || q.id.startsWith('aff'))) ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(qtxt)}`;
@@ -895,7 +908,7 @@
       + (R.joker && R.comp ? `<button class="btn block pr-a joker" data-act="pr-joker">🃏 Que conteste ${esc(R.comp.p.short)}<small>${esc(PERS[R.comp.pers].n)}</small></button>` : '')
       + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(TL.t ? TL.t(skillName(a.need[0])) : skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
     // Sin fuerzas para nada: te quedas en blanco
-    if (!R.cur.some(a => (R.uses[a.cat] || 0) < CATS[a.cat].cap && R.en >= costOf(a.cat, extra))) {
+    if (!R.cur.some(a => (R.uses[a.cat] || 0) < capOf(a.cat) && R.en >= costOf(a.cat, extra))) {
       R.timers.push(setTimeout(() => answer({ t: '… (te quedas en blanco)', cat: 'eva', g: 0, silence: true, fx: {} }), 1400));
       return;
     }
@@ -906,6 +919,7 @@
       const P = R.comp.pers, p = R.comp.p;
       if (P === 'timido' && Math.random() < 0.18) R.timers.push(setTimeout(() => companionLine(`${p.short}: «Eh… yo… mejor que conteste el míster.»`, { temp: 8 }), 900));
       if (P === 'bocazas' && Math.random() < 0.18) R.timers.push(setTimeout(() => companionLine(`${p.short}, sin que nadie le pregunte: «¡Y que lo sepa todo el mundo: aquí venimos a ganarlo todo!»`, { temp: 12, aud: { afi: 1, dir: -1 } }), 1200));
+      if (R.comp.grumpy && Math.random() < 0.3) R.timers.push(setTimeout(() => companionLine(`${p.short}, mirando el reloj: «¿Cuánto queda? Llevo tres ruedas de prensa seguidas…»`, { temp: 10, aud: { vest: -0.8 } }), 1000));
       if ((p.mor == null ? 70 : p.mor) < 35 && Math.random() < 0.1) R.timers.push(setTimeout(() => companionLine(`${p.short} resopla en el micro: «Ya veremos si sigo aquí en enero…»`, { temp: 14, aud: { vest: -1, dir: -1 } }), 1500));
     }
   }
@@ -966,6 +980,13 @@
     R.cur = null; stopClock();
     if (R.inTwist) { R.inTwist = false; a.react = settleTwist(S, a); }
     if (a.arc) { a.arc(S); if (S._affRx) { a.react = S._affRx; delete S._affRx; } }
+    if (a.nuke) {
+      R.nuked = a.nuke; R.bigForce = { score: -3, t: a.t, rep: R.rep }; const N = TL.News.fx, club = S.clubs[S.user];
+      if (a.nuke === 'pres') { N.board(S, -22); N.fans(S, 0.008); TL.News.add(S, 'polemica', `Bomba: ${S.manager} carga contra su presidente`, `«No tiene ni idea de fútbol. Ni de nada.» El técnico de ${club.name} incendia la sala de prensa.`, club.id, null, 'neg'); }
+      if (a.nuke === 'walk') { N.board(S, -8); TL.News.add(S, 'polemica', `${S.manager} tira el micrófono y se va`, `Escena insólita en la sala de prensa de ${club.name}. El vídeo ya da la vuelta al mundo.`, club.id, null, 'neg'); }
+      if (a.nuke === 'ref') { N.board(S, -10); const f = N.fineClub(S, S.user, 30000); R.log.fine = (R.log.fine || 0) + f; R.ban = true; TL.News.add(S, 'polemica', `Competición abre expediente a ${S.manager}`, `Insinúa un complot entre la prensa y los árbitros. Le puede caer sanción.`, club.id, null, 'neg'); }
+      R.temp = 100; R.walk = true;
+    }
     if (a.mule) { R.muleUsed = true; const u = useMule(S, R.c); a.g = u.g; a.react = u.react; }
     apply(S, a.fx, R.log);
     const cat = a.cat || 'eva', C = CATS[cat];
@@ -974,6 +995,7 @@
     const w = a.g === 0 ? 0.6 : 1;
     for (const k in C.aud) R.aud[k] += C.aud[k] * w * (a.silence ? 0 : 1);
     let score = (PREF[rep ? rep.t : 'serio'][cat] || 0) + ((a.g == null ? 1 : a.g) - 1) - (rep && rep.g >= 2 ? 1 : 0);
+    if (!a.silence && satOf(cat) >= 3) { score -= 1; a.react = a.react || pick(['«¡Siempre dice lo mismo!», se oye al fondo.', 'La sala bosteza: esa ya se la sabían.', 'Alguien hace como que ronca. Ese discurso está muy visto.']); }
     if (a.silence) score = -2;
     reaction(score, a);
     // En escena
@@ -1007,6 +1029,17 @@
   }
 
   // ---- Final: veredicto según a quién necesitabas contentar, y la portada de mañana
+  /** ¿Te echan por la rueda de prensa? Si la directiva cae muy abajo (o has cargado contra el presidente), sí. */
+  function fireCheck(S) {
+    const conf = S.board.conf;
+    const fire = conf <= 12 || (R.nuked === 'pres' && conf < 45 && Math.random() < 0.7);
+    if (!fire || S.fired) return false;
+    const club = S.clubs[S.user];
+    S.fired = true;
+    if (TL.Career) { TL.Career.cv(S); TL.Career.cvClose(S, 'fired'); if (!S.over) TL.Career.makeOffers(S, 'midseason'); }
+    TL.News.add(S, 'polemica', `${club.name} destituye a ${S.manager}`, 'La rueda de prensa fue la gota que colmó el vaso. El club anuncia el cese del técnico.', club.id, null, 'neg');
+    return true;
+  }
   function verdict2(S) {
     const club = S.clubs[S.user], N = TL.News.fx;
     const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
@@ -1018,7 +1051,9 @@
     R.log.board = (R.log.board || 0) + A0.dir * 0.6; R.log.team = (R.log.team || 0) + A0.vest * 0.5; R.log.fans = (R.log.fans || 0) + A0.afi * 0.0015;
     ps.rep = U.clamp(ps.rep + A0.sala * 2 - (R.walk ? 10 : 0), 0, 100);
     if (R.walk) {
-      N.board(S, -2);
+      N.board(S, R.nuked ? 0 : -5);
+      if (R.badN >= 3) N.board(S, -3);
+      if (fireCheck(S)) return { win: false, fired: true, title: 'Destituido', text: `${club.name} no aguanta más: la directiva te echa esta misma noche.` };
       TL.News.add(S, 'polemica', `${S.manager} abandona la rueda de prensa`, `El técnico de ${club.name} se levanta a mitad de las preguntas. La sala, en llamas.`, club.id, null, 'neg');
       return { win: false, title: 'Te has levantado y te has ido', text: 'La sala estaba al rojo vivo. Mañana se hablará más de tu salida que del partido.' };
     }
@@ -1028,11 +1063,12 @@
       TL.News.add(S, 'club', `${S.manager}, sobresaliente ante los micrófonos`, `El técnico de ${club.name} firmó una rueda de prensa impecable tras el partido.`, club.id, null, 'pos');
       return { win: true, title: 'Rueda de prensa redonda', text: `Has contentado a ${AUD[R.prio]}, que era lo que tocaba esta semana.` };
     }
+    if (R.temp >= 70 && fireCheck(S)) return { win: false, fired: true, title: 'Destituido', text: `${club.name} no aguanta más: la directiva te echa esta misma noche.` };
     if (R.temp >= 70) TL.News.add(S, 'polemica', `Rueda de prensa tensa de ${S.manager}`, `Las respuestas del técnico de ${club.name} no gustaron ni en la sala ni en el club.`, club.id, null, 'neg');
     return { win: false, title: R.temp >= 70 ? 'Se te ha ido de las manos' : 'No has convencido', text: A0[R.prio] < 1.2 ? `Esta semana necesitabas a ${AUD[R.prio]} y no te ha comprado el discurso.` : 'La sala ha acabado demasiado caliente.' };
   }
   function portada(S, v) {
-    const big = R.big || { t: '…', rep: { m: 'Diario Deportivo' }, score: 0 };
+    const big = R.bigForce || R.big || { t: '…', rep: { m: 'Diario Deportivo' }, score: 0 };
     const media = big.rep && big.rep.m ? big.rep.m : 'Diario Deportivo';
     const raw = big.t.replace(/^[^«]*«|»$/g, '').replace(/^«|»$/g, ''); const quote = raw.length > 95 ? raw.slice(0, 92) + '…' : raw;
     const d = TL.Events ? TL.Events.dateOf(S, TL.Events.st(S).d + 1) : new Date();
@@ -1048,11 +1084,16 @@
     const panel = document.querySelector('#prensa .pr-panel');
     const v = verdict2(S);
     const fame = muleSteps(S);
+    // La prensa se acuerda de tus estilos de siempre (se olvida poco a poco, antes con Discurso renovado)
+    const PS = S.pressStyle || (S.pressStyle = {});
+    for (const k in PS) PS[k] = Math.max(0, PS[k] - (1 + 0.6 * lv(S, 'pre5')));
+    for (const k in R.uses) PS[k] = (PS[k] || 0) + R.uses[k] * 1.2;
     // El que te acompaña sale desgastado: cuanto más larga y caliente la sala, más (y si le hiciste contestar, más aún)
     if (R.comp && S.players[R.comp.p.id]) {
       const p = S.players[R.comp.p.id];
       const n = R.goodN + R.badN + R.fu + 3;
-      const wear = Math.round(8 + n * 1.6 + (R.temp >= 70 ? 8 : 0) + (R.joker ? 0 : 5) + (R.comp.pers === 'timido' ? 5 : 0));
+      const wear = Math.round((8 + n * 1.6 + (R.temp >= 70 ? 8 : 0) + (R.joker ? 0 : 5) + (R.comp.pers === 'timido' ? 5 : 0)) * (1 + 0.6 * (R.comp.times || 0)) * (1 - 0.15 * lv(S, 'pre3')));
+      if (R.comp.times >= 1 && TL.News && TL.News.fx) TL.News.fx.mor(p, -Math.round(3 * R.comp.times * (1 - 0.25 * lv(S, 'pre3'))));
       p.fit = Math.max(35, (p.fit == null ? 100 : p.fit) - wear);
       if (R.temp >= 70 && TL.News && TL.News.fx) TL.News.fx.mor(p, -4);
       fame.push(wear >= 22 ? `${p.short} sale de la sala exprimido: le costará rendir en los próximos días.` : `${p.short} acaba cansado de tanto micrófono.`);
@@ -1061,8 +1102,9 @@
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>Fin de la rueda de prensa</small><span class="pr-v ${v.win ? 'win' : 'lose'}">${esc(v.title)}</span> ${esc(v.text)}`;
     panel.querySelector('.pr-as').innerHTML = portada(S, v) + `<ul class="pr-sum">${fame.map(x => `<li class="pr-fame">${esc(x)}</li>`).join('')}${summary(S, R.log).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
-      <button class="btn primary block" data-act="pr-close">Salir de la sala</button>`;
+      <button class="btn primary block" data-act="pr-close">${v.fired ? 'Recoger tus cosas' : 'Salir de la sala'}</button>`;
     burst(v.win ? 4 : 8);
+    if (v.fired) { const st = document.querySelector('#prensa .pr-stage'); if (st) st.classList.add('fired'); }
     G.save();
   }
   A['pr-close'] = () => {
@@ -1071,6 +1113,7 @@
     const root = el('prensa'); if (root) root.remove();
     const cb = R.onDone; R.onDone = null;
     if (cb) cb();
+    if (R.c && R.c.S.fired) { G.save(); UI.closeSheet && UI.closeSheet(); if (document.getElementById('match') && A['mv-close']) A['mv-close'](); else UI.render(false); }
   };
 
   /** Deforma el anuncio para que case con las esquinas reales de la pantalla (máscara): el lado izquierdo es más alto. */
