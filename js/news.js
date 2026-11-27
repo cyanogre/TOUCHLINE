@@ -16,7 +16,7 @@
   const CAT = {
     liga: 'Liga', fichajes: 'Fichajes', polemica: 'Polémica', arbitraje: 'Arbitraje', aficion: 'Afición',
     vestuario: 'Vestuario', sucesos: 'Sucesos', tribunales: 'Tribunales', dopaje: 'Dopaje', redes: 'Redes',
-    ocio: 'Vida nocturna', mercado: 'Mercado', club: 'Club', positivo: 'Buenas noticias', rumor: 'Rumores'
+    ocio: 'Vida nocturna', mercado: 'Mercado', club: 'Club', positivo: 'Buenas noticias', rumor: 'Rumores', opinion: 'Opinión'
   };
 
   const g = (S, m, f) => (S.gender === 'F' ? f : m);

@@ -277,7 +277,13 @@
       out.push(pool.splice(k, 1)[0].q);
     }
     out.sort((a, b) => (RESULT.includes(b.id) ? 1 : 0) - (RESULT.includes(a.id) ? 1 : 0));
-    return out;
+    // Tu personalidad tiene su propia historia (el mote, sus capítulos) y a veces te preguntan de sociedad
+    const PE = TL.Persona;
+    if (PE) {
+      const sq = PE.socQ(c.S); if (sq) out.splice(Math.min(out.length, 2 + Math.floor(Math.random() * 2)), 0, sq);
+      const pq = PE.pressQ(c.S, c); if (pq) out.splice(Math.min(1, out.length), 0, pq);
+    }
+    return out.slice(0, N_QUESTIONS + 1);
   }
   // Frases de base (data/game/prensa-frases-*.js): otras formas de preguntar y de responder cada cosa.
   const ES = () => !TL.I18N || TL.I18N.lang === 'es';
@@ -396,6 +402,7 @@
     const calm = lv(S, 'pre1') * 0.08 + lv(S, 'dis3') * 0.05;
     if (Math.random() < Math.max(0.05, a.risk + dr - calm)) {
       a.exposed = true;
+      if (TL.Persona) TL.Persona.signal(S, 'lio');
       const N = TL.News.fx;
       N.board(S, -3); N.fans(S, -0.006); N.teamMor(S, -2);
       if (p) { N.mor(p, -15); p.listed = true; }
@@ -614,7 +621,7 @@
     R.log.twistBad = R.twisted;
     const hot = R.twistHot && /físico|Espectacular/.test(R.twisted);
     if (!S.romance && R.twistPid != null && S.players[R.twistPid] && S.players[R.twistPid].club === S.user && (hot ? Math.random() < 0.3 : Math.random() < 0.04))
-      S.romance = { pid: R.twistPid, stage: 1, w: S.week, s: S.season, aff: 0 };
+      { S.romance = { pid: R.twistPid, stage: 1, w: S.week, s: S.season, aff: 0 }; if (TL.Persona) TL.Persona.signal(S, 'flechazo'); }
     return 'Mañana estará en todas partes.';
   }
 
@@ -745,7 +752,7 @@
     R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null;
     R.muleUsed = false; R.twisted = null; R.inTwist = false; R.fu = 0; R.follow = null;
     R.en = 100 + 15 * lv(S, 'pre1'); R.uses = {}; R.temp = 25; R.aud = { vest: 0, dir: 0, afi: 0, sala: 0 };
-    R.bigForce = null; R.nuked = null; R.ban = false; R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
+    R.bigForce = null; R.nuked = null; R.nickUsed = false; R.ban = false; R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
     // Lo que más necesitas esta semana: lo que peor está
     const conf = S.board.conf, fan = TL.Hud ? TL.Hud.fansOpinion(S) : 50, mood = TL.Hud ? TL.Hud.squadMood(S) : 60;
     R.prio = conf <= fan && conf <= mood ? 'dir' : fan <= mood ? 'afi' : 'vest';
@@ -805,6 +812,7 @@
   A['pr-comp'] = b => {
     const k = +b.dataset.k, S = R.c.S;
     R.comp = k >= 0 ? R.cand[k] : null;
+    if (TL.Persona && !R.comp) TL.Persona.signal(S, 'solo');
     if (R.comp) {
       const st = document.querySelector('#prensa .pr-stage');
       const kc = kitCss(S.clubs[S.user]);
@@ -850,7 +858,7 @@
 
   const satOf = cat => Math.floor(((R.c && R.c.S.pressStyle) || {})[cat] || 0);
   function capOf(cat) { return CATS[cat].cap + (lv(R.c.S, 'pre4') >= 2 ? 1 : 0) - (satOf(cat) >= 4 ? 1 : 0); }
-  function costOf(cat, extra) { return CATS[cat].cost + (6 - 1.5 * lv(R.c.S, 'pre4')) * (R.uses[cat] || 0) + 3 * satOf(cat) + (extra || 0); }
+  function costOf(cat, extra) { return Math.max(4, CATS[cat].cost + (6 - 1.5 * lv(R.c.S, 'pre4')) * (R.uses[cat] || 0) + 3 * satOf(cat) + (extra || 0) + (TL.Persona ? TL.Persona.costMod(R.c.S, cat) : 0)); }
   function btnHtml(a, k, extra) {
     const cat = a.cat, C = CATS[cat], used = R.uses[cat] || 0, cost = costOf(cat, extra);
     const out = used >= capOf(cat), poor = R.en < cost;
@@ -883,6 +891,8 @@
       if (!q) return end();
       rep = reporter();
       qtxt = dressQ(qText(q, c));
+      const nick = TL.Persona && !q.persona && TL.Persona.nickname(S);
+      if (nick && !R.nickUsed && Math.random() < 0.3) R.nickUsed = true, qtxt = `Míster —o «${nick}», como ya le llaman—: ${qtxt.charAt(0).toLowerCase()}${qtxt.slice(1)}`;
       const o = options(S, q, c);
       opts = o.shown; locked = o.locked;
       tag = `${R.k + 1}/${R.qs.length}`;
@@ -909,7 +919,7 @@
       + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(TL.t ? TL.t(skillName(a.need[0])) : skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
     // Sin fuerzas para nada: te quedas en blanco
     if (!R.cur.some(a => (R.uses[a.cat] || 0) < capOf(a.cat) && R.en >= costOf(a.cat, extra))) {
-      R.timers.push(setTimeout(() => answer({ t: '… (te quedas en blanco)', cat: 'eva', g: 0, silence: true, fx: {} }), 1400));
+      R.timers.push(setTimeout(() => answer({ t: '… (te quedas en blanco)', cat: 'eva', g: 0, silence: true, blank: true, fx: {} }), 1400));
       return;
     }
     flash();
@@ -937,6 +947,7 @@
     if (!R.cur || !R.joker || !R.comp) return;
     R.joker = 0; stopClock();
     const P = R.comp.pers, p = R.comp.p, rep = R.rep;
+    if (TL.Persona) TL.Persona.signal(R.c.S, { comodin: 1, ['comodin_' + P]: 1 });
     const L = {
       lider: [`${p.short}: «Esto lo arreglamos dentro y lo demostramos el domingo. Todos a una.»`, { temp: -15, aud: { vest: 1.5, dir: 0.5 } }, 2],
       profesional: [`${p.short}: «Hemos hablado mucho de esto. Sabemos qué corregir y lo vamos a corregir.»`, { temp: -8, aud: { dir: 0.8, sala: 0.5 } }, 1],
@@ -978,7 +989,7 @@
   function answer(a) {
     const S = R.c.S, rep = R.rep;
     R.cur = null; stopClock();
-    if (R.inTwist) { R.inTwist = false; a.react = settleTwist(S, a); }
+    if (R.inTwist) { R.inTwist = false; R.inTwistDone = true; a.react = settleTwist(S, a); }
     if (a.arc) { a.arc(S); if (S._affRx) { a.react = S._affRx; delete S._affRx; } }
     if (a.nuke) {
       R.nuked = a.nuke; R.bigForce = { score: -3, t: a.t, rep: R.rep }; const N = TL.News.fx, club = S.clubs[S.user];
@@ -990,6 +1001,13 @@
     if (a.mule) { R.muleUsed = true; const u = useMule(S, R.c); a.g = u.g; a.react = u.react; }
     apply(S, a.fx, R.log);
     const cat = a.cat || 'eva', C = CATS[cat];
+    // Lo que dices va dejando rastro en tu personalidad (oculta)
+    const PE = TL.Persona;
+    if (PE) {
+      if (a.silence) PE.signal(S, 'silencio', a.blank ? 0.3 : 1);   // quedarse sin fuerzas no es timidez; callarse a propósito, sí
+      else { PE.signal(S, 'estilo:' + cat); if (a.nuke) PE.signal(S, 'nuke:' + a.nuke); if (a.sig) PE.signal(S, a.sig); if (a.mule) PE.signal(S, 'muletilla'); }
+      if (R.inTwistDone) { PE.signal(S, cat === 'pol' ? 'twist_echa' : cat === 'tec' ? 'twist_desmonta' : 'estilo:' + cat, 0.5); R.inTwistDone = false; }
+    }
     R.en -= a.silence ? 0 : costOf(cat, rep && rep.g >= 2 ? 6 : 0);
     R.uses[cat] = (R.uses[cat] || 0) + 1;
     const w = a.g === 0 ? 0.6 : 1;
@@ -1036,6 +1054,7 @@
     if (!fire || S.fired) return false;
     const club = S.clubs[S.user];
     S.fired = true;
+    if (TL.Persona) TL.Persona.milestone(S, 'despido');
     if (TL.Career) { TL.Career.cv(S); TL.Career.cvClose(S, 'fired'); if (!S.over) TL.Career.makeOffers(S, 'midseason'); }
     TL.News.add(S, 'polemica', `${club.name} destituye a ${S.manager}`, 'La rueda de prensa fue la gota que colmó el vaso. El club anuncia el cese del técnico.', club.id, null, 'neg');
     return true;
@@ -1328,6 +1347,7 @@
     const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
     ps.skipped++;
     if (lv(S, 'pre2') >= 1) return 'El jefe de prensa atiende a los medios por ti.';
+    if (TL.Persona) TL.Persona.signal(S, 'plantar');
     ps.rep = Math.max(0, ps.rep - 5);
     const N = TL.News && TL.News.fx;
     if (N) { N.board(S, -1.2); N.fans(S, -0.002); }

@@ -136,6 +136,7 @@
         (S.hud || (S.hud = [])).push({ w: S.week, s: S.season, conf: S.board.conf, fans: S.com ? S.com.fans : 0, mor: Math.round(mor), gf: mine, ga: opp });
         if (S.hud.length > 40) S.hud.shift();
         TL.Career.cvMatch(S, mine, opp, oppId);
+        if (TL.Persona) TL.Persona.weekly(S, mine, opp);
         if (TL.Movil) TL.Movil.weekly(S);
       }
       TL.Manager.addXp(S, (mine > opp ? 25 : mine === opp ? 10 : 4) + mine + (opp === 0 ? 5 : 0) + Math.max(0, Math.round(repGap * 2)));
@@ -297,6 +298,7 @@
     });
     TL.Cups.seasonEnd(S, sum);
     TL.Career.cv(S); TL.Career.cvSeason(S, sum);
+    if (TL.Persona) { if (sum.pos === 1) TL.Persona.signal(S, 'titulo'); if (sum.moved === 'up') TL.Persona.signal(S, 'ascenso'); }
 
     if (S.board.conf < 15) { S.fired = true; sum.fired = true; TL.Career.cvClose(S, 'fired'); }
     // Reputación del mánager y ofertas de trabajo de otros clubes

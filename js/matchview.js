@@ -438,6 +438,7 @@
   function onFinal() {
     clearTimeout(MV.timer);
     MV.finished = true;
+    if (TL.Persona && MV.m && MV.m.coachOff && !MV.persoRed) { MV.persoRed = true; TL.Persona.signal(G.S, 'roja_tecnico'); }
     if (TL.Balls && MV.me != null) { const nw = TL.Balls.addMatch(MV.m, MV.me); if (nw.length) setTimeout(() => UI.toast(`🏆 ¡Logro: ${nw[0].name}!${nw.length > 1 ? ` (+${nw.length - 1})` : ''} El Profe te lo cuenta al salir`), 1500); }
     const fin = () => {
       if (!MV.pitch || !MV.m) return;
@@ -697,6 +698,7 @@
       text = `Reclamas ${R.what} en la banda. La grada se pone de tu parte y el árbitro toma nota.`;
     } else text = `Reclamas ${R.what}, pero el cuarto árbitro te pide calma.`;
     (m.protests || (m.protests = [])).push({ min: m.min, what: R.what, right: !R.truth, card });   // para la rueda de prensa
+    if (TL.Persona) TL.Persona.signal(G.S, R.truth ? { protesta: 1, protesta_mal: 1 } : 'protesta');
     if (card && P && P.ref) { P.ref.state = 'card'; P.ref.card = card; P.ref.until = P.t + 1.6; }
     addEvent({ min: m.min, add: m.extra, type: card === 'red' ? 'coachRed' : card ? 'coachYellow' : 'protest', team: me, text });
     clearTimeout(MV.refTimer);
