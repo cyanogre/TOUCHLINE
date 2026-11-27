@@ -533,6 +533,16 @@ details summary { list-style: revert; }
 .pips { display: inline-flex; gap: 4px; }
 .pips i { width: 14px; height: 6px; border-radius: 3px; background: var(--line); }
 .pips i.on { background: var(--accent); }
+.pips i.off { background: #6b5a8a; }
+/* Tu sello: la rama que depende de quién eres */
+.branch.sello { background: linear-gradient(160deg, rgba(150, 90, 220, 0.12), transparent 55%), var(--card, var(--bg1)); border-color: rgba(170, 120, 240, 0.35); }
+.branch.sello .sello-intro { margin: -2px 0 4px; }
+.branch .skill.secret { border-style: dashed; }
+.branch .skill.secret b { letter-spacing: 3px; color: var(--muted, #9aa); }
+.branch .skill.secret .note { font-style: italic; }
+.branch .skill.asleep { opacity: 0.7; border-color: #6b5a8a; }
+.branch .skill.closed { border-color: rgba(230, 80, 80, 0.45); background: repeating-linear-gradient(135deg, rgba(230, 80, 80, 0.06) 0 8px, transparent 8px 16px), var(--bg2); }
+.branch .closed-why { color: #e88 !important; }
 .mgr-badge {
   width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; flex: none;
   font-size: 30px; font-weight: 800; color: var(--accent-ink); background: linear-gradient(145deg, #d6ff7a, #7fc23a);
@@ -1946,3 +1956,62 @@ body.shake-s { animation: shake-s .35s; }
 .bio li{position:relative;padding:4px 0 6px 12px;font:italic 14px Georgia,serif;color:#fde68a}
 .bio li::before{content:'';position:absolute;left:-6px;top:10px;width:10px;height:10px;border-radius:50%;background:#fde68a}
 .bio li span{display:block;font:10px ui-monospace,monospace;opacity:.6;color:var(--text);font-style:normal}
+
+/* ---- Rueda de prensa previa: invitación antes de los partidos grandes */
+.pv-inv { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 16px; background: rgb(4 8 6 / .72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .25s ease; }
+.pv-inv.on { opacity: 1; }
+.pv-card { width: min(420px, 100%); border-radius: 18px; padding: 18px 16px 14px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--c1) 35%, transparent), transparent 60%), linear-gradient(170deg, #142019, #0a120e);
+  border: 1px solid color-mix(in srgb, var(--c1) 45%, #2b3a31); box-shadow: 0 20px 60px rgb(0 0 0 / .55); transform: translateY(14px) scale(.97); transition: transform .3s cubic-bezier(.2, .9, .3, 1.2); }
+.pv-inv.on .pv-card { transform: none; }
+.pv-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 1px, transparent 1px 3px); }
+.pv-tag { display: inline-flex; align-items: center; gap: 6px; font: 800 11px var(--font-c), sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #ffd0d0;
+  background: rgb(255 59 59 / .14); border: 1px solid rgb(255 59 59 / .35); border-radius: 999px; padding: 3px 9px; }
+.pv-tag i { width: 7px; height: 7px; border-radius: 50%; background: #ff3b3b; animation: prBlink 1.2s steps(2) infinite; }
+.pv-card h3 { margin: 10px 0 6px; font: 800 20px/1.15 var(--font-c), sans-serif; }
+.pv-vs { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 8px 0 10px; font: 800 18px var(--font-c), sans-serif; }
+.pv-vs b { padding: 6px 10px; border-radius: 10px; background: rgb(255 255 255 / .06); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%; }
+.pv-vs em { font-style: normal; color: var(--c2, #ccc); opacity: .8; font-size: 13px; letter-spacing: .1em; }
+.pv-card .btn { margin-top: 8px; }
+.pv-card .pv-skip { flex-direction: column; gap: 2px; }
+.pv-card .pv-skip small { display: block; font-size: 11px; opacity: .7; letter-spacing: .02em; }
+.prensa.previa .pr-live { background: rgb(120 20 20 / .55); }
+.bio li.cap{font:700 16px/1.25 Georgia,serif;color:#fff3c4;padding-top:8px}
+.bio li.cap::before{width:14px;height:14px;left:-8px;top:12px;background:#fff3c4;box-shadow:0 0 10px rgba(253,230,138,.7)}
+
+/* ---- Entrevista de fin de temporada con Garrido (El Balcón): papel de periódico, serif y café */
+.gar { position: fixed; inset: 0; z-index: 74; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: rgb(10 8 6 / .78);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; transition: opacity .3s ease; }
+.gar.on { opacity: 1; }
+.gar-card { width: min(520px, 100%); color: #2a2118; background: #f3ead8; border-radius: 6px; padding: 16px 16px 14px; position: relative;
+  box-shadow: 0 24px 70px rgb(0 0 0 / .6), inset 0 0 60px rgb(120 90 40 / .18); transform: rotate(-.4deg) translateY(10px); transition: transform .35s cubic-bezier(.2, .9, .3, 1.2);
+  background-image: radial-gradient(circle at 85% 12%, rgb(120 80 30 / .12) 0 38px, transparent 39px), radial-gradient(circle at 85% 12%, transparent 30px, rgb(120 80 30 / .1) 31px 34px, transparent 35px); }
+.gar.on .gar-card { transform: rotate(-.4deg); }
+.gar-mast { font: 900 26px/1 Georgia, 'Times New Roman', serif; letter-spacing: .02em; border-bottom: 3px double #2a2118; padding-bottom: 6px; }
+.gar-mast small { display: block; font: italic 12px Georgia, serif; letter-spacing: 0; margin-top: 4px; opacity: .75; }
+.gar-who { display: flex; align-items: center; gap: 10px; margin: 10px 0 6px; }
+.gar-who b { display: block; font: 700 15px Georgia, serif; }
+.gar-who small { font: italic 12px Georgia, serif; opacity: .7; }
+.gar-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #2a2118; color: #f3ead8; font: 700 14px Georgia, serif; font-style: normal; flex: none; }
+.gar-n { margin-left: auto; font: 11px ui-monospace, monospace; opacity: .6; }
+.gar-intro { font: italic 14px/1.45 Georgia, serif; margin: 4px 0 10px; opacity: .85; }
+.gar-q { font: 700 18px/1.3 Georgia, serif; margin: 6px 0 10px; }
+.gar-q::before { content: '— '; }
+.gar-q.done { font-size: 14px; opacity: .6; }
+.gar .gar-a { background: #fffaf0; color: #2a2118; border: 1px solid #cdbb98; text-align: left; font: 15px/1.35 Georgia, serif; text-transform: none; letter-spacing: 0; margin-top: 8px; display: block; }
+.gar .gar-a small { display: block; margin-top: 4px; font: 600 11px var(--font-c), sans-serif; letter-spacing: .06em; text-transform: uppercase; opacity: .65; }
+.gar .gar-a:active { transform: translateY(1px); }
+.gar-me { margin: 6px 0; padding: 8px 12px; border-left: 3px solid #a8842f; font: italic 16px/1.4 Georgia, serif; background: rgb(168 132 47 / .08); }
+.gar-r { font: 14px/1.45 Georgia, serif; margin: 8px 0 12px; }
+.gar-chap { text-align: center; padding: 10px 0 6px; border-top: 1px solid #cdbb98; border-bottom: 1px solid #cdbb98; margin: 6px 0 10px; }
+.gar-chap small { font: 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; opacity: .65; }
+.gar-chap h3 { margin: 6px 0 0; font: 900 24px/1.15 Georgia, serif; animation: garInk 1.2s ease both; }
+@keyframes garInk { from { opacity: 0; letter-spacing: .2em; filter: blur(3px); } to { opacity: 1; letter-spacing: 0; filter: none; } }
+.gar-col { font: 15px/1.55 Georgia, serif; text-align: justify; hyphens: auto; }
+.gar-col::first-letter { float: left; font: 900 42px/.85 Georgia, serif; margin: 4px 6px 0 0; }
+.gar-sign { font: italic 13px Georgia, serif; text-align: right; opacity: .75; margin: 4px 0 12px; }
+.gar .btn.primary { margin-top: 4px; }
+.gar-btn small { display: block; font-size: 11px; opacity: .7; text-transform: none; letter-spacing: 0; }
+.gar-btn { flex-direction: column; }
+.gar-done { font-family: Georgia, serif; font-style: italic; }

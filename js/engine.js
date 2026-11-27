@@ -383,11 +383,23 @@
   /** Lo que dijiste en rueda de prensa calienta al rival: en el próximo partido contra ti sale algo más
    *  motivado (una vez; luego se olvida). */
   function prensaBoost(S, clubId, isUser) {
+    let k = 1;
+    // La rueda de prensa previa (partidos grandes): los tuyos salen enchufados o con dudas, y el rival, picado o no.
+    // Vale para el partido que tocaba esa jornada y se gasta al usarlo.
+    const pr = S.prensaPre;
+    if (pr) {
+      if (pr.season !== S.season || pr.week !== S.week) delete S.prensaPre;
+      else {
+        if (isUser && !pr.ownUsed) { k *= pr.own; pr.ownUsed = true; }
+        if (!isUser && clubId === pr.club && !pr.rivUsed) { k *= pr.rival; pr.rivUsed = true; }
+        if (pr.ownUsed && pr.rivUsed) delete S.prensaPre;
+      }
+    }
     const r = S.prensaRival;
-    if (isUser || !r || r.club !== clubId) return 1;
-    if (S.season !== r.season) { delete S.prensaRival; return 1; }
+    if (isUser || !r || r.club !== clubId) return k;
+    if (S.season !== r.season) { delete S.prensaRival; return k; }
     delete S.prensaRival;
-    return 1.025;
+    return k * 1.025;
   }
 
   class Match {
@@ -491,7 +503,8 @@
     _strength(i) {
       const t = this.teams[i];
       const b = this.bonus[i];
-      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1) * (t.reorg && this.min < t.reorg ? REORG_MULT : 1);
+      const mult = t.boost * b.teamBoost * (t.bigGame ? 1 + b.bigGame : 1) * (t.day || 1) * (t.reorg && this.min < t.reorg ? REORG_MULT : 1)
+        * (t.surge && this.min <= t.surge.until ? t.surge.k : 1);   // la grada empuja un rato (Tu sello: Trinchera)
       const LK = TL.Locker;
       let tm = 1, extra = { mid: 0, att: 0, def: 0 };
       if (LK && this.S.lk) {

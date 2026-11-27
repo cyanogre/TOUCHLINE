@@ -12,6 +12,18 @@
 | `peligro` | Estás a punto de palmarla: la directiva casi sin confianza o en zona de descenso | Oscura, nerviosa, cuenta atrás |
 | `fin-de-temporada` | Resumen de la temporada | Cierre emotivo, de balance |
 
+## La sala de prensa
+
+Estas carpetas no son momentos de la carrera, sino escenas: mientras estás en la sala de prensa, mandan sobre todo lo demás. Al salir, vuelve la música que tocaba.
+
+| Carpeta | Cuándo suena | Qué hay ahora |
+|---|---|---|
+| `prensa` | La rueda de prensa después del partido | `1.mp3`: «Matchday Melody» |
+| `prensa-tensa` | Cuando la sala se calienta (y hasta que se enfría) | `1.mp3`: «Pressroom Tension» |
+| `prensa-previa` | La rueda de prensa previa a un partido grande (copa, top contra top, duelo directo, recta final) | `1.mp3`: «Pre-Match Jazz» |
+
+Para meter más, súbelas con el siguiente número: `prensa/2.mp3`, `prensa-tensa/2.mp3`, `prensa-previa/2.mp3`… (hasta 12 por carpeta). Si `prensa-previa` o `prensa-tensa` están vacías, suena la de `prensa`.
+
 ## Cómo se comporta
 
 - **Prioridad:** si estás en peligro, manda el peligro. Si no, la racha. Si no, el momento de la temporada.

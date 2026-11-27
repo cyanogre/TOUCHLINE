@@ -48,6 +48,17 @@
   }
   /** Rasgos: la principal y hasta dos secundarias (para matices). */
   function traits(S) { return ranking(S).filter(x => x[1] >= MIN_PTS * 0.6).slice(0, 3).map(x => x[0]); }
+  /** ¿Eres así, y ya se te nota fuera? ids: una personalidad o varias. Cuenta la principal y las secundarias que
+   *  alguna vez se destaparon (rev ≥ minRev: 1 = Garrido ya lo insinuó · 2 = ya tienes mote). */
+  function is(S, ids, minRev) {
+    if (!S || S.mode === 'tour') return false;
+    const s = st(S), list = [].concat(ids), mr = minRev == null ? 1 : minRev;
+    const d = dominant(S);
+    if (d && list.includes(d) && (s.rev[d] || 0) >= mr) return true;
+    return traits(S).some(t => t !== d && list.includes(t) && (s.rev[t] || 0) >= mr);
+  }
+  /** Tu personalidad pública (la principal, si ya tiene mote), o null. */
+  function known(S) { const d = dominant(S); return d && (st(S).rev[d] || 0) >= 2 ? d : null; }
 
   // ------------------------------------------------------------ Textos
   function moteOf(S, id) {
@@ -62,7 +73,7 @@
     return String(t).replace(/\{(\w+)\}/g, (m, k) => ({
       mote: id ? moteOf(S, id) : '', club: club ? club.name : '', yo: S.manager || 'el míster',
       rival: ex.rival || 'el rival', pres: 'el presidente'
-    })[k] ?? m);
+    })[k] ?? m).replace(/\b([Dd])e el /g, '$1el ').replace(/\b([Aa]) el /g, '$1l ');   // «de el Invisible» → «del Invisible»
   }
   const bio = (S, t) => { const s = st(S); s.bio.push({ s: S.season, w: S.week, t }); if (s.bio.length > 40) s.bio.shift(); };
   function column(S, text, title) {
@@ -130,14 +141,14 @@
     if (!pe || !P[pe.id]) return null;
     const p = P[pe.id], id = pe.id, ex = { rival: c && c.opp ? c.opp.name : '' };
     if (pe.type === 'mote') {
-      return { id: 'per_mote', persona: true, w: () => 99, q: () => fill(S, p.mote.q, id, ex), o: () => p.mote.a.map(a => ({
+      return { id: 'per_mote', vkey: 'mote:' + id, vfill: t => fill(S, t, id, ex), persona: true, w: () => 99, q: () => fill(S, p.mote.q, id, ex), o: () => p.mote.a.map(a => ({
         t: fill(S, a.t, id, ex), cat: a.cat, g: 1, fx: {},
         arc: S2 => { signal(S2, { [id]: a.abraza ? 3 : -3 }); const s2 = st(S2); s2.rev[id] = 2; s2.pend = null; }
       })) };
     }
     const cap = p.caps[pe.k];
     if (!cap) { s.pend = null; return null; }
-    return { id: 'per_cap', persona: true, w: () => 99, q: () => fill(S, cap.q, id, ex), o: () => cap.o.map(a => ({
+    return { id: 'per_cap', vkey: `cap:${id}:${pe.k}`, vfill: t => fill(S, t, id, ex), persona: true, w: () => 99, q: () => fill(S, cap.q, id, ex), o: () => cap.o.map(a => ({
       t: fill(S, a.t, id, ex), cat: a.cat, g: a.fx && (a.fx.board || 0) < -1.5 ? 0 : 1, fx: a.fx || {},
       arc: S2 => {
         if (a.sig) signal(S2, a.sig);
@@ -154,7 +165,7 @@
     const pool = L.filter(q => !s.soc.includes(q.id));
     const q = pick(pool.length ? pool : L);
     s.soc.push(q.id); if (s.soc.length > 8) s.soc.shift();
-    return { id: 'soc', w: () => 99, q: () => q.q, o: () => q.o.map(a => ({ t: a.t, cat: a.cat, g: a.g, fx: a.fx || {}, sig: a.sig })) };
+    return { id: 'soc', vkey: 'soc:' + q.id, vfill: t => fill(S, t, null), w: () => 99, q: () => q.q, o: () => q.o.map(a => ({ t: a.t, cat: a.cat, g: a.g, fx: a.fx || {}, sig: a.sig })) };
   }
   /** Coste de un estilo según quién eres: lo natural cuesta menos; lo contrario, mucho más. */
   function costMod(S, cat) {
@@ -169,7 +180,9 @@
     return d && (s.rev[d] || 0) >= 2 ? moteOf(S, d) : null;
   }
   function bioList(S) { return st(S).bio.slice(); }
+  /** El título del capítulo de una temporada (lo escribe Garrido en la entrevista de fin de temporada). */
+  function chapter(S, season, title) { const s = st(S); s.bio.push({ s: season, w: 0, t: title, cap: true }); if (s.bio.length > 40) s.bio.shift(); }
   function milestone(S, key) { const G = DB().garrido; if (G && G.biografia[key]) bio(S, fill(S, pick(G.biografia[key]), st(S).dom)); }
 
-  TL.Persona = { st, signal, ranking, dominant, traits, weekly, pressQ, socQ, costMod, nickname, bioList, milestone, moteOf };
+  TL.Persona = { st, signal, ranking, dominant, traits, is, known, weekly, pressQ, socQ, costMod, nickname, bioList, milestone, moteOf, chapter, column, fill };
 })();

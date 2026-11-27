@@ -78,192 +78,129 @@
   }
 
   // ------------------------------------------------------------ Preguntas
-  // Opción: { t, g: 2 buena · 1 regular · 0 mala, need: [habilidad, nivel], fx: { team, pl: [pid, d], board, fans, fine: [p, €], rival, rivalClub } }
-  const name = (c, id) => c.S.players[id].short;
-  const QS = [
-    { id: 'win', w: c => (c.diff > 0 ? 3 : 0), q: c => `Tres puntos ante el ${c.opp.name}. ¿Se va a casa con una sonrisa o con la libreta llena de deberes?`, o: c => [
-      { t: 'Hoy mis jugadores han dejado el alma en el césped. Yo solo he puesto la corbata.', g: 2, fx: { team: 1.5 } },
-      { t: 'Contento, sí. Pero esta noche veré el partido otra vez y no voy a dormir mucho.', g: 1, fx: { board: 0.5 } },
-      { t: 'Hoy les hemos hecho un unboxing. No había color, tremendo.', g: c.diff >= 3 ? 1 : 0, fx: { fans: 0.004, rival: 1, rivalClub: c.opp } },
-      { t: 'Este grupo tiene un aura que no se compra. Y aún estamos en modo tutorial.', g: 2, need: ['mot1', 2], fx: { team: 2.5, fans: 0.004 } }] },
-    { id: 'draw', w: c => (c.diff === 0 ? 3 : 0), q: c => `Un punto ante el ${c.opp.name}. ¿Vaso medio lleno o medio vacío?`, o: c => [
-      { t: 'Medio lleno. En mayo, los puntos que hoy parecen pequeños pesan como piedras.', g: 2, fx: { team: 1 } },
-      { t: 'Medio vacío. Ni tan mal, pero no me renta.', g: 1, fx: { board: 0.3 } },
-      { t: 'El árbitro hoy tenía el mando en la mano. Red flag.', g: c.refMine.length ? 1 : 0, fx: { fine: [0.35, 5000], fans: 0.003 } },
-      { t: 'Sabe a poco, y eso me encanta: hace un año esto nos habría sabido a gloria.', g: 2, need: ['tac2', 1], fx: { team: 1.5, board: 0.8 } }] },
-    { id: 'loss', w: c => (c.diff < 0 && c.diff > -3 ? 3 : 0), q: c => `${c.ga}-${c.gf}. ¿Dónde se ha perdido hoy el partido?`, o: () => [
-      { t: 'Se ha perdido en mi pizarra. Los palos, para mí; a los chavales, ni tocarlos.', g: 2, fx: { team: 1.5, board: -0.3 } },
-      { t: 'Alguno hoy ha jugado en modo avión. Y lo sabe.', g: 0, fx: { team: -3 } },
-      { t: 'Día random. Mañana café cargado y a seguir.', g: 1, fx: { team: 0.5 } },
-      { t: 'En tres detalles. Los tengo apuntados aquí, y el martes los vamos a machacar.', g: 2, need: ['tac1', 2], fx: { team: 1, board: 1 } }] },
-    { id: 'thrash', w: c => (c.diff <= -3 ? 4 : 0), q: c => `${c.ga}-${c.gf}. ¿Le han pasado por encima?`, o: () => [
-      { t: 'Nos han pasado por encima, literal. A la gente que ha venido: perdón, de corazón.', g: 2, fx: { fans: 0.003, team: 0.5 } },
-      { t: 'Esta camiseta pesa, y hoy a alguno le quedaba oversize.', g: 0, fx: { team: -3.5, board: 0.5 } },
-      { t: 'Cero dramas. Un mal día lo tiene cualquiera, hasta Spotify se cae.', g: 0, fx: { board: -1 } },
-      { t: 'Esto escuece, y quiero que escueza. Que nadie duerma bien hoy: mañana a las ocho, todos aquí.', g: 2, need: ['mot3', 1], fx: { team: 1.5, board: 1, fans: 0.003 } }] },
+  // Las preguntas son datos (data/game/prensa/partido.js); aquí solo está el intérprete que las convierte en
+  // preguntas de verdad: cuándo salen, con qué peso, qué texto y qué efectos según lo que ha pasado.
+  // Opción ya resuelta: { t, g: 2 buena · 1 regular · 0 mala, need: [habilidad, nivel], cat, sig, fx: { team, pl: [pid, d], board, fans, fine: [p, €], rival, rivalClub } }
+  const some = (a, f) => (a || []).some(f);
+  const FLAGS = {
+    win: c => c.diff > 0, draw: c => c.diff === 0, loss: c => c.diff < 0 && c.diff > -3, thrash: c => c.diff <= -3, lost: c => c.diff < 0,
+    goleada: c => c.diff >= 3, ahead: c => c.diff >= 0, cup: c => c.cup,
+    protests: c => c.protests.length > 0 && !c.coachRed, protestRight: c => some(c.protests, p => p.right) && !some(c.protests, p => !p.right),
+    protestWrong: c => some(c.protests, p => !p.right), protestCard: c => some(c.protests, p => p.card),
+    coachRed: c => c.coachRed, refMine: c => c.refMine.length > 0, refNoProtest: c => c.refMine.length > 0 && !c.protests.length,
+    lateLost: c => c.lateLost, penMiss: c => c.penMiss != null, og: c => c.og != null, bigMissLoss: c => c.bigMiss >= 2 && c.diff <= 0,
+    red: c => c.reds.length > 0, subGoal: c => c.subScorer != null, noSubs: c => c.noSubs, tactic: c => c.tactic,
+    comeback: c => c.comeback, lateWin: c => c.lateWin != null, hat: c => c.hat != null, star: c => c.star != null && c.hat == null,
+    kid: c => c.kid != null, clean: c => c.clean, cleanWin: c => c.clean && c.diff > 0, bolt: c => c.bolt != null,
+    crowd: c => !!c.crowd, crowdParty: c => !!(c.crowd && c.crowd.party), inj: c => c.inj.length > 0,
+    signing: c => !!c.feed.signing, signingPlayed: c => !!(c.feed.signing && c.m.pl[c.feed.signing.pid] && c.m.pl[c.feed.signing.pid].team === c.me),
+    sale: c => !!c.feed.sale, staff: c => !!c.feed.staff, sponsorR: c => !!(c.feed.sponsor && c.feed.sponsor.risky),
+    sponsor: c => !!(c.feed.sponsor && !c.feed.sponsor.risky), campaign: c => !!c.feed.campaign, next: c => !!c.next,
+    boardLow: c => !!(c.S.board && c.S.board.conf < 40)
+  };
+  /** ¿Se cumple la situación? Una clave, '!clave' (negada) o una lista (todas). Las claves que no existen no se cumplen. */
+  function when(c, cond, flags) {
+    if (cond == null) return true;
+    if (Array.isArray(cond)) return cond.every(k => when(c, k, flags));
+    const neg = cond[0] === '!', k = neg ? cond.slice(1) : cond, f = (flags || FLAGS)[k];
+    const v = f ? !!f(c) : false;
+    return neg ? !v : v;
+  }
+  const pesoOf = (c, p, flags) => (typeof p === 'number' ? p : p && p.si ? (when(c, p.si, flags) ? p.n : p.no) : 1);
+  // '@penMiss' → el jugador de esa situación; '@opp' / '@next' → el club
+  function pidOf(ref, c) {
+    const f = c.feed, k = String(ref).replace(/^@/, '');
+    const m = { penMiss: c.penMiss, og: c.og, red: c.reds && c.reds[0], subGoal: c.subScorer, hat: c.hat, star: c.star, kid: c.kid, inj: c.inj && c.inj[0],
+      bolt: c.bolt, signing: f && f.signing && f.signing.pid, sale: f && f.sale && f.sale.pid, lateWin: c.lateWin, guest: c.guest };
+    return m[k];
+  }
+  function fxOf(fx, c) {
+    if (!fx) return {};
+    const out = Object.assign({}, fx);
+    if (fx.pl) { const pid = typeof fx.pl[0] === 'string' ? pidOf(fx.pl[0], c) : fx.pl[0]; if (pid != null && c.S.players[pid]) out.pl = [pid, fx.pl[1]]; else delete out.pl; }
+    if (fx.rival) out.rivalClub = fx.rivalClub === '@next' ? c.next : fx.rivalClub && typeof fx.rivalClub === 'object' ? fx.rivalClub : c.opp;
+    if (fx.rival && !out.rivalClub) { delete out.rival; delete out.rivalClub; }
+    return out;
+  }
+  /** Una pregunta de la base de datos convertida en pregunta jugable (mismo formato que los arcos en código). */
+  function compile(d, flags) {
+    return { id: d.id, data: d,
+      w: c => (when(c, d.cuando, flags) ? pesoOf(c, d.peso, flags) : 0),
+      q: c => fill(d.q, d, c),
+      o: c => d.o.map(o => {
+        const t = o.tsi ? (when(c, o.tsi, flags) ? o.t : o.tno) : o.t;
+        const g = o.gsi ? (when(c, o.gsi[0], flags) ? o.gsi[1] : o.gsi[2]) : o.g;
+        const fx = o.fxsi ? (when(c, o.fxsi[0], flags) ? o.fxsi[1] : o.fxsi[2]) : o.fx;
+        const r = { t: fill(t, d, c), g: g == null ? 1 : g, fx: fxOf(fx, c) };
+        if (o.need) r.need = o.need; if (o.cat) r.cat = o.cat; if (o.sig) r.sig = o.sig; if (o.pre) r.pre = o.pre;
+        return r;
+      }) };
+  }
+  const QS = ((window.TL_PRENSA_DB || {}).partido || []).map(d => compile(d));
 
-    // --- Tus reclamaciones al árbitro (con lo que pasó de verdad)
-    { id: 'protest', w: c => (c.protests.length && !c.coachRed ? 3.2 : 0), q: c => `Le vimos muy encendido en la banda${c.protests.some(p => p.card) ? ', hasta ver una amarilla' : ''}. ¿Por qué?`, o: c => {
-      const right = c.protests.some(p => p.right), wrong = c.protests.some(p => !p.right);
-      return [
-        { t: 'Pongan la repetición. Si no tenía razón, les invito a unas cañas. Spoiler: la tenía.', g: right && !wrong ? 2 : 0, fx: right && !wrong ? { fans: 0.004 } : { fine: [0.35, 4000], board: -0.5 } },
-        { t: 'Me he calentado más que Sevilla en agosto. No era mi mejor versión, lo reconozco.', g: wrong ? 2 : 1, fx: { board: 0.8 } },
-        { t: 'Si quieren un entrenador NPC, que pongan una estatua en la banda.', g: 0, fx: { fans: 0.003, board: -0.8 } },
-        { t: 'Al cuarto árbitro le hablé de usted y con educación. Discrepar no es faltar.', g: 2, need: ['arb2', 1], fx: { board: 0.6, team: 0.5 } }];
-    } },
-    { id: 'coachRed', w: c => (c.coachRed ? 5 : 0), q: () => '¿Qué tal se ve el fútbol desde la grada?', o: () => [
-      { t: 'Fatal, se lo aseguro. Me equivoqué y pido disculpas.', g: 2, fx: { board: 1 } },
-      { t: 'Desde arriba se ve todo mejor. Y lo volvería a hacer, sin filtro.', g: 0, fx: { fans: 0.005, fine: [0.5, 5000], board: -1 } },
-      { t: 'Siguiente pregunta. Next.', g: 1, fx: {} },
-      { t: 'Me equivoqué yo, no ellos. Esta semana llamo al colegiado y lo arreglamos como adultos.', g: 2, need: ['dis3', 1], fx: { board: 1.5, team: 0.5 } }] },
-    { id: 'refNoProtest', w: c => (c.refMine.length && !c.protests.length ? 2.6 : 0), q: () => 'Hubo una jugada muy discutida en su contra y usted ni se inmutó. ¿Es zen o estaba mirando el móvil?', o: () => [
-      { t: 'De árbitros no hablo, que luego me cobran.', g: 1, fx: { board: 0.3 } },
-      { t: 'Ni zen ni móvil: estaba contando hasta diez. Pero que nos han robado, nos han robado.', g: 0, fx: { fans: 0.006, fine: [0.45, 6000], board: -0.5 } },
-      { t: 'Zen. Mi energía la gasto en mis jugadores, no en un señor de amarillo.', g: 2, fx: { board: 0.8, team: 0.5 } },
-      { t: 'Lo veré con calma. Y si hay algo que decir, el club tiene buenos abogados y mejores cauces.', g: 2, need: ['dis3', 2], fx: { board: 1.2 } }] },
-
-    // --- Lo que salió mal
-    { id: 'lateLost', w: c => (c.lateLost ? 3 : 0), q: () => 'Gol en el descuento. ¿Se apagó la luz?', o: () => [
-      { t: 'Se apagó la luz del banquillo, que es la mía. No supe cerrar el partido.', g: 2, fx: { team: 1, board: -0.3 } },
-      { t: 'Algunos ya estaban pensando en el after.', g: 0, fx: { team: -2 } },
-      { t: 'El fútbol es así: cuando crees que lo tienes, te deja en visto.', g: 1, fx: {} },
-      { t: 'Nos faltó picardía. Esta semana entrenamos a perder tiempo como profesionales.', g: 2, need: ['tac2', 2], fx: { team: 1, board: 0.8 } }] },
-    { id: 'penMiss', w: c => (c.penMiss != null ? 3 : 0), q: c => `${name(c, c.penMiss)} falló el penalti. ¿Seguirá tirándolos?`, o: c => [
-      { t: 'El que más. Solo falla los penaltis quien tiene lo que hay que tener para tirarlos.', g: 2, fx: { pl: [c.penMiss, 3] } },
-      { t: 'Hay cola para tirar penaltis en este equipo. Ya veremos.', g: 1, fx: { pl: [c.penMiss, -2] } },
-      { t: 'Eso no se falla. Ni con los ojos cerrados.', g: 0, fx: { pl: [c.penMiss, -5], team: -0.5 } },
-      { t: `${name(c, c.penMiss)} es de los que más se responsabilizan. El próximo lo mete, seguro.`, g: 2, need: ['mot2', 1], fx: { pl: [c.penMiss, 5], team: 0.5 } }] },
-    { id: 'og', w: c => (c.og != null ? 2.6 : 0), q: c => `El gol en propia de ${name(c, c.og)}. ¿Cómo está?`, o: c => [
-      { t: 'Hoy le invito yo a cenar. A cualquiera le pasa, y él es de los que más corre.', g: 2, fx: { pl: [c.og, 3] } },
-      { t: 'Hombre, hay que mirar a qué portería se dispara. Básico.', g: 0, fx: { pl: [c.og, -3] } },
-      { t: 'Del vídeo no hablo, que me pongo triste.', g: 1, fx: {} }] },
-    { id: 'bigMiss', w: c => (c.bigMiss >= 2 && c.diff <= 0 ? 2.4 : 0), q: () => 'Ocasiones para ganar tres partidos. ¿Mal de ojo o skill issue?', o: () => [
-      { t: 'Si llegamos así, los goles vendrán como el Cercanías: tarde, pero de tres en tres.', g: 2, fx: { team: 1 } },
-      { t: 'Hoy el portero rival se merece un monumento. Y nosotros, un tirón de orejas.', g: 1, fx: { team: -0.5, board: 0.3 } },
-      { t: 'Skill issue. A los delanteros se les paga por meterla.', g: 0, fx: { team: -2 } },
-      { t: 'La portería no se mueve. Ya les dije que algún día se van a cansar de fallar.', g: 2, need: ['mot1', 1], fx: { team: 1.5 } }] },
-    { id: 'red', w: c => (c.reds.length ? 2.8 : 0), q: c => `¿Cómo valora la expulsión de ${name(c, c.reds[0])}?`, o: c => [
-      { t: 'Se le ha ido la cabeza un segundo. Ya me ha pedido perdón y yo le he pedido un café.', g: 2, fx: { pl: [c.reds[0], -1], board: 0.5 } },
-      { t: 'Con esa vara de medir, el partido habría acabado siete contra siete.', g: c.refMine.length ? 1 : 0, fx: { fans: 0.003, fine: [0.25, 4000] } },
-      { t: 'Nos ha dejado con diez. Hablaremos, y no por WhatsApp.', g: 0, fx: { pl: [c.reds[0], -5], team: -1 } },
-      { t: 'De puertas afuera, lo defiendo a muerte. De puertas adentro… que se prepare.', g: 2, need: ['mot2', 2], fx: { pl: [c.reds[0], 2], team: 1, board: 0.5 } }] },
-
-    // --- Tus decisiones en el partido
-    { id: 'subGoal', w: c => (c.subScorer != null ? 3 : 0), q: c => `${name(c, c.subScorer)} sale del banquillo y la clava. ¿Brujería?`, o: c => [
-      { t: `El mérito es de ${name(c, c.subScorer)}, que ha salido con hambre.`, g: 2, fx: { pl: [c.subScorer, 4] } },
-      { t: 'Brujería no: aura de entrenador. De nada.', g: 0, fx: { team: -0.5 } },
-      { t: 'Hoy ha salido cara. Otro día saldrá cruz.', g: 1, fx: {} },
-      { t: 'Ni brujería ni suerte: sus centrales sufrían a la espalda. Lo preparamos el jueves, y él lo ha bordado.', g: 2, need: ['tac3', 1], fx: { pl: [c.subScorer, 4], board: 0.8 } }] },
-    { id: 'noSubs', w: c => (c.noSubs ? 2.6 : 0), q: () => 'Perdiendo, y el banquillo intacto. ¿Se le olvidó que había cambios?', o: () => [
-      { t: 'Creía en los once que estaban dentro. Ciegamente.', g: 1, fx: { team: 0.5 } },
-      { t: 'Si hubiera visto calentar a los del banquillo, tampoco. Estaban en modo siesta.', g: 0, fx: { team: -2.5 } },
-      { t: 'No se me olvidó, se me pasó. Que es peor. Culpa mía.', g: 2, fx: { board: 0.5, team: 0.5 } },
-      { t: 'El plan era aguantar y morder al final. No mordimos. Lo asumo.', g: 2, need: ['tac2', 1], fx: { board: 0.8 } }] },
-    { id: 'tactic', w: c => (c.tactic ? 1.8 : 0), q: () => 'Cambió el dibujo en pleno partido. ¿Qué vio desde la banda?', o: c => [
-      { t: c.diff >= 0 ? 'Dar un paso adelante, y el equipo lo ha entendido.' : 'Buscar soluciones. No han llegado.', g: 2, fx: { team: 0.5 } },
-      { t: 'Eso se queda en mi libreta. Y mi libreta no sale de esta sala.', g: 1, fx: {} },
-      { t: 'Que mis jugadores me tenían silenciado. Ya no.', g: 0, fx: { team: -2 } },
-      { t: 'Que nos estaban encontrando entre líneas. Movimos dos piezas y se les acabó el chollo.', g: 2, need: ['tac3', 2], fx: { board: 1 } }] },
-
-    // --- Lo bueno
-    { id: 'comeback', w: c => (c.comeback ? 3.4 : 0), q: () => 'Remontada. ¿Qué les dijo para darle la vuelta? ¿Hubo gritos?', o: () => [
-      { t: 'Ni un grito. Les miré a los ojos y les dije: este partido es nuestro, id a por él.', g: 2, fx: { team: 2, fans: 0.003 } },
-      { t: 'Dos flechas en la pizarra. Son listos, lo pillaron a la primera.', g: 1, fx: { board: 0.6 } },
-      { t: 'Mejor no tener que remontar, ¿eh? Que me salen canas y no tengo edad.', g: 1, fx: { team: -0.5, board: 0.6 } },
-      { t: 'Les dije que el partido todavía nos estaba esperando. Y salieron a buscarlo como lobos.', g: 2, need: ['mot1', 3], fx: { team: 3, fans: 0.005 } }] },
-    { id: 'lateWin', w: c => (c.lateWin != null ? 2.8 : 0), q: () => 'Gol en el último suspiro. ¿Le queda corazón?', o: c => [
-      { t: 'Tengo el corazón a 200. Si alguien lo encuentra en la banda, que me lo devuelva por Wallapop.', g: 2, fx: { fans: 0.004 } },
-      { t: 'Llevábamos llamando a la puerta desde el minuto uno. Al final nos abrieron.', g: 1, fx: { team: 0.5 } },
-      { t: 'Suerte, para qué engañarnos. Hoy nos ha tocado la lotería de Navidad.', g: 0, fx: { team: -1 } },
-      { t: `Este equipo cree hasta el final. Lo de ${c.lateWin != null && c.S.players[c.lateWin] ? name(c, c.lateWin) : 'hoy'} es el premio a eso.`, g: 2, need: ['mot3', 2], fx: { team: 2, fans: 0.004 } }] },
-    { id: 'hat', w: c => (c.hat != null ? 2.6 : 0), q: c => `${c.hatN >= 3 ? 'Hat-trick' : 'Doblete'} de ${name(c, c.hat)}. ¿Hasta dónde puede llegar?`, o: c => [
-      { t: 'Hasta donde quiera. Tiene más hambre que un estudiante de Erasmus.', g: 2, fx: { pl: [c.hat, 4] } },
-      { t: 'Él empuja el balón, pero detrás hay diez tíos poniéndoselo en bandeja.', g: 2, fx: { team: 1, pl: [c.hat, 1] } },
-      { t: 'Que no se flipe. Mañana a recoger conos, por si acaso.', g: 1, fx: { pl: [c.hat, -1], board: 0.4 } },
-      { t: 'Cuando llegó, vi a un buen jugador. Hoy he visto a otra cosa. Y aún no tiene techo.', g: 2, need: ['can2', 1], fx: { pl: [c.hat, 6], board: 0.5 } }] },
-    { id: 'star', w: c => (c.star != null && c.hat == null ? 2 : 0), q: c => `${name(c, c.star)} ha estado espectacular. ¿Es su mejor momento?`, o: c => [
-      { t: `${name(c, c.star)} es un futbolista diferente.`, g: 1, fx: { pl: [c.star, 5], team: -0.4 } },
-      { t: 'Un violín suena bonito, pero lo de hoy ha sido una orquesta.', g: 2, fx: { team: 1, pl: [c.star, 1] } },
-      { t: 'Le voy a exigir el doble. A los buenos, más.', g: 1, fx: { pl: [c.star, -2], board: 0.4 } },
-      { t: `${name(c, c.star)} hace mejores a los de su alrededor. Eso es lo que más valoro.`, g: 2, need: ['mot2', 1], fx: { pl: [c.star, 4], team: 1 } }] },
-    { id: 'kid', w: c => (c.kid != null ? 1.8 : 0), q: c => `${name(c, c.kid)} ha dado un paso adelante. ¿Le veremos más?`, o: c => [
-      { t: 'Ha llamado a la puerta, y la puerta se le ha abierto.', g: 2, fx: { pl: [c.kid, 5] } },
-      { t: 'Despacito. A los chavales no se les quema: se les cocina a fuego lento.', g: 2, fx: { pl: [c.kid, 1], board: 0.4 } },
-      { t: 'Que no se emocione. Aquí nadie tiene el sitio reservado, esto no es Ryanair con prioridad.', g: 0, fx: { pl: [c.kid, -2] } }] },
-    { id: 'clean', w: c => (c.clean && c.diff > 0 ? 1.4 : 0), q: () => 'Portería a cero. ¿La defensa es la clave?', o: () => [
-      { t: 'Aquí defiende hasta el utillero. Empezando por el nueve.', g: 2, fx: { team: 1 } },
-      { t: 'Hoy sí. No me acostumbro, que otras semanas parecemos un colador.', g: 1, fx: { board: 0.4 } },
-      { t: 'Hoy el portero ha hecho speedrun de paradas. A los demás, ni las buenas noches.', g: 0, fx: { team: -1.5 } }] },
-
-    // --- Lo inesperado
-    { id: 'bolt', w: c => (c.bolt != null ? 6 : 0), q: c => `Lo ocurrido con ${name(c, c.bolt)} ha conmocionado a todos. ¿Unas palabras?`, o: () => [
-      { t: 'Hoy el marcador me da igual. Todo el vestuario está con él y con su familia.', g: 2, fx: { team: 1, board: 1, fans: 0.004 } },
-      { t: 'Perdonen, hoy no me salen las palabras de fútbol.', g: 2, fx: { team: 0.5 } },
-      { t: 'La temporada no espera a nadie. El domingo, otra vez.', g: 0, fx: { team: -2, fans: -0.004 } }] },
-    { id: 'crowd', w: c => (c.crowd ? 2.2 : 0), q: () => '¿Qué le ha parecido el espectáculo de la grada?', o: c => [
-      { t: 'Eso no es fútbol. Quien venga a eso, que se quede en casa.', g: c.crowd && c.crowd.party ? 1 : 2, fx: { board: 0.8 } },
-      { t: 'Cuatro random no son una afición. La nuestra es top.', g: c.crowd && c.crowd.party ? 2 : 0, fx: { fans: 0.004 } },
-      { t: 'Para eso hay un club con despachos. Yo tengo una pizarra.', g: 1, fx: {} },
-      { t: 'Nuestra grada es lo mejor que tenemos. Por eso le pido que la cuide como cuida el escudo.', g: 2, need: ['neg2', 1], fx: { fans: 0.005, board: 0.6 } }] },
-    { id: 'inj', w: c => (c.inj.length ? 1.8 : 0), q: c => `¿Cómo está ${name(c, c.inj[0])}?`, o: c => [
-      { t: 'Crucemos los dedos. Mañana, resonancia y a rezar.', g: 2, fx: { pl: [c.inj[0], 1] } },
-      { t: 'Si es lo que parece, nos quitan un pulmón.', g: 1, fx: { pl: [c.inj[0], 2], team: -0.3 } },
-      { t: 'Para eso tenemos veinticinco. Aquí nadie es imprescindible.', g: 1, fx: { team: 0.5, pl: [c.inj[0], -1] } },
-      { t: 'Está en las mejores manos. Y cuando vuelva, le estará esperando su sitio.', g: 2, need: ['fis3', 1], fx: { pl: [c.inj[0], 3], team: 0.5 } }] },
-    // --- Lo que has hecho en el club estas semanas (fichajes, ventas, técnicos, patrocinios, campañas)
-    { id: 'signing', w: c => (c.feed.signing ? 2.2 : 0), q: c => `¿Qué aporta ${name(c, c.feed.signing.pid)}, el fichaje?`, o: c => {
-      const pid = c.feed.signing.pid, played = c.m.pl[pid] && c.m.pl[pid].team === c.me;
-      return [
-        { t: played ? 'Lo han visto ustedes igual que yo: carácter y una zurda que da gusto.' : 'Necesita su rodaje, como un coche nuevo. Pero acelera que da miedo.', g: 2, fx: { pl: [pid, 3] } },
-        { t: 'Con él vamos a por todo. Hacedle captura a esto.', g: 1, fx: { pl: [pid, 2], fans: 0.003, board: -0.3 } },
-        { t: 'Firmar es fácil. Ahora, que se lo curre.', g: 0, fx: { pl: [pid, -3] } },
-        { t: 'Le seguíamos desde hace meses. Era la pieza que le faltaba al puzle.', g: 2, need: ['neg1', 1], fx: { pl: [pid, 3], board: 0.8 } }];
-    } },
-    { id: 'sale', w: c => (c.feed.sale ? 2 : 0), q: c => `¿Por qué ha dejado salir a ${c.S.players[c.feed.sale.pid] ? name(c, c.feed.sale.pid) : 'uno de sus jugadores'}?`, o: () => [
-      { t: 'Se va un amigo. Le deseo todo, menos contra nosotros.', g: 2, fx: { board: 0.6 } },
-      { t: 'Pregunten arriba. Yo solo entreno.', g: 0, fx: { board: -1 } },
-      { t: 'No se puede retener a quien ya tenía la maleta en el Bizum.', g: 1, fx: { team: -0.3 } },
-      { t: 'Con ese dinero el club respira. Y el chaval que esperaba su hueco, ya lo tiene.', g: 2, need: ['neg3', 1], fx: { board: 1, team: 0.5 } }] },
-    { id: 'staff', w: c => (c.feed.staff ? 1.4 : 0), q: c => `Ha incorporado a ${c.feed.staff.name} a su cuerpo técnico. ¿Por qué?`, o: () => [
-      { t: 'Sabe cosas que yo no sé. Y eso, en un cuerpo técnico, vale oro.', g: 2, fx: { team: 0.5 } },
-      { t: 'Porque el anterior era muy de boomer. Así de claro.', g: 0, fx: { board: -0.5 } },
-      { t: 'Buen profesional. Mejor persona. Fin.', g: 1, fx: {} }] },
-    { id: 'sponsor', w: c => (c.feed.sponsor ? (c.feed.sponsor.risky ? 2.4 : 1.2) : 0), q: c => c.feed.sponsor.risky ? `El nuevo patrocinador, ${c.feed.sponsor.brand}, no gusta a parte de la afición. ¿Qué opina?` : `${c.feed.sponsor.brand} entra como patrocinador. ¿Qué supone para el club?`, o: c => c.feed.sponsor.risky ? [
-      { t: 'Entiendo el enfado. Yo pongo el once, no el logo de la camiseta.', g: 2, fx: { fans: 0.002 } },
-      { t: 'Con poesía no se paga el alquiler. Y mira cómo está Madrid.', g: 1, fx: { board: 0.5, fans: -0.002 } },
-      { t: '¿Patrocinador? Ni idea de lo que venden, la verdad.', g: 0, fx: { fans: -0.003 } },
-      { t: 'Les doy mi palabra: ese dinero irá a la cantera y al estadio. Y yo vigilaré que así sea.', g: 2, need: ['neg2', 2], fx: { fans: 0.004, board: 0.8 } }] : [
-      { t: 'Que el club crece. Y cuando el club crece, crecemos todos.', g: 2, fx: { board: 0.6 } },
-      { t: 'Más balones, más vídeo, más de todo. Bienvenidos.', g: 1, fx: { board: 0.3 } },
-      { t: 'Yo de eso sé lo mismo que de criptos.', g: 0, fx: { board: -0.5 } },
-      { t: 'Que una marca así quiera nuestro escudo en el pecho dice mucho de lo que estamos construyendo.', g: 2, need: ['neg2', 1], fx: { board: 1, fans: 0.003 } }] },
-    { id: 'campaign', w: c => (c.feed.campaign ? 1.2 : 0), q: c => `El club ha lanzado «${c.feed.campaign.name}». ¿Lo apoya?`, o: () => [
-      { t: 'Al cien por cien. Un club sin su gente es un solar.', g: 2, fx: { fans: 0.003 } },
-      { t: 'Si llena el estadio, yo mismo hago el TikTok.', g: 1, fx: {} },
-      { t: 'Mi única campaña es ganar el domingo. Lo demás, contenido.', g: 0, fx: { board: -0.5 } }] },
-
-    // --- Para completar la rueda de prensa
-    { id: 'next', w: c => (c.next ? 1 : 0), q: c => `Ahora viene el ${c.next.name}. ¿Les ha mandado algún mensaje?`, o: c => [
-      { t: 'Respeto, todo el del mundo. Miedo, ninguno.', g: 2, fx: { team: 0.3 } },
-      { t: 'Que vayan reservando el BlaBlaCar de vuelta.', g: 1, fx: { team: 0.8, fans: 0.003, rival: 1, rivalClub: c.next } },
-      { t: 'Que se preocupen ellos. Nosotros, tranqui.', g: 0, fx: { rival: 1, rivalClub: c.next, fans: 0.003 } },
-      { t: 'Ya tengo tres vídeos suyos vistos. Sé dónde les duele.', g: 2, need: ['tac3', 1], fx: { team: 1, board: 0.4 } }] },
-    { id: 'board', w: c => (c.S.board && c.S.board.conf < 40 ? 2 : 0.6), q: () => 'Se dice que su silla tiembla. ¿Lo nota?', o: () => [
-      { t: 'Mi silla está más firme que nunca. Pregunten al vestuario.', g: 1, fx: { team: 0.3 } },
-      { t: 'Mi silla me la gano cada domingo. Lo demás son tertulias.', g: 2, fx: {} },
-      { t: 'Si alguien quiere mi silla, que me lo diga a la cara y no por un audio de tres minutos.', g: 0, fx: { board: -2 } },
-      { t: 'Ceno con el presidente cada semana. Y de momento me sigue invitando.', g: 2, need: ['neg3', 1], fx: { board: 1.5 } }] },
-    { id: 'season', w: () => 0.8, q: () => '¿Con qué sueña para lo que queda de temporada?', o: c => [
-      { t: `El que nos ha pedido el club: ${String((c.S.board && c.S.board.text) || 'competir').toLowerCase()}.`, g: 2, fx: { board: 0.8 } },
-      { t: 'Con ganarlo todo. Main character energy.', g: 0, fx: { fans: 0.004, board: -0.5 } },
-      { t: 'Sueño despierto: con el próximo domingo.', g: 1, fx: {} },
-      { t: 'Con ver a este equipo mejor cada lunes que el anterior. Lo demás vendrá solo.', g: 2, need: ['mot3', 1], fx: { team: 1, board: 0.6 } }] },
-    { id: 'fans', w: () => 0.7, q: () => 'Última pregunta. ¿Algo para los que les siguen desde casa?', o: () => [
-      { t: 'Que el domingo los quiero afónicos. Os necesitamos, de verdad.', g: 2, fx: { fans: 0.003 } },
-      { t: 'Paciencia. Esto no es un reel de quince segundos.', g: 1, fx: {} },
-      { t: 'Que vengan más, que hay asientos con más polvo que mi Tuenti.', g: 0, fx: { fans: -0.004 } },
-      { t: 'Este escudo es suyo. Nosotros solo lo llevamos prestado noventa minutos.', g: 2, need: ['neg2', 2], fx: { fans: 0.007 } }] }
-  ];
+  // ------------------------------------------------------------ La previa de los partidos grandes
+  const ord = n => `${n}.º`;
+  /** ¿Es un partido grande? Copa (eliminatoria, o liguilla contra alguien de tu nivel), top contra top,
+   *  duelo directo en la tabla o recta final jugándote algo. Devuelve el porqué, o null. */
+  function bigMatch(S) {
+    if (!S || S.mode === 'tour' || S.over || S.fired) return null;
+    const cp = TL.Cups && TL.Cups.pendingUser(S);
+    if (cp) {
+      const opp = cp.home === S.user ? cp.away : cp.home, oc = S.clubs[opp];
+      if (!oc) return null;
+      if (!cp.group) return { kind: 'cupKO', opp, home: cp.home === S.user, label: cp.label, ronda: cp.round };
+      return oc.rep >= S.clubs[S.user].rep - 2 ? { kind: 'cup', opp, home: cp.home === S.user, label: cp.label, ronda: cp.round } : null;
+    }
+    const fx = TL.Season.nextFixture(S);
+    if (!fx || S.week < 3) return null;
+    const opp = fx[0] === S.user ? fx[1] : fx[0];
+    const T = TL.Season.table(S), n = T.length;
+    const pos = id => T.findIndex(r => r.id === id) + 1;
+    const pm = pos(S.user), po = pos(opp), left = S.fixtures.length - S.week;
+    const base = { opp, home: fx[0] === S.user, pm, po, n, left };
+    if (left <= 5 && (pm <= 2 || pm > n - 4)) return Object.assign(base, { kind: 'end', label: `Recta final · quedan ${left} jornadas` });
+    if (pm <= 4 && po <= 4 && S.week >= 5) return Object.assign(base, { kind: 'top', label: `${ord(pm)} contra ${ord(po)}` });
+    if (Math.abs(pm - po) === 1 && S.week >= 7) return Object.assign(base, { kind: 'direct', label: `Duelo directo en la tabla (${ord(pm)} y ${ord(po)})` });
+    if (left <= 5 && pm <= 4) return Object.assign(base, { kind: 'end', label: `Recta final · quedan ${left} jornadas` });
+    return null;
+  }
+  /** Lo que se sabe antes del partido (mismo molde que context(), para reutilizar el minijuego). */
+  function preContext(S, big) {
+    const oc = S.clubs[big.opp], me = S.clubs[S.user];
+    const best = id => W.squad(S, id).filter(p => !(p.inj > 0)).sort((a, b) => b.ovr - a.ovr)[0];
+    const fig = best(big.opp), mine = best(S.user);
+    const res = [];
+    for (let w = 0; w < S.week; w++) for (const f of S.fixtures[w] || []) {
+      if (f[2] < 0 || (f[0] !== S.user && f[1] !== S.user)) continue;
+      const my = f[0] === S.user ? f[2] : f[3], th = f[0] === S.user ? f[3] : f[2];
+      res.push({ opp: f[0] === S.user ? f[1] : f[0], d: my - th });
+    }
+    const last3 = res.slice(-3);
+    const revenge = res.some(r => r.opp === big.opp && r.d <= -2);
+    const c = { S, m: null, me: 0, opp: oc, next: oc, gf: 0, ga: 0, diff: 0, reds: [], refMine: [], protests: [], crowd: null, inj: [], star: null, hat: null, hatN: 0,
+      comeback: false, lateWin: null, lateLost: false, og: null, subs: [], subScorer: null, noSubs: false, tactic: false, penMiss: null, bigMiss: 0, bolt: null, kid: null,
+      guest: mine ? mine.id : null, feed: {}, clean: false, coachRed: false, cup: big.kind === 'cup' || big.kind === 'cupKO', pre: big,
+      vars: { pos: ord(big.pm || 0), posr: ord(big.po || 0), figura: fig ? fig.short : 'su estrella', mi: mine ? mine.short : 'nuestro capitán', ronda: big.ronda || big.label || '', quedan: big.left || 0 },
+      flags: { cupKO: big.kind === 'cupKO', cup: big.kind === 'cup' || big.kind === 'cupKO', league: big.kind !== 'cup' && big.kind !== 'cupKO', top: big.kind === 'top', direct: big.kind === 'direct',
+        end: big.kind === 'end', title: big.kind === 'end' && big.pm <= 2, down: big.kind === 'end' && big.pm > big.n - 4,
+        fav: oc.rep < me.rep - 3 || (big.pm && big.po && big.pm < big.po - 3), under: oc.rep > me.rep + 3 || (big.pm && big.po && big.pm > big.po + 3),
+        home: big.home, away: !big.home, streakW: last3.length === 3 && last3.every(r => r.d > 0), streakL: last3.length >= 2 && last3.slice(-2).every(r => r.d < 0),
+        boardLow: S.board && S.board.conf < 35, revenge: revenge } };
+    return c;
+  }
+  const PFLAGS = new Proxy({}, { get: (_, k) => (c => !!(c.flags && c.flags[k])) });
+  const PQS = ((window.TL_PRENSA_DB || {}).previa || []).map(d => compile(d, PFLAGS));
+  const N_PRE = 4;
+  function preQuestions(c) {
+    const pool = PQS.map(q => ({ q, w: q.w(c) })).filter(x => x.w > 0), out = [];
+    while (pool.length && out.length < N_PRE) {
+      const ws = pool.map(x => x.w * (0.75 + Math.random() * 0.5));
+      let r = Math.random() * ws.reduce((a, b) => a + b, 0), k = 0;
+      for (; k < pool.length - 1; k++) { r -= ws[k]; if (r <= 0) break; }
+      out.push(pool.splice(k, 1)[0].q);
+    }
+    return out.sort((a, b) => b.w(c) - a.w(c));
+  }
 
   const RESULT = ['win', 'draw', 'loss', 'thrash', 'bolt'];
   /** Las preguntas de hoy: lo que ha pasado según su peso, el resultado primero, y se completa hasta cinco. */
@@ -298,16 +235,38 @@
     return pid != null && c.S.players[pid] ? c.S.players[pid].short : 'él';
   }
   function fill(t, q, c) {
-    const f = c.feed;
+    const f = c.feed || {};
     return t.replace(/\{(\w+)\}/g, (_, k) => ({
       rival: c.opp.name, next: c.next ? c.next.name : 'próximo rival', gf: c.gf, ga: c.ga, jug: jugOf(q.id, c),
-      staff: f.staff ? f.staff.name : 'el nuevo', brand: f.sponsor ? f.sponsor.brand : 'la marca', camp: f.campaign ? f.campaign.name : 'la campaña'
+      staff: f.staff ? f.staff.name : 'el nuevo', brand: f.sponsor ? f.sponsor.brand : 'la marca', camp: f.campaign ? f.campaign.name : 'la campaña',
+      hatTipo: c.hatN >= 3 ? 'Hat-trick' : 'Doblete', objetivo: String((c.S.board && c.S.board.text) || 'competir').toLowerCase(),
+      tarjeta: some(c.protests, p => p.card) ? ', hasta ver una amarilla' : '', yo: c.S.manager, club: c.S.clubs[c.S.user].name,
+      ...(c.vars || {})
     })[k] ?? _);
   }
+  // Formas de preguntar: las del banco antiguo + data/game/prensa/formas-*.js. Cada pregunta tiene su bolsa y no
+  // repite ninguna forma hasta haberlas usado todas (la bolsa se guarda en la partida).
+  const FORMAS = () => (ES() ? (window.TL_PRENSA_DB || {}).formas || {} : {});
+  function bagPick(S, key, n) {
+    const B = S.prensaBag || (S.prensaBag = {});
+    let b = B[key];
+    if (!b || b.n !== n || !b.left || !b.left.length) {
+      const idx = U.shuffle(Array.from({ length: n }, (_, i) => i));
+      const last = b ? b.last : null;
+      if (last != null && n > 1 && idx[idx.length - 1] === last) idx.unshift(idx.pop());   // al rellenar, nunca la misma que la última
+      b = B[key] = { n, left: idx, last };
+    }
+    const k = b.left.pop();
+    b.last = k;
+    return k;
+  }
   function qText(q, c) {
-    const b = BANK()[bankKey(q, c)];
-    c._qb = !!(b && b.q && b.q.length && Math.random() < 0.65);
-    return c._qb ? fill(pick(b.q), q, c) : q.q(c);
+    const key = q.vkey || bankKey(q, c), b = BANK()[bankKey(q, c)];
+    const pool = [null].concat((b && b.q) || [], FORMAS()[key] || []);
+    const k = pool.length > 1 ? bagPick(c.S, key, pool.length) : 0;
+    c._qb = k > 0;
+    if (!k) return q.q(c);
+    return q.vfill ? q.vfill(pool[k]) : fill(pool[k], q, c);
   }
   function bankVary(all, q, c) {
     const b = BANK()[bankKey(q, c)];
@@ -538,13 +497,14 @@
   const muleOf = S => S.mule && MULES.find(x => x.id === S.mule.id);
   /** La sueltas en esta pregunta: lo que pasa depende de cómo ha ido el partido. */
   function useMule(S, c) {
-    const mu = S.mule, f = muleOf(S);
+    const mu = S.mule, f = muleOf(S), f0 = mu.fame || 0;
     mu.uses = (mu.uses || 0) + 1;
     let g, react;
     if (c.diff > 0) { mu.fame += 1.5; g = 2; react = 'La sala se ríe. Alguien ya lo está subiendo a TikTok.'; }
     else if (c.diff === 0) { mu.fame += 1; g = 1; react = 'Sonrisas en la sala.'; }
     else if (c.diff <= -3) { mu.fame += 0.5; mu.meme = (mu.meme || 0) + 1; g = 0; react = 'Silencio incómodo. Cringe máximo: eso acaba en meme.'; }
     else { mu.fame += 0.5; g = 1; react = 'Alguna risa nerviosa.'; }
+    if (lv(S, 'se_show')) mu.fame += mu.fame - f0;   // Tu sello: Showman
     if (mu.merch && c.diff > 0) { const k = Math.round(4000 + Math.random() * 6000); S.clubs[S.user].cash += k; R.log.merch = (R.log.merch || 0) + k; }
     if (mu.meme === 2 && !mu.memed && TL.News) { mu.memed = true; TL.News.add(S, 'polemica', `«${f.t}», el meme de la jornada`, `Las redes se ceban con la frase de ${S.manager} tras la derrota.`, S.user, null, 'neg'); TL.News.fx.board(S, -1); }
     return { g, react };
@@ -615,7 +575,8 @@
   }
   function settleTwist(S, a) {
     const club = S.clubs[S.user];
-    if (Math.random() < (a.kill || 0)) { R.log.twistOk = R.twisted; return 'El titular se desinfla. Nadie se lo compra.'; }
+    const kill = Math.min(1, (a.kill || 0) + (lv(S, 'se_encanto') ? 0.35 : 0));   // Tu sello: Encanto
+    if (Math.random() < kill) { R.log.twistOk = R.twisted; return lv(S, 'se_encanto') && Math.random() < 0.5 ? 'Les guiñas un ojo y el titular se desinfla. Hasta el periodista se sonroja.' : 'El titular se desinfla. Nadie se lo compra.'; }
     if (TL.News) TL.News.add(S, 'polemica', R.twisted, `${pick(TABLOIDS)} saca de contexto unas palabras del técnico de ${club.name}. Las redes, divididas.`, club.id, null, 'neg');
     TL.News.fx.board(S, -0.8); TL.News.fx.fans(S, -0.002);
     R.log.twistBad = R.twisted;
@@ -749,10 +710,14 @@
   function open(S, m, me, onDone) {
     affairMaybe(S);
     const c = context(S, m, me);
-    R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null;
+    stage(S, c, questions(c), onDone, null);
+  }
+  /** Monta la sala: la de después del partido o la previa (pre = el porqué del partido grande). */
+  function stage(S, c, qs, onDone, pre) {
+    R.c = c; R.qs = qs; R.k = 0; R.log = {}; R.onDone = onDone || null; R.pre = pre ? { big: pre, own: 0, riv: 0 } : null;
     R.muleUsed = false; R.twisted = null; R.inTwist = false; R.fu = 0; R.follow = null;
     R.en = 100 + 15 * lv(S, 'pre1'); R.uses = {}; R.temp = 25; R.aud = { vest: 0, dir: 0, afi: 0, sala: 0 };
-    R.bigForce = null; R.nuked = null; R.nickUsed = false; R.ban = false; R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
+    R.bigForce = null; R.nuked = null; R.nickUsed = false; R.ban = false; R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.jokerUsed = false; R.comp = null;
     // Lo que más necesitas esta semana: lo que peor está
     const conf = S.board.conf, fan = TL.Hud ? TL.Hud.fansOpinion(S) : 50, mood = TL.Hud ? TL.Hud.squadMood(S) : 60;
     R.prio = conf <= fan && conf <= mood ? 'dir' : fan <= mood ? 'afi' : 'vest';
@@ -761,7 +726,7 @@
     const club = S.clubs[S.user], [c1, c2] = U.clubColors(club.name);
     R.cols = [c1, c2];
     const root = document.createElement('div');
-    root.id = 'prensa'; root.className = 'prensa';
+    root.id = 'prensa'; root.className = 'prensa' + (pre ? ' previa' : '');
     root.innerHTML = `<div class="pr-stage" style="--c1:${c1};--c2:${c2}">
         <img class="pr-bg" src="assets/prensa/sala.webp" alt="">
         <canvas class="pr-wall"></canvas>
@@ -773,11 +738,15 @@
         <div class="pr-crowd">${Array.from({ length: 9 }, (_, k) => `<i style="--h:${(k * 47) % 360};--x:${4 + k * 11.5}%;--s:${0.85 + ((k * 37) % 30) / 100}"></i>`).join('')}</div>
         <div class="pr-say"></div>
         <div class="pr-flash"></div>
-        <div class="pr-live"><i></i>EN DIRECTO</div>
+        <div class="pr-live"><i></i>${pre ? 'PREVIA · EN DIRECTO' : 'EN DIRECTO'}</div>
       </div>
       <div class="pr-panel"><div class="pr-meter"></div><div class="pr-q"></div><div class="pr-as"></div></div>`;
     document.body.appendChild(root);
     requestAnimationFrame(() => root.classList.add('on'));
+    // Música propia de la sala (assets/music/prensa, prensa-previa y, si se calienta, prensa-tensa)
+    const M = UI.Music;
+    R.music = pre ? 'prensa-previa' : 'prensa'; R.musicNow = null; R.ducked = !!(M && M.vol < 1);
+    if (M) { M.duck(false); musicMood(); }
     startFx(root, c1, c2, club);
     lightInit(root);
     requestAnimationFrame(() => fitTv(root));
@@ -789,10 +758,10 @@
   // ---- Antes de empezar: ¿quién te acompaña?
   function pickCompanion() {
     const c = R.c, S = c.S, sq = W.squad(S, S.user).filter(p => !(p.inj > 0));
-    const notes = c.m.lastRatings || {};
+    const notes = (c.m && c.m.lastRatings) || {};
     const cand = [];
     const add = (p, why) => { if (p && !cand.some(x => x.p.id === p.id)) cand.push({ p, why }); };
-    if (c.guest != null) add(S.players[c.guest], 'Mejor del partido');
+    if (c.guest != null && !R.pre) add(S.players[c.guest], 'Mejor del partido');
     add(sq.slice().sort((a, b) => (b.age - a.age) || (b.ovr - a.ovr))[0], 'Capitán');
     add(sq.slice().sort((a, b) => b.ovr - a.ovr)[0], 'Estrella');
     add(sq.filter(p => notes[p.id] != null).sort((a, b) => notes[a.id] - notes[b.id])[0], 'Ha tenido un mal día');
@@ -803,7 +772,7 @@
     const lim = 3 + lv(S, 'pre3');
     const panel = document.querySelector('#prensa .pr-panel');
     panel.querySelector('.pr-meter').innerHTML = '';
-    panel.querySelector('.pr-q').innerHTML = `<small>Antes de salir</small>¿Quién te acompaña en la sala?
+    panel.querySelector('.pr-q').innerHTML = `<small>${R.pre ? esc('Previa · ' + R.pre.big.label) : 'Antes de salir'}</small>¿Quién te acompaña en la sala?
       <span class="pr-prio">Esta semana te conviene contentar a <b>${esc(AUD[R.prio])}</b>.</span>`;
     panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => { const no = x.times >= lim; return `<button class="btn block pr-a pr-comp ${no ? 'tired' : ''}" data-act="pr-comp" data-k="${k}" ${no ? 'disabled' : ''}>
         <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers">${esc(PERS[x.pers].n)}</i></span><small>${esc(no ? 'Se niega a volver: está harto de micrófonos.' : x.times >= lim - 1 ? 'Ya ha venido mucho: saldrá quemado y de mal humor.' : x.times >= 1 ? 'Repite: se desgastará más que la última vez.' : PERS[x.pers].d)}</small></button>`; }).join('')
@@ -824,6 +793,7 @@
       H[R.comp.p.id] = { n: (R.comp.times || 0) + 1, last: S.season * 60 + S.week };
       if (R.comp.times >= 2 + lv(S, 'pre3') - 1) R.comp.grumpy = true;
       if (R.comp.pers === 'timido') R.joker = 0;
+      else if (lv(S, 'se_familia')) R.joker = 2;   // Tu sello: Familia
     } else R.joker = 0;
     ask();
   };
@@ -832,6 +802,7 @@
   function meter() {
     const el0 = document.querySelector('#prensa .pr-meter');
     if (!el0) return;
+    musicMood();
     const en = Math.max(0, Math.round(R.en)), tp = Math.min(100, Math.round(R.temp));
     const aud = Object.keys(R.aud).map(k => `<span class="pr-aud ${k === R.prio ? 'prio' : ''} ${R.aud[k] > 0.4 ? 'up' : R.aud[k] < -0.4 ? 'dn' : ''}" title="${AUD_T[k]}">${AUD_T[k]} ${R.aud[k] > 0.4 ? '▲' : R.aud[k] < -0.4 ? '▼' : '·'}</span>`).join('');
     el0.innerHTML = `<div class="pr-bars"><label>🧠 Cabeza<span class="pr-bar en"><i style="width:${Math.min(100, en)}%"></i></span></label>
@@ -858,7 +829,10 @@
 
   const satOf = cat => Math.floor(((R.c && R.c.S.pressStyle) || {})[cat] || 0);
   function capOf(cat) { return CATS[cat].cap + (lv(R.c.S, 'pre4') >= 2 ? 1 : 0) - (satOf(cat) >= 4 ? 1 : 0); }
-  function costOf(cat, extra) { return Math.max(4, CATS[cat].cost + (6 - 1.5 * lv(R.c.S, 'pre4')) * (R.uses[cat] || 0) + 3 * satOf(cat) + (extra || 0) + (TL.Persona ? TL.Persona.costMod(R.c.S, cat) : 0)); }
+  function costOf(cat, extra) {
+    const S = R.c.S, k = (cat === 'hu' || cat === 'amb') && lv(S, 'se_show') ? 0.5 : 1;   // Tu sello: Showman
+    return Math.max(4, Math.round(k * (CATS[cat].cost + (6 - 1.5 * lv(S, 'pre4')) * (R.uses[cat] || 0) + 3 * satOf(cat) + (extra || 0) + (TL.Persona ? TL.Persona.costMod(S, cat) : 0))));
+  }
   function btnHtml(a, k, extra) {
     const cat = a.cat, C = CATS[cat], used = R.uses[cat] || 0, cost = costOf(cat, extra);
     const out = used >= capOf(cat), poor = R.en < cost;
@@ -945,7 +919,7 @@
   }
   A['pr-joker'] = () => {
     if (!R.cur || !R.joker || !R.comp) return;
-    R.joker = 0; stopClock();
+    R.joker--; R.jokerUsed = true; stopClock();
     const P = R.comp.pers, p = R.comp.p, rep = R.rep;
     if (TL.Persona) TL.Persona.signal(R.c.S, { comodin: 1, ['comodin_' + P]: 1 });
     const L = {
@@ -999,8 +973,14 @@
       R.temp = 100; R.walk = true;
     }
     if (a.mule) { R.muleUsed = true; const u = useMule(S, R.c); a.g = u.g; a.react = u.react; }
-    apply(S, a.fx, R.log);
     const cat = a.cat || 'eva', C = CATS[cat];
+    const soc = R.q && R.q.id === 'soc';
+    let fx = a.fx || {};
+    // Tu sello: Puño de hierro (exigir duele la mitad) · La causa (la sociedad suma el doble de afición)
+    if (cat === 'dur' && lv(S, 'se_puno')) { fx = Object.assign({}, fx); if (fx.team < 0) fx.team /= 2; if (fx.pl && fx.pl[1] < 0) fx.pl = [fx.pl[0], fx.pl[1] / 2]; }
+    if (soc && lv(S, 'se_causa') && fx.fans > 0) fx = Object.assign({}, fx, { fans: fx.fans * 2 });
+    apply(S, fx, R.log);
+    if (R.pre && a.pre) { R.pre.own += a.pre.own || 0; R.pre.riv += a.pre.rival || 0; }
     // Lo que dices va dejando rastro en tu personalidad (oculta)
     const PE = TL.Persona;
     if (PE) {
@@ -1011,10 +991,14 @@
     R.en -= a.silence ? 0 : costOf(cat, rep && rep.g >= 2 ? 6 : 0);
     R.uses[cat] = (R.uses[cat] || 0) + 1;
     const w = a.g === 0 ? 0.6 : 1;
-    for (const k in C.aud) R.aud[k] += C.aud[k] * w * (a.silence ? 0 : 1);
+    const goma = cat === 'eva' && !a.silence && lv(S, 'se_goma');   // Tu sello: Muro de goma
+    for (const k in C.aud) R.aud[k] += (goma && C.aud[k] < 0 ? 0 : C.aud[k]) * w * (a.silence ? 0 : 1);
+    if ((cat === 'pol' || cat === 'dur') && !a.silence && lv(S, 'se_sincomplejos')) R.aud.afi += 0.8;   // Tu sello: Sin complejos
     let score = (PREF[rep ? rep.t : 'serio'][cat] || 0) + ((a.g == null ? 1 : a.g) - 1) - (rep && rep.g >= 2 ? 1 : 0);
     if (!a.silence && satOf(cat) >= 3) { score -= 1; a.react = a.react || pick(['«¡Siempre dice lo mismo!», se oye al fondo.', 'La sala bosteza: esa ya se la sabían.', 'Alguien hace como que ronca. Ese discurso está muy visto.']); }
     if (a.silence) score = -2;
+    if (goma) score = Math.max(0, score);
+    if (soc && lv(S, 'se_causa')) score = Math.max(1, score);
     reaction(score, a);
     // En escena
     const say = document.querySelector('#prensa .pr-say'), me = document.querySelector('#prensa .pr-c');
@@ -1079,7 +1063,7 @@
     const ok = A0[R.prio] >= 1.2 && R.temp < 70;
     if (ok) {
       ps.wins++;
-      TL.News.add(S, 'club', `${S.manager}, sobresaliente ante los micrófonos`, `El técnico de ${club.name} firmó una rueda de prensa impecable tras el partido.`, club.id, null, 'pos');
+      TL.News.add(S, 'club', `${S.manager}, sobresaliente ante los micrófonos`, `El técnico de ${club.name} firmó una rueda de prensa impecable ${R.pre ? 'en la previa del partido' : 'tras el partido'}.`, club.id, null, 'pos');
       return { win: true, title: 'Rueda de prensa redonda', text: `Has contentado a ${AUD[R.prio]}, que era lo que tocaba esta semana.` };
     }
     if (R.temp >= 70 && fireCheck(S)) return { win: false, fired: true, title: 'Destituido', text: `${club.name} no aguanta más: la directiva te echa esta misma noche.` };
@@ -1094,7 +1078,7 @@
     const line = k => `${AUD_T[k]}: ${R.aud[k] > 0.4 ? 'a favor' : R.aud[k] < -0.4 ? 'en contra' : 'indiferente'}`;
     return `<div class="pr-paper ${v.win ? 'win' : 'lose'}"><div class="pp-mast">${esc(media)}</div>
       <div class="pp-date">${esc(d.toLocaleDateString(TL.I18N ? TL.I18N.locale() : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</div>
-      <div class="pp-body"><i class="pp-photo" style="--c:${R.cols[0]}"></i><div><h3>«${esc(quote)}»</h3><p>${esc(S.manager)}, ${big.score >= 1 ? 'convincente' : big.score < 0 ? 'en el ojo del huracán' : 'sin mojarse demasiado'} tras el partido.</p></div></div>
+      <div class="pp-body"><i class="pp-photo" style="--c:${R.cols[0]}"></i><div><h3>«${esc(quote)}»</h3><p>${esc(S.manager)}, ${big.score >= 1 ? 'convincente' : big.score < 0 ? 'en el ojo del huracán' : 'sin mojarse demasiado'} ${R.pre ? 'en la previa' : 'tras el partido'}.</p></div></div>
       <div class="pp-cols">${['vest', 'dir', 'afi', 'sala'].map(k => `<span class="${R.aud[k] > 0.4 ? 'up' : R.aud[k] < -0.4 ? 'dn' : ''}">${esc(line(k))}</span>`).join('')}</div></div>`;
   }
   function end() {
@@ -1111,13 +1095,14 @@
     if (R.comp && S.players[R.comp.p.id]) {
       const p = S.players[R.comp.p.id];
       const n = R.goodN + R.badN + R.fu + 3;
-      const wear = Math.round((8 + n * 1.6 + (R.temp >= 70 ? 8 : 0) + (R.joker ? 0 : 5) + (R.comp.pers === 'timido' ? 5 : 0)) * (1 + 0.6 * (R.comp.times || 0)) * (1 - 0.15 * lv(S, 'pre3')));
+      const wear = Math.round((8 + n * 1.6 + (R.temp >= 70 ? 8 : 0) + (R.jokerUsed ? 5 : 0) + (R.comp.pers === 'timido' ? 5 : 0)) * (1 + 0.6 * (R.comp.times || 0)) * (1 - 0.15 * lv(S, 'pre3')) * (lv(S, 'se_familia') ? 0.5 : 1));
       if (R.comp.times >= 1 && TL.News && TL.News.fx) TL.News.fx.mor(p, -Math.round(3 * R.comp.times * (1 - 0.25 * lv(S, 'pre3'))));
       p.fit = Math.max(35, (p.fit == null ? 100 : p.fit) - wear);
       if (R.temp >= 70 && TL.News && TL.News.fx) TL.News.fx.mor(p, -4);
       fame.push(wear >= 22 ? `${p.short} sale de la sala exprimido: le costará rendir en los próximos días.` : `${p.short} acaba cansado de tanto micrófono.`);
     }
     if (R.log.merch) fame.push(`Las camisetas con tu frase vuelan: +${U.money(R.log.merch)}.`);
+    if (R.pre && !S.fired) fame.push(...preSettle(S, v));
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>Fin de la rueda de prensa</small><span class="pr-v ${v.win ? 'win' : 'lose'}">${esc(v.title)}</span> ${esc(v.text)}`;
     panel.querySelector('.pr-as').innerHTML = portada(S, v) + `<ul class="pr-sum">${fame.map(x => `<li class="pr-fame">${esc(x)}</li>`).join('')}${summary(S, R.log).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
@@ -1126,8 +1111,18 @@
     if (v.fired) { const st = document.querySelector('#prensa .pr-stage'); if (st) st.classList.add('fired'); }
     G.save();
   }
+  /** La música sigue a la sala: si se calienta, suena la tensa; cuando se enfría, vuelve la de siempre. */
+  function musicMood() {
+    const M = UI.Music;
+    if (!M || !R.music) return;
+    const want = R.temp >= 70 ? 'prensa-tensa' : R.temp < 50 || !R.musicNow ? R.music : R.musicNow;
+    if (want === R.musicNow) return;
+    R.musicNow = want;
+    M.scene(want, want === 'prensa-tensa' ? R.music : 'prensa');
+  }
   A['pr-close'] = () => {
     R.timers.forEach(clearTimeout); R.timers = []; stopClock();
+    if (UI.Music && R.music) { R.music = null; R.musicNow = null; UI.Music.unscene(); if (R.ducked && document.getElementById('match')) UI.Music.duck(true); }
     cancelAnimationFrame(R.raf);
     const root = el('prensa'); if (root) root.remove();
     const cb = R.onDone; R.onDone = null;
@@ -1342,7 +1337,7 @@
   function offered() { return true; }   // después de cada partido hay rueda de prensa (no ir tiene castigo)
 
   /** No ir: con «Portavoz» va el jefe de prensa y no pasa nada; si no, a la directiva y a la prensa no les gusta. */
-  function skip(S, m, me) {
+  function skip(S, m, me, pre) {
     const club = S.clubs[S.user];
     const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
     ps.skipped++;
@@ -1351,10 +1346,62 @@
     ps.rep = Math.max(0, ps.rep - 5);
     const N = TL.News && TL.News.fx;
     if (N) { N.board(S, -1.2); N.fans(S, -0.002); }
-    if (TL.News) TL.News.add(S, 'polemica', `${S.manager} plantó a la prensa`, `El técnico de ${club.name} no compareció tras el partido.`, club.id, null, 'neg');
+    if (TL.News) TL.News.add(S, 'polemica', `${S.manager} plantó a la prensa`, `El técnico de ${club.name} no compareció ${pre ? 'en la previa del partido' : 'tras el partido'}.`, club.id, null, 'neg');
     return 'No te has presentado. A la directiva no le ha gustado.';
   }
   const canDelegate = S => lv(S, 'pre2') >= 1;
 
-  TL.Prensa = { MULES, STEPS, open, offered, skip, canDelegate, _options: options, _verdict: verdict, _questions: questions, _context: context };
+  // ------------------------------------------------------------ La previa: invitación, sala y lo que te llevas al campo
+  /** Lo que dijiste en la previa, al partido: los tuyos (enchufados o con dudas) y el rival (picado o confiado). */
+  function preSettle(S, v) {
+    const P = R.pre, oc = S.clubs[P.big.opp];
+    const own = U.clamp(P.own + (v.win ? 1 : 0) - (R.walk ? 2 : 0) - (R.temp >= 70 ? 1 : 0), -4, 5), riv = U.clamp(P.riv, -2, 5);
+    S.prensaPre = { club: P.big.opp, own: 1 + 0.005 * own, rival: 1 + 0.006 * riv, season: S.season, week: S.week };
+    const out = [own >= 3 ? 'Tu vestuario sale de la sala con el cuchillo entre los dientes.' : own >= 1 ? 'Los tuyos se van al partido con buenas sensaciones.'
+      : own <= -1 ? 'Tus palabras siembran dudas en tu propio vestuario.' : 'Nada de lo que has dicho va a cambiar mucho el partido.'];
+    if (riv >= 3) out.push(`En el vestuario del ${oc.name} ya han colgado tus frases en la pizarra. Saldrán a morder.`);
+    else if (riv >= 1) out.push(`Al ${oc.name} no le ha hecho ninguna gracia lo que has dicho.`);
+    else if (riv < 0) out.push(`El ${oc.name} se cree tu papel de humilde: saldrá confiado.`);
+    return out;
+  }
+  /** Antes de jugar: si es un partido grande, te esperan en la sala (una vez por jornada). Luego, then(). */
+  function preview(S, then) {
+    const big = bigMatch(S), key = S.season * 1000 + S.week;
+    if (!big || S.prensaPreDone === key || !PQS.length || document.getElementById('prensa')) return then();
+    S.prensaPreDone = key;
+    const club = S.clubs[S.user], oc = S.clubs[big.opp], [c1, c2] = U.clubColors(club.name);
+    R.inv = { S, big, then };
+    const box = document.createElement('div');
+    box.id = 'prensa-inv'; box.className = 'pv-inv';
+    box.innerHTML = `<div class="pv-card" style="--c1:${c1};--c2:${c2}">
+        <div class="pv-tag"><i></i>Rueda de prensa previa</div>
+        <h3>${esc(big.label)}</h3>
+        <div class="pv-vs"><b>${esc(club.short || club.name)}</b><em>vs</em><b>${esc(oc.short || oc.name)}</b></div>
+        <p class="note">Partido grande: la sala está llena y lo que digas hoy se lo llevan los dos vestuarios al campo.</p>
+        <button class="btn primary block" data-act="pv-go">🎙️ Salir a la sala</button>
+        ${canDelegate(S) ? '<button class="btn block ghost" data-act="pv-delegate">Mandar al portavoz</button>' : ''}
+        <button class="btn block ghost pv-skip" data-act="pv-skip">Plantar a la prensa<small>${canDelegate(S) ? '' : 'A la directiva no le gustará'}</small></button>
+      </div>`;
+    document.body.appendChild(box);
+    requestAnimationFrame(() => box.classList.add('on'));
+  }
+  function invDone(go) {
+    const iv = R.inv; R.inv = null;
+    const box = el('prensa-inv'); if (box) box.remove();
+    if (iv && go) go(iv);
+  }
+  A['pv-go'] = () => invDone(iv => {
+    const S = iv.S, c = preContext(S, iv.big), qs = preQuestions(c);
+    if (!qs.length) return iv.then();
+    stage(S, c, qs, () => { G.save(); if (!S.fired && !S.over) iv.then(); }, iv.big);
+  });
+  A['pv-delegate'] = () => invDone(iv => { UI.toast('El jefe de prensa atiende la previa por ti.'); iv.then(); });
+  A['pv-skip'] = () => invDone(iv => {
+    const S = iv.S, msg = skip(S, null, null, true);
+    UI.toast(msg, !canDelegate(S));
+    iv.then();
+  });
+
+  TL.Prensa = { MULES, STEPS, open, preview, bigMatch, offered, skip, canDelegate, _options: options, _verdict: verdict, _questions: questions, _context: context,
+    _preContext: preContext, _preQuestions: preQuestions, _R: R, _meter: () => meter(), _qText: qText, _bagPick: bagPick };
 })();

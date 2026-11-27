@@ -92,7 +92,7 @@
         <div class="cv-d">${x.from[0]}/${String(x.from[0] + 1).slice(2)} J${x.from[1]} → ${x.to ? `${x.to[0]}/${String(x.to[0] + 1).slice(2)} J${x.to[1]}` : tr('hoy')} · ${x.g}G ${x.e}E ${x.p}P${best ? ` · mejor puesto ${best}º` : ''}${x.titles ? ` · 🏆×${x.titles}` : ''}${x.revenge.length ? ` · venganzas ${x.revenge.length}` : ''}</div></div>`;
     }).join('');
     const bio = TL.Persona ? TL.Persona.bioList(S) : [];
-    const bioH = bio.length ? `<div class="bio"><div class="group-title">Biografía no autorizada <small>por Aurelio Garrido</small></div><ol>${bio.map(b => `<li><span>${b.s}/${String(b.s + 1).slice(2)} · J${b.w}</span>${esc(b.t)}</li>`).join('')}</ol></div>` : '';
+    const bioH = bio.length ? `<div class="bio"><div class="group-title">Biografía no autorizada <small>por Aurelio Garrido</small></div><ol>${bio.map(b => (b.cap ? `<li class="cap"><span>Temporada ${b.s}/${String(b.s + 1).slice(2)} · capítulo</span>«${esc(b.t)}»</li>` : `<li><span>${b.s}/${String(b.s + 1).slice(2)} · J${b.w}</span>${esc(b.t)}</li>`)).join('')}</ol></div>` : '';
     return `<div class="cv"><div class="group-title">Historial de entrenador</div>${rows}<p class="cv-story">${esc(story(S))}</p>${bioH}</div>`;
   }
 

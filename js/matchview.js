@@ -681,8 +681,13 @@
     MV.refAnnoy = Math.max(0, (MV.refAnnoy || 0) - Math.max(0, m.min - (MV.refAnnoyMin || 0)) / 15 * 0.5); MV.refAnnoyMin = m.min;
     let pc = (R.truth ? 0.28 : 0.07) + 0.12 * MV.refAnnoy - 0.06 * dip;
     if (m.ref && m.ref.strict > 1.1) pc *= 1.2;
-    pc = U.clamp(pc, 0.02, 0.7);
-    MV.refAnnoy += (R.truth ? 1.5 : 1) * (1 - 0.2 * dip);
+    // Los árbitros también leen la prensa: tu fama (la personalidad con mote) llega antes que tú a la banda
+    const PE = TL.Persona, S = G.S;
+    const fameBad = PE && PE.is(S, ['bocazas', 'lloron', 'conspiranoico', 'polemista'], 2);
+    const fameGood = PE && PE.is(S, ['curante', 'leyenda'], 2);
+    if (fameBad) pc *= 1.35; else if (fameGood) pc *= 0.75;
+    pc = U.clamp(pc, 0.02, 0.75);
+    MV.refAnnoy += (R.truth ? 1.5 : 1) * (1 - 0.2 * dip) * (fameBad ? 1.3 : fameGood ? 0.8 : 1);
     // Tu entrenador sale a la banda a protestar
     const P = MV.pitch, c = P && P.coaches && P.coaches[me];
     if (c) { c.state = 'wave'; c.until = P.t + 2.4; c.goTo = { x: c.base, y: -0.4 }; setTimeout(() => { if (c) c.goTo = null; }, 2600); }
@@ -697,6 +702,13 @@
       m.owed = { team: me, until: m.min + 15 };
       text = `Reclamas ${R.what} en la banda. La grada se pone de tu parte y el árbitro toma nota.`;
     } else text = `Reclamas ${R.what}, pero el cuarto árbitro te pide calma.`;
+    if (!card && fameBad && Math.random() < 0.5) text += ` El árbitro ni te mira: «${PE.nickname(S) || 'usted'}, otra vez no».`;
+    if (!card && fameGood && Math.random() < 0.4) text += ' Viniendo de ti, el árbitro al menos escucha.';
+    // Tu sello: Trinchera. Reclamar enciende la grada y el equipo aprieta unos minutos
+    if (card !== 'red' && TL.Manager && TL.Manager.lvl(S, 'se_trinchera')) {
+      m.teams[me].surge = { until: m.min + 8, k: 1.03 }; m._str = null;
+      text += ' La grada se viene arriba contigo y el equipo aprieta.';
+    }
     (m.protests || (m.protests = [])).push({ min: m.min, what: R.what, right: !R.truth, card });   // para la rueda de prensa
     if (TL.Persona) TL.Persona.signal(G.S, R.truth ? { protesta: 1, protesta_mal: 1 } : 'protesta');
     if (card && P && P.ref) { P.ref.state = 'card'; P.ref.card = card; P.ref.until = P.t + 1.6; }
@@ -1026,6 +1038,8 @@
     if (TL.Balls) setTimeout(() => TL.Balls.explain(), 1800);
   };
 
-  A['play-live'] = () => (UI.advance ? UI.advance(open) : open());
+  // Antes de los partidos grandes, la rueda de prensa previa (js/prensa.js); luego, al campo
+  const withPreview = f => () => (TL.Prensa && TL.Prensa.preview ? TL.Prensa.preview(G.S, f) : f());
+  A['play-live'] = () => (UI.advance ? UI.advance(withPreview(open)) : withPreview(open)());
   TL.MatchView = { open, MV, _tick: () => tick(), _soulPop: soulPop };   // _tick: solo para las pruebas automáticas
 })();
