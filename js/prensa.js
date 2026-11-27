@@ -588,19 +588,23 @@
       + `<span class="pr-head">${esc(head)}</span> Así titularemos mañana. ¿Algo que añadir?`;
     const calm = lv(S, 'pre1') >= 1 || lv(S, 'dis3') >= 1;
     const opts = [
-      { t: 'Lo tienen grabado. Pongan la frase entera y que la gente juzgue.', g: calm ? 2 : 1, kill: calm ? 0.8 : 0.45, fx: { board: 0.3 } },
-      { t: 'Ustedes no hacen periodismo, hacen ficción. Y mala.', g: 1, kill: 0.25, fx: { fans: 0.004, board: -0.8 } },
-      { t: 'Si quieren, también les firmo la portada.', g: 0, kill: 0.1, fx: { fans: 0.002 } }
+      { t: 'Lo tienen grabado. Pongan la frase entera y que la gente juzgue.', cat: 'tec', g: calm ? 2 : 1, kill: calm ? 0.8 : 0.45, fx: { board: 0.3 } },
+      { t: 'Ustedes no hacen periodismo, hacen ficción. Y mala.', cat: 'pol', g: 1, kill: 0.25, fx: { fans: 0.004, board: -0.8 } },
+      { t: 'Si quieren, también les firmo la portada.', cat: 'hu', g: 0, kill: 0.1, fx: { fans: 0.002 } }
     ];
-    const pro = { t: 'Mi jefe de prensa hablará con su director esta misma noche.', g: 2, kill: 1, fx: { board: 0.5 }, need: ['pre2', 1] };
+    const pro = { t: 'Mi jefe de prensa hablará con su director esta misma noche.', cat: 'hum', g: 2, kill: 1, fx: { board: 0.5 }, need: ['pre2', 1] };
     const open = lv(S, 'pre2') >= 1;
     if (open) opts.push(pro);
     R.cur = opts.sort(() => Math.random() - 0.5);
-    panel.querySelector('.pr-as').innerHTML = R.cur.map((o, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(o.t)}</button>`).join('')
+    R.rep = { n: pick(SLY), m: pick(TABLOIDS), t: 'sensa', g: 0 };
+    meter();
+    panel.querySelector('.pr-as').innerHTML = R.cur.map((o, k) => btnHtml(o, k)).join('')
       + (open ? '' : `<button class="btn block pr-a locked" disabled><span>${esc(pro.t)}</span><small>Requiere: ${esc(skillName('pre2'))} 1</small></button>`);
     const stage = document.querySelector('#prensa .pr-stage');
     if (stage) { stage.classList.remove('murmur'); void stage.offsetWidth; stage.classList.add('murmur'); }
     burst(9); react(RX.scoop, 4);
+    R.temp += 8; meter();
+    startClock();
   }
   function settleTwist(S, a) {
     const club = S.clubs[S.user];
@@ -614,18 +618,141 @@
     return 'Mañana estará en todas partes.';
   }
 
-  // ------------------------------------------------------------ Escena
+  // ------------------------------------------------------------ Escena y minijuego
+  // Cada respuesta tiene un estilo (humilde, protectora, exigente, polémica, evasiva, técnica, ambiciosa, humor) que
+  // gusta a unos y molesta a otros (vestuario, directiva, afición, sala). Esa semana necesitas contentar sobre todo
+  // a uno de ellos. Cada estilo cansa la cabeza: si repites, cuesta más, y los recursos fáciles (las evasivas) se
+  // agotan enseguida. Los periodistas tienen carácter y memoria, repreguntan si les das cuerda, hay tiempo para
+  // contestar y la sala se calienta. Antes de empezar eliges quién te acompaña: según su forma de ser, te salva una
+  // pregunta… o te la lía. Al día siguiente, la portada.
+  const CATS = {
+    hum: { n: 'Humilde', ic: '🙏', cost: 12, cap: 3, aud: { vest: 1, dir: 1, afi: 0, sala: 0 } },
+    pro: { n: 'Protectora', ic: '🛡️', cost: 12, cap: 3, aud: { vest: 2, dir: -0.5, afi: 0.5, sala: 0 } },
+    dur: { n: 'Exigente', ic: '🔨', cost: 14, cap: 2, aud: { vest: -2, dir: 1, afi: 0.5, sala: 1 } },
+    pol: { n: 'Polémica', ic: '🔥', cost: 10, cap: 2, aud: { vest: 0.5, dir: -1.5, afi: 1.5, sala: 2 } },
+    eva: { n: 'Evasiva', ic: '🤐', cost: 20, cap: 2, aud: { vest: 0, dir: 0, afi: -0.5, sala: -2 } },
+    tec: { n: 'Técnica', ic: '🧠', cost: 16, cap: 3, aud: { vest: 0.5, dir: 1, afi: 0, sala: 0.5 } },
+    amb: { n: 'Ambiciosa', ic: '🚀', cost: 10, cap: 2, aud: { vest: 1, dir: -0.5, afi: 1.5, sala: 1 } },
+    hu: { n: 'Humor', ic: '😂', cost: 8, cap: 2, aud: { vest: 0.5, dir: 0, afi: 1, sala: 1.5 } }
+  };
+  const AUD = { vest: 'el vestuario', dir: 'la directiva', afi: 'la afición', sala: 'la prensa' };
+  const AUD_T = { vest: 'Vestuario', dir: 'Directiva', afi: 'Afición', sala: 'Prensa' };
+  function catOf(o) {
+    if (o.cat) return o.cat;
+    const fx = o.fx || {}, t = (o.t || '').toLowerCase();
+    if (o.need) return /^tac|^can|^fis|^neg/.test(o.need[0]) ? 'tec' : /^mot/.test(o.need[0]) ? 'pro' : 'hum';
+    if (fx.fine || fx.rival || /árbitro|robad|colegiado|amarillo|vergüenza|escándalo/.test(t)) return 'pol';
+    if ((fx.pl && fx.pl[1] < 0) || (fx.team || 0) < -0.4) return 'dur';
+    if (/jaja|bocadillo|croqueta|caña|tiktok|abuela|netflix|wallapop|ryanair|spotify|speedrun|unboxing/.test(t)) return 'hu';
+    if (fx.pl && fx.pl[1] > 0) return 'pro';
+    if (o.g === 1 && !Object.keys(fx).length) return 'eva';
+    if (/siguiente|no voy a|prefiero no|sin comentarios|no tengo nada|no entro/.test(t)) return 'eva';
+    if (fx.fans && !(fx.board > 0)) return 'amb';
+    if ((fx.board || 0) > 0) return /pizarra|detall|sistema|líneas|presión|transicion|plan/.test(t) ? 'tec' : 'hum';
+    if ((fx.team || 0) > 0) return 'pro';
+    return 'eva';
+  }
+  // Periodistas: tipo (qué les gusta) y memoria entre ruedas de prensa
+  const REPS = [
+    ['Marta Ibarra', 'Diario Deportivo', 'serio'], ['Luis Cardoso', 'Radio Estadio', 'local'], ['Nerea Sanz', 'La Grada TV', 'local'],
+    ['Pablo Ferrán', 'El Balcón', 'serio'], ['Lucía Mendo', 'Mundo Gol', 'serio'], ['Óscar Rial', 'Pizarra FM', 'serio'],
+    ['Irene Valdés', 'Onda Fútbol', 'local'], ['Bruno Rapiña', 'El Chismoso', 'sensa'], ['Sonia Morbo', 'ClickGol', 'sensa'],
+    ['Ramón Cebo', 'Titular Fácil', 'sensa'], ['Vero Trending', 'La Lupa Rosa', 'sensa'], ['Hugo Ledesma', 'Al Larguero Digital', 'rival']
+  ];
+  const REP_T = { serio: 'serio', local: 'de la casa', sensa: 'sensacionalista', rival: 'del rival' };
+  const PREF = {
+    serio: { hum: 1, pro: 0, dur: 0, pol: -2, eva: -1, tec: 2, amb: -1, hu: -1 },
+    local: { hum: 1, pro: 2, dur: -2, pol: 1, eva: -1, tec: 0, amb: 1, hu: 2 },
+    sensa: { hum: -1, pro: 0, dur: 2, pol: 2, eva: -2, tec: -1, amb: 1, hu: 1 },
+    rival: { hum: 2, pro: 0, dur: 0, pol: -1, eva: 0, tec: 0, amb: -2, hu: -1 }
+  };
+  const mem = S => S.pressMem || (S.pressMem = {});
+  // Repreguntas según el estilo de tu respuesta
+  const FOLLOW = {
+    eva: ['Insisto, míster: ¿no va a contestar a la pregunta?', [
+      { t: 'Vale, se lo digo: no estuvimos finos y lo sabemos.', cat: 'hum', g: 2, fx: { board: 0.3 } },
+      { t: 'Ya he contestado. Siguiente, por favor.', cat: 'eva', g: 0 },
+      { t: 'Le contesto con datos: perdimos los duelos y eso no se negocia.', cat: 'tec', g: 2 }]],
+    pol: ['¿Está acusando directamente al árbitro?', [
+      { t: 'Digo lo que ha visto todo el estadio. Y lo mantengo.', cat: 'pol', g: 1, fx: { fine: [0.45, 5000], fans: 0.003 } },
+      { t: 'No acuso a nadie. Pido que se revise y ya está.', cat: 'hum', g: 2, fx: { board: 0.4 } },
+      { t: 'Le acuso de tener un mal día. Como todos alguna vez.', cat: 'hu', g: 1 }]],
+    dur: ['¿Está diciendo que alguno no tiene nivel para este equipo?', [
+      { t: 'Digo que aquí se exige. El que no lo entienda, lo entenderá.', cat: 'dur', g: 1, fx: { team: -1 } },
+      { t: 'No. Digo que todos podemos dar más, empezando por mí.', cat: 'hum', g: 2, fx: { team: 0.5 } },
+      { t: 'Lo que pasa en el vestuario se queda en el vestuario.', cat: 'eva', g: 1 }]],
+    amb: ['¿Y si no lo consigue? ¿Se iría?', [
+      { t: 'Si no lo consigo, que me lo digan. Pero lo vamos a conseguir.', cat: 'amb', g: 1, fx: { fans: 0.003 } },
+      { t: 'Me iría con la cabeza alta y el trabajo hecho.', cat: 'hum', g: 2, fx: { board: 0.4 } },
+      { t: 'Eso es una pregunta para mayo. Estamos en otro mes.', cat: 'hu', g: 1 }]],
+    pro: ['¿Aunque haya fallado? ¿No es demasiado blando con los suyos?', [
+      { t: 'Blando no. Justo. Al que se equivoca, se le corrige dentro.', cat: 'tec', g: 2, fx: { board: 0.3 } },
+      { t: 'Con los míos, siempre. Que se metan conmigo, no con ellos.', cat: 'pro', g: 1, fx: { team: 0.8, board: -0.3 } },
+      { t: 'Si quiere un sargento, hay películas muy buenas.', cat: 'hu', g: 1 }]],
+    hum: ['¿No le preocupa parecer débil ante el vestuario?', [
+      { t: 'Reconocer errores es de fuertes. Débil es esconderse.', cat: 'hum', g: 2, fx: { team: 0.4 } },
+      { t: 'Débil no. Y el domingo lo verán.', cat: 'amb', g: 1, fx: { fans: 0.002 } },
+      { t: 'Prefiero no seguir por ahí.', cat: 'eva', g: 0 }]],
+    tec: ['Eso suena a excusa de pizarra. ¿Y la actitud?', [
+      { t: 'La actitud ha sido buena. El problema estaba donde le digo.', cat: 'tec', g: 2 },
+      { t: 'Ahí tiene razón: hubo jugadores que no estuvieron.', cat: 'dur', g: 1, fx: { team: -1 } },
+      { t: 'La actitud se entrena. Y la vamos a entrenar.', cat: 'hum', g: 2, fx: { board: 0.3 } }]],
+    hu: ['¿Le parece momento para bromas?', [
+      { t: 'Tiene razón. Perdonen. Hoy no tocaba.', cat: 'hum', g: 2, fx: { board: 0.3 } },
+      { t: 'Si no me río, lloro. Y llorar sale caro.', cat: 'hu', g: 1, fx: { fans: 0.002 } },
+      { t: 'Siguiente pregunta.', cat: 'eva', g: 0 }]]
+  };
+  // Acompañantes: su forma de ser decide si te salvan o te la lían
+  const PERS = {
+    lider: { n: 'Líder', d: 'Comodín: contesta por ti una pregunta y calma la sala.' },
+    profesional: { n: 'Profesional', d: 'Comodín: se queda una pregunta y responde sin sorpresas.' },
+    bromista: { n: 'Bromista', d: 'Comodín: un chiste que destensa la sala (a la prensa seria no le hace gracia).' },
+    bocazas: { n: 'Bocazas', d: 'Puede soltar lo que no debe en cualquier momento. Comodín: una frase que levanta a la grada.' },
+    timido: { n: 'Tímido', d: 'No ayuda. Si le preguntan a él, se bloquea.' }
+  };
+  function persOf(S, p) {
+    const pr = TL.Social && TL.Social.profile ? (() => { try { return TL.Social.profile(S, p); } catch (e) { return null; } })() : null;
+    const tx = JSON.stringify(pr || {}).toLowerCase();
+    if (/líder|lider|capit/.test(tx)) return 'lider';
+    if (/bromist|payas|gracios/.test(tx)) return 'bromista';
+    if (/tímid|timid|introvert/.test(tx)) return 'timido';
+    if (/ego|bocaz|polém|conflict/.test(tx)) return 'bocazas';
+    return ['lider', 'profesional', 'bromista', 'bocazas', 'timido'][(p.id * 7 + (p.age || 0)) % 5];
+  }
+
+  /** El jugador que te acompaña lleva la primera equipación del club (oficial si la conocemos). */
+  function kitCss(club) {
+    const K = club.kit || (window.TL_KITS && window.TL_KITS[club.name]);
+    const c1 = K ? K[0][0] : club.c1 || '#888', c2 = K ? (K[0][1] || K[0][0]) : (club.c2 && club.c2 !== '#111' ? club.c2 : club.c1), p = K ? K[0][2] || '' : '';
+    if (c1 === c2 || !p) return { bg: c1, ring: c2 === c1 ? 'rgba(255,255,255,.85)' : c2 };
+    const bg = {
+      s: `repeating-linear-gradient(90deg, ${c1} 0 14%, ${c2} 14% 28%)`,
+      h: `repeating-linear-gradient(0deg, ${c1} 0 16%, ${c2} 16% 32%)`,
+      c: `linear-gradient(90deg, ${c1} 39%, ${c2} 39% 61%, ${c1} 61%)`,
+      v: `linear-gradient(90deg, ${c1} 50%, ${c2} 50%)`,
+      x: `linear-gradient(135deg, ${c1} 38%, ${c2} 38% 62%, ${c1} 62%)`,
+      k: `conic-gradient(${c1} 25%, ${c2} 0 50%, ${c1} 0 75%, ${c2} 0) 0 0 / 50% 50%`
+    }[p] || c1;
+    return { bg, ring: c2 };
+  }
   const R = { c: null, qs: [], k: 0, log: {}, timers: [], raf: 0, onDone: null };
   function el(id) { return document.getElementById(id); }
+  const timerOn = () => { try { return localStorage.getItem('touchline.prTimer') !== '0'; } catch (e) { return true; } };
 
   function open(S, m, me, onDone) {
     affairMaybe(S);
     const c = context(S, m, me);
-    R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null; R.streak = 0; R.best = 0; R.marks = []; R.grace = lv(S, 'pre1') + (S.me && S.me.st.lab >= 65 ? 1 : 0); R.muleUsed = false; R.twisted = null; R.inTwist = false;
+    R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null;
+    R.muleUsed = false; R.twisted = null; R.inTwist = false; R.fu = 0; R.follow = null;
+    R.en = 100 + 15 * lv(S, 'pre1'); R.uses = {}; R.temp = 25; R.aud = { vest: 0, dir: 0, afi: 0, sala: 0 };
+    R.best = 0; R.streak = 0; R.goodN = 0; R.badN = 0; R.big = null; R.walk = false; R.joker = 1; R.comp = null;
+    // Lo que más necesitas esta semana: lo que peor está
+    const conf = S.board.conf, fan = TL.Hud ? TL.Hud.fansOpinion(S) : 50, mood = TL.Hud ? TL.Hud.squadMood(S) : 60;
+    R.prio = conf <= fan && conf <= mood ? 'dir' : fan <= mood ? 'afi' : 'vest';
     for (const k in c.feed) c.feed[k].asked = true;
     if (!R.qs.length) { if (onDone) onDone(); return; }
     const club = S.clubs[S.user], [c1, c2] = U.clubColors(club.name);
-    const right = c.guest != null ? S.players[c.guest] : null;
+    R.cols = [c1, c2];
     const root = document.createElement('div');
     root.id = 'prensa'; root.className = 'prensa';
     root.innerHTML = `<div class="pr-stage" style="--c1:${c1};--c2:${c2}">
@@ -634,7 +761,6 @@
         <div class="pr-tv"><div class="pr-ad"></div></div>
         <div class="pr-dot pr-l" title="Jefe de prensa"><i></i><b>Prensa</b></div>
         <div class="pr-dot pr-c me" title="${esc(S.manager)}"><i></i><b>Tú</b></div>
-        ${right ? `<div class="pr-dot pr-r" title="${esc(right.name)}"><i></i><b>${esc(right.short)}</b></div>` : ''}
         <img class="pr-table" src="assets/prensa/mesa.webp" alt="">
         <canvas class="pr-light"></canvas>
         <div class="pr-crowd">${Array.from({ length: 9 }, (_, k) => `<i style="--h:${(k * 47) % 360};--x:${4 + k * 11.5}%;--s:${0.85 + ((k * 37) % 30) / 100}"></i>`).join('')}</div>
@@ -650,39 +776,169 @@
     requestAnimationFrame(() => fitTv(root));
     R.timers.push(setTimeout(ambient, 900));
     window.addEventListener('resize', () => { const r = document.getElementById('prensa'); if (r) fitTv(r); });
-    ask();
+    pickCompanion();
   }
 
+  // ---- Antes de empezar: ¿quién te acompaña?
+  function pickCompanion() {
+    const c = R.c, S = c.S, sq = W.squad(S, S.user).filter(p => !(p.inj > 0));
+    const notes = c.m.lastRatings || {};
+    const cand = [];
+    const add = (p, why) => { if (p && !cand.some(x => x.p.id === p.id)) cand.push({ p, why }); };
+    if (c.guest != null) add(S.players[c.guest], 'Mejor del partido');
+    add(sq.slice().sort((a, b) => (b.age - a.age) || (b.ovr - a.ovr))[0], 'Capitán');
+    add(sq.slice().sort((a, b) => b.ovr - a.ovr)[0], 'Estrella');
+    add(sq.filter(p => notes[p.id] != null).sort((a, b) => notes[a.id] - notes[b.id])[0], 'Ha tenido un mal día');
+    add(pick(sq), 'Le apetecía venir');
+    R.cand = cand.slice(0, 4).map(x => ({ ...x, pers: persOf(S, x.p) }));
+    const panel = document.querySelector('#prensa .pr-panel');
+    panel.querySelector('.pr-meter').innerHTML = '';
+    panel.querySelector('.pr-q').innerHTML = `<small>Antes de salir</small>¿Quién te acompaña en la sala?
+      <span class="pr-prio">Esta semana te conviene contentar a <b>${esc(AUD[R.prio])}</b>.</span>`;
+    panel.querySelector('.pr-as').innerHTML = R.cand.map((x, k) => `<button class="btn block pr-a pr-comp" data-act="pr-comp" data-k="${k}">
+        <span><b>${esc(x.p.short)}</b> · ${esc(x.why)} · <i class="pr-pers">${esc(PERS[x.pers].n)}</i></span><small>${esc(PERS[x.pers].d)}</small></button>`).join('')
+      + '<button class="btn block ghost pr-a" data-act="pr-comp" data-k="-1">Voy solo</button>';
+  }
+  A['pr-comp'] = b => {
+    const k = +b.dataset.k, S = R.c.S;
+    R.comp = k >= 0 ? R.cand[k] : null;
+    if (R.comp) {
+      const st = document.querySelector('#prensa .pr-stage');
+      const kc = kitCss(S.clubs[S.user]);
+      st.insertAdjacentHTML('beforeend', `<div class="pr-dot pr-r" title="${esc(R.comp.p.name)}"><i style="background:${kc.bg};box-shadow:0 0 0 3px ${kc.ring}, 0 4px 10px rgb(0 0 0 / .45)"></i><b>${esc(R.comp.p.short)}</b></div>`);
+      const tb = st.querySelector('.pr-table'); if (tb) st.appendChild(tb); const lt = st.querySelector('.pr-light'); if (lt) st.appendChild(lt);
+      const cw = st.querySelector('.pr-crowd'); if (cw) st.appendChild(cw); const sy = st.querySelector('.pr-say'); if (sy) st.appendChild(sy);
+      R.c.guest = R.comp.p.id;
+      if (R.comp.pers === 'timido') R.joker = 0;
+    } else R.joker = 0;
+    ask();
+  };
+
+  // ---- Marcadores: cabeza (agotamiento), temperatura de la sala, tiempo y a quién estás contentando
   function meter() {
     const el0 = document.querySelector('#prensa .pr-meter');
     if (!el0) return;
-    const dots = Array.from({ length: NEED_STREAK }, (_, k) => `<i class="${k < R.streak ? 'on' : ''}"></i>`).join('');
-    const marks = R.marks.map(g => `<b class="g${g}"></b>`).join('');
-    el0.innerHTML = `<span class="pr-st" title="Respuestas buenas seguidas">${dots}</span><span class="pr-mk">${marks}</span>`;
+    const en = Math.max(0, Math.round(R.en)), tp = Math.min(100, Math.round(R.temp));
+    const aud = Object.keys(R.aud).map(k => `<span class="pr-aud ${k === R.prio ? 'prio' : ''} ${R.aud[k] > 0.4 ? 'up' : R.aud[k] < -0.4 ? 'dn' : ''}" title="${AUD_T[k]}">${AUD_T[k]} ${R.aud[k] > 0.4 ? '▲' : R.aud[k] < -0.4 ? '▼' : '·'}</span>`).join('');
+    el0.innerHTML = `<div class="pr-bars"><label>🧠 Cabeza<span class="pr-bar en"><i style="width:${Math.min(100, en)}%"></i></span></label>
+      <label>🌡️ Sala<span class="pr-bar tp ${tp >= 70 ? 'hot' : ''}"><i style="width:${tp}%"></i></span></label>
+      <button class="pr-tmr ${timerOn() ? 'on' : ''}" data-act="pr-tmr" title="Tiempo para responder">⏱</button></div>
+      <div class="pr-auds">${aud}</div>`;
+    const st = document.querySelector('#prensa .pr-stage');
+    if (st) st.classList.toggle('tense', tp >= 70);
+  }
+  A['pr-tmr'] = () => { try { localStorage.setItem('touchline.prTimer', timerOn() ? '0' : '1'); } catch (e) { /* nada */ } meter(); if (!timerOn()) stopClock(); };
+  function stopClock() { clearInterval(R.clock); R.clock = 0; const b = document.querySelector('#prensa .pr-clock'); if (b) b.remove(); }
+  function startClock() {
+    stopClock();
+    if (!timerOn()) return;
+    const total = 14000 + 2000 * lv(R.c.S, 'pre1'), t0 = performance.now();
+    const q = document.querySelector('#prensa .pr-q');
+    if (q) q.insertAdjacentHTML('beforeend', '<span class="pr-clock"><i></i></span>');
+    R.clock = setInterval(() => {
+      const k = (performance.now() - t0) / total, bar = document.querySelector('#prensa .pr-clock i');
+      if (bar) bar.style.width = Math.max(0, 100 - k * 100) + '%';
+      if (k >= 1) { stopClock(); if (R.cur) answer({ t: '…', cat: 'eva', g: 0, silence: true, fx: {} }); }
+    }, 100);
+  }
+
+  function costOf(cat, extra) { return CATS[cat].cost + 6 * (R.uses[cat] || 0) + (extra || 0); }
+  function btnHtml(a, k, extra) {
+    const cat = a.cat, C = CATS[cat], used = R.uses[cat] || 0, cost = costOf(cat, extra);
+    const out = used >= C.cap, poor = R.en < cost;
+    return `<button class="btn block pr-a ${out || poor ? 'tired' : ''}" data-act="pr-answer" data-k="${k}" ${out || poor ? 'disabled' : ''}>
+      <span>${esc(a.t)}</span><small class="pr-cat c-${cat}">${C.ic} ${C.n}${out ? ' · ya no te sale' : poor ? ' · sin fuerzas' : ` · ${'●'.repeat(Math.max(1, Math.round(cost / 8)))}`}</small></button>`;
+  }
+  /** Quién pregunta: un periodista con carácter y memoria (si le dejaste mal, viene a por ti). */
+  function reporter(forced) {
+    if (forced) return forced;
+    const S = R.c.S;
+    const pool = REPS.filter(r => r[2] !== 'rival' || Math.random() < 0.5);
+    const grudgers = pool.filter(r => (mem(S)[r[0]] || 0) >= 2);
+    const r = grudgers.length && Math.random() < 0.45 ? pick(grudgers) : pick(pool);
+    return { n: r[0], m: r[2] === 'rival' ? `corresponsal del ${R.c.opp.name}` : r[1], t: r[2], g: mem(S)[r[0]] || 0 };
   }
   function ask() {
-    const q = R.qs[R.k], c = R.c;
+    const c = R.c, S = c.S;
     const panel = document.querySelector('#prensa .pr-panel');
-    if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
+    if (R.walk) return end();
+    // Repregunta pendiente
+    let q, rep, opts, locked = [], qtxt, tag = '';
+    if (R.follow) {
+      rep = R.follow.rep; const F = FOLLOW[R.follow.cat];
+      qtxt = F[0]; opts = F[1].map(o => ({ ...o })); tag = 'repregunta';
+      R.follow = null; R.fu++;
+      const h = pick(Array.from(document.querySelectorAll('#prensa .pr-crowd i')));
+      if (h) { h.classList.add('mic'); R.timers.push(setTimeout(() => h.classList.remove('mic'), 2400)); }
+    } else {
+      q = R.qs[R.k];
+      if (!q) return end();
+      rep = reporter();
+      qtxt = dressQ(qText(q, c));
+      const o = options(S, q, c);
+      opts = o.shown; locked = o.locked;
+      tag = `${R.k + 1}/${R.qs.length}`;
+      R.k++;
+    }
+    opts.forEach(o => { o.cat = catOf(o); });
+    R.rep = rep; R.q = q || null;
+    // Muletilla: un recurso de humor más
+    const mu = muleOf(S);
+    R.cur = opts.slice();
+    if (!R.muleUsed && mu) R.cur.push({ t: '«' + mu.t + '»', cat: 'hu', g: 1, mule: true, fx: {} });
+    const extra = rep.g >= 2 ? 6 : 0;
     meter();
-    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${(q.id.startsWith('rom') || q.id.startsWith('aff')) ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(dressQ(qText(q, c)))}`;
+    panel.querySelector('.pr-q').innerHTML = `<small>${esc(rep.n)} · ${esc(rep.m)} <i class="pr-rt t-${rep.t}">${esc(REP_T[rep.t])}</i>${rep.g >= 2 ? ' <i class="pr-grudge">🎯 viene a por ti</i>' : ''} <span class="pr-n">${esc(tag)}</span></small>${(q && (q.id.startsWith('rom') || q.id.startsWith('aff'))) ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(qtxt)}`;
     hands();
-    const { shown, locked } = options(c.S, q, c);
-    R.cur = shown;
-    panel.querySelector('.pr-as').innerHTML = shown.map((a, k) => `<button class="btn block pr-a" data-act="pr-answer" data-k="${k}">${esc(a.t)}</button>`).join('')
-      + (R.muleUsed ? '' : muleOf(c.S) ? `<button class="btn block pr-a mule" data-act="pr-mule">«${esc(muleOf(c.S).t)}»<small>Tu frase</small></button>`
-        : (!c.S.mule && R.k === R.qs.length - 1 - (R.qs.length > 3 ? 1 : 0) ? `<button class="btn block pr-a mule" data-act="pr-mule-new">Soltar una frase propia…<small>Puede hacerse famosa</small></button>` : ''))
+    panel.querySelector('.pr-as').innerHTML = R.cur.map((a, k) => btnHtml(a, k, extra)).join('')
+      + (!S.mule && !R.muleUsed && R.k === Math.max(2, R.qs.length - 1) ? `<button class="btn block pr-a mule" data-act="pr-mule-new">Soltar una frase propia…<small>Puede hacerse famosa</small></button>` : '')
+      + (R.joker && R.comp ? `<button class="btn block pr-a joker" data-act="pr-joker">🃏 Que conteste ${esc(R.comp.p.short)}<small>${esc(PERS[R.comp.pers].n)}</small></button>` : '')
       + locked.map(a => `<button class="btn block pr-a locked" disabled><span>${esc(a.t)}</span><small>Requiere: ${esc(TL.t ? TL.t(skillName(a.need[0])) : skillName(a.need[0]))} ${a.need[1]}</small></button>`).join('');
+    // Sin fuerzas para nada: te quedas en blanco
+    if (!R.cur.some(a => (R.uses[a.cat] || 0) < CATS[a.cat].cap && R.en >= costOf(a.cat, extra))) {
+      R.timers.push(setTimeout(() => answer({ t: '… (te quedas en blanco)', cat: 'eva', g: 0, silence: true, fx: {} }), 1400));
+      return;
+    }
     flash();
+    startClock();
+    // El tímido: a veces le preguntan a él y se bloquea. El bocazas: a veces se arranca solo.
+    if (R.comp && !tag.startsWith('rep')) {
+      const P = R.comp.pers, p = R.comp.p;
+      if (P === 'timido' && Math.random() < 0.18) R.timers.push(setTimeout(() => companionLine(`${p.short}: «Eh… yo… mejor que conteste el míster.»`, { temp: 8 }), 900));
+      if (P === 'bocazas' && Math.random() < 0.18) R.timers.push(setTimeout(() => companionLine(`${p.short}, sin que nadie le pregunte: «¡Y que lo sepa todo el mundo: aquí venimos a ganarlo todo!»`, { temp: 12, aud: { afi: 1, dir: -1 } }), 1200));
+      if ((p.mor == null ? 70 : p.mor) < 35 && Math.random() < 0.1) R.timers.push(setTimeout(() => companionLine(`${p.short} resopla en el micro: «Ya veremos si sigo aquí en enero…»`, { temp: 14, aud: { vest: -1, dir: -1 } }), 1500));
+    }
   }
-  A['pr-mule'] = () => {
-    if (!R.cur || R.muleUsed) return;
-    R.muleUsed = true;
-    const S = R.c.S, u = useMule(S, R.c);
-    answer({ t: '«' + muleOf(S).t + '»', g: u.g, fx: {}, react: u.react });
+  function companionLine(text, fx) {
+    if (!document.getElementById('prensa')) return;
+    const say = document.querySelector('#prensa .pr-say');
+    if (say) { say.textContent = text; say.classList.remove('on'); void say.offsetWidth; say.classList.add('on'); }
+    const g = document.querySelector('#prensa .pr-r'); if (g) { g.classList.remove('talk'); void g.offsetWidth; g.classList.add('talk'); }
+    if (fx.temp) R.temp += fx.temp;
+    for (const k in fx.aud || {}) R.aud[k] += fx.aud[k];
+    if (fx.temp > 0) { burst(5); react(RX.bad, 2); } else react(RX.good, 2);
+    meter();
+  }
+  A['pr-joker'] = () => {
+    if (!R.cur || !R.joker || !R.comp) return;
+    R.joker = 0; stopClock();
+    const P = R.comp.pers, p = R.comp.p, rep = R.rep;
+    const L = {
+      lider: [`${p.short}: «Esto lo arreglamos dentro y lo demostramos el domingo. Todos a una.»`, { temp: -15, aud: { vest: 1.5, dir: 0.5 } }, 2],
+      profesional: [`${p.short}: «Hemos hablado mucho de esto. Sabemos qué corregir y lo vamos a corregir.»`, { temp: -8, aud: { dir: 0.8, sala: 0.5 } }, 1],
+      bromista: [`${p.short}: «Yo solo sé que el míster ha prometido pizza si ganamos. Pregunten por la pizza.»`, { temp: -20, aud: { sala: 1, afi: 0.5 } }, rep.t === 'serio' ? -1 : 2],
+      bocazas: [`${p.short}: «¡El domingo les pasamos por encima! ¡Apunten!»`, { temp: 6, aud: { afi: 1.5, dir: -0.5 } }, rep.t === 'sensa' ? 2 : 0]
+    }[P];
+    if (!L) return;
+    R.cur = null;
+    companionLine(L[0], L[1]);
+    reaction(L[2], { t: L[0] });
+    document.querySelectorAll('#prensa .pr-a').forEach(x => { x.disabled = true; });
+    R.timers.push(setTimeout(ask, 2300));
   };
   A['pr-mule-new'] = () => {
     if (!R.cur) return;
+    stopClock();
     const opts = MULES.slice().sort(() => Math.random() - 0.5).slice(0, 3);
     document.querySelector('#prensa .pr-as').innerHTML = '<p class="muted small" style="margin:0 0 6px">Elige con cuidado: si cala, te acompañará siempre.</p>'
       + opts.map(m => `<button class="btn block pr-a mule" data-act="pr-mule-pick" data-id="${m.id}">«${esc(m.t)}»</button>`).join('');
@@ -690,59 +946,127 @@
   A['pr-mule-pick'] = b => {
     const S = R.c.S;
     S.mule = { id: b.dataset.id, fame: 0, uses: 0 };
-    A['pr-mule']();
+    answer({ t: '«' + muleOf(S).t + '»', cat: 'hu', g: 1, mule: true, fx: {} });
   };
   A['pr-answer'] = b => {
     const a = R.cur && R.cur[+b.dataset.k];
     if (a) answer(a);
   };
+  /** Cómo le sienta a la sala: sube o baja la temperatura y queda en la memoria del periodista. */
+  function reaction(score, a) {
+    const S = R.c.S, rep = R.rep;
+    R.temp += score >= 2 ? -8 : score === 1 ? -3 : score === 0 ? 5 : score === -1 ? 12 : 20;
+    R.temp = Math.max(0, R.temp);
+    if (rep && rep.n) { const M = mem(S); M[rep.n] = U.clamp((M[rep.n] || 0) + (score < 0 ? 1 : score >= 2 ? -1 : 0), -2, 3); }
+    if (score >= 1) { R.goodN++; R.streak++; R.best = Math.max(R.best, R.streak); } else { R.badN += score < 0 ? 1 : 0; R.streak = 0; }
+    if (!R.big || Math.abs(score) >= Math.abs(R.big.score)) R.big = { score, t: a.t, rep };
+  }
   function answer(a) {
-    R.cur = null;
-    if (R.inTwist) { R.inTwist = false; a.react = settleTwist(R.c.S, a); }
-    if (a.arc) { a.arc(R.c.S); if (R.c.S._affRx) { a.react = R.c.S._affRx; delete R.c.S._affRx; } }
-    apply(R.c.S, a.fx, R.log);
-    let g = a.g;
-    if (g === 1 && R.grace > 0 && R.streak > 0) { R.grace--; g = 1.5; }
-    if (g === 2) R.streak++; else if (g !== 1.5) R.streak = 0;
-    R.best = Math.max(R.best, R.streak);
-    R.marks.push(g === 1.5 ? 1 : g);
+    const S = R.c.S, rep = R.rep;
+    R.cur = null; stopClock();
+    if (R.inTwist) { R.inTwist = false; a.react = settleTwist(S, a); }
+    if (a.arc) { a.arc(S); if (S._affRx) { a.react = S._affRx; delete S._affRx; } }
+    if (a.mule) { R.muleUsed = true; const u = useMule(S, R.c); a.g = u.g; a.react = u.react; }
+    apply(S, a.fx, R.log);
+    const cat = a.cat || 'eva', C = CATS[cat];
+    R.en -= a.silence ? 0 : costOf(cat, rep && rep.g >= 2 ? 6 : 0);
+    R.uses[cat] = (R.uses[cat] || 0) + 1;
+    const w = a.g === 0 ? 0.6 : 1;
+    for (const k in C.aud) R.aud[k] += C.aud[k] * w * (a.silence ? 0 : 1);
+    let score = (PREF[rep ? rep.t : 'serio'][cat] || 0) + ((a.g == null ? 1 : a.g) - 1) - (rep && rep.g >= 2 ? 1 : 0);
+    if (a.silence) score = -2;
+    reaction(score, a);
+    // En escena
     const say = document.querySelector('#prensa .pr-say'), me = document.querySelector('#prensa .pr-c');
     if (say) { say.textContent = a.t; say.classList.remove('on'); void say.offsetWidth; say.classList.add('on'); }
-    if (me) { me.classList.remove('talk'); void me.offsetWidth; me.classList.add('talk'); }
+    if (me) { me.classList.remove('talk', 'happy', 'sad'); void me.offsetWidth; me.classList.add('talk', score >= 1 ? 'happy' : score < 0 ? 'sad' : 'talk'); }
     lightPulse(0.5, 0.25, 0.5, 0.35, 1400, [255, 236, 200]);
     const gg = document.querySelector('#prensa .pr-r');
     if (gg && a.fx && a.fx.pl && a.fx.pl[0] === R.c.guest) { const k = a.fx.pl[1] > 0 ? 'happy' : 'sad'; gg.classList.remove('happy', 'sad'); void gg.offsetWidth; gg.classList.add(k); }
-    // La sala reacciona: el de prensa asiente con las buenas y se lleva la mano a la frente con las malas
     const l = document.querySelector('#prensa .pr-l');
-    if (l) { const k = a.g === 0 ? 'sad' : 'nod'; l.classList.remove('nod', 'sad'); void l.offsetWidth; l.classList.add(k); }
-    if (a.react && /TikTok|ríe|Sonrisas|risa/.test(a.react)) { burst(4); react(RX.funny, 3); }
-    else if (a.g === 2) { burst(3); react(RX.good, 2); }
-    else if (a.g === 1) react(RX.meh, 1);
-    else { burst(7); react(RX.bad, 4); }
+    if (l) { const k = score < 0 ? 'sad' : 'nod'; l.classList.remove('nod', 'sad'); void l.offsetWidth; l.classList.add(k); }
+    if (cat === 'hu' && score >= 1) { burst(4); react(RX.funny, 3); }
+    else if (score >= 2) { burst(3); react(RX.good, 2); }
+    else if (score >= 0) react(RX.meh, 1);
+    else { burst(score <= -2 ? 9 : 6); react(RX.bad, score <= -2 ? 5 : 3); }
     const stage = document.querySelector('#prensa .pr-stage');
-    if (stage) { stage.classList.remove('murmur'); if (a.g === 0) { void stage.offsetWidth; stage.classList.add('murmur'); } }
+    if (stage) { stage.classList.remove('murmur'); if (score < 0) { void stage.offsetWidth; stage.classList.add('murmur'); } }
     meter();
     document.querySelectorAll('#prensa .pr-a').forEach(x => { x.disabled = true; });
     if (TL.SFX && TL.SFX.click) TL.SFX.click();
     if (a.react) { const q = document.querySelector('#prensa .pr-q'); if (q) q.insertAdjacentHTML('beforeend', `<em class="pr-react">${esc(a.react)}</em>`); }
-    const doTwist = !R.twisted && !a.react && R.k < R.qs.length - 1 && Math.random() < 0.16;
-    if (doTwist) { R.inTwist = true; R.timers.push(setTimeout(() => showTwist(a), 1900)); return; }
-    R.timers.push(setTimeout(() => { R.k++; ask(); }, a.react ? 2300 : 1700));
+    // La sala se desborda: te levantas y te vas (o te echan)
+    if (R.temp >= 100) { R.walk = true; R.timers.push(setTimeout(end, 1900)); return; }
+    // Titular retorcido (los sensacionalistas, sobre todo)
+    const twistP = rep && rep.t === 'sensa' ? 0.35 : 0.08;
+    if (!R.twisted && !a.react && !a.silence && !a.cat2 && Math.random() < twistP && R.k < R.qs.length) { R.inTwist = true; R.timers.push(setTimeout(() => showTwist(a), 1900)); return; }
+    // Repregunta: si les das cuerda, o si vienen a por ti
+    const fuP = (['eva', 'pol', 'dur', 'amb', 'hu'].includes(cat) ? 0.45 : 0.18) + (rep && rep.g >= 2 ? 0.3 : 0);
+    if (R.fu < 2 && !a.fu && Math.random() < fuP) R.follow = { cat, rep };
+    R.timers.push(setTimeout(ask, a.react ? 2300 : 1700));
+  }
+
+  // ---- Final: veredicto según a quién necesitabas contentar, y la portada de mañana
+  function verdict2(S) {
+    const club = S.clubs[S.user], N = TL.News.fx;
+    const ps = S.prensaStats || (S.prensaStats = { n: 0, wins: 0, bestStreak: 0, twists: 0, twistOk: 0, rep: 50, skipped: 0 });
+    ps.n++; ps.bestStreak = Math.max(ps.bestStreak, R.best);
+    if (R.twisted) { ps.twists++; if (R.log.twistOk) ps.twistOk++; }
+    // Efectos de los públicos
+    const A0 = R.aud;
+    N.board(S, A0.dir * 0.6); N.teamMor(S, A0.vest * 0.5); N.fans(S, A0.afi * 0.0015);
+    R.log.board = (R.log.board || 0) + A0.dir * 0.6; R.log.team = (R.log.team || 0) + A0.vest * 0.5; R.log.fans = (R.log.fans || 0) + A0.afi * 0.0015;
+    ps.rep = U.clamp(ps.rep + A0.sala * 2 - (R.walk ? 10 : 0), 0, 100);
+    if (R.walk) {
+      N.board(S, -2);
+      TL.News.add(S, 'polemica', `${S.manager} abandona la rueda de prensa`, `El técnico de ${club.name} se levanta a mitad de las preguntas. La sala, en llamas.`, club.id, null, 'neg');
+      return { win: false, title: 'Te has levantado y te has ido', text: 'La sala estaba al rojo vivo. Mañana se hablará más de tu salida que del partido.' };
+    }
+    const ok = A0[R.prio] >= 1.2 && R.temp < 70;
+    if (ok) {
+      ps.wins++;
+      TL.News.add(S, 'club', `${S.manager}, sobresaliente ante los micrófonos`, `El técnico de ${club.name} firmó una rueda de prensa impecable tras el partido.`, club.id, null, 'pos');
+      return { win: true, title: 'Rueda de prensa redonda', text: `Has contentado a ${AUD[R.prio]}, que era lo que tocaba esta semana.` };
+    }
+    if (R.temp >= 70) TL.News.add(S, 'polemica', `Rueda de prensa tensa de ${S.manager}`, `Las respuestas del técnico de ${club.name} no gustaron ni en la sala ni en el club.`, club.id, null, 'neg');
+    return { win: false, title: R.temp >= 70 ? 'Se te ha ido de las manos' : 'No has convencido', text: A0[R.prio] < 1.2 ? `Esta semana necesitabas a ${AUD[R.prio]} y no te ha comprado el discurso.` : 'La sala ha acabado demasiado caliente.' };
+  }
+  function portada(S, v) {
+    const big = R.big || { t: '…', rep: { m: 'Diario Deportivo' }, score: 0 };
+    const media = big.rep && big.rep.m ? big.rep.m : 'Diario Deportivo';
+    const raw = big.t.replace(/^[^«]*«|»$/g, '').replace(/^«|»$/g, ''); const quote = raw.length > 95 ? raw.slice(0, 92) + '…' : raw;
+    const d = TL.Events ? TL.Events.dateOf(S, TL.Events.st(S).d + 1) : new Date();
+    const line = k => `${AUD_T[k]}: ${R.aud[k] > 0.4 ? 'a favor' : R.aud[k] < -0.4 ? 'en contra' : 'indiferente'}`;
+    return `<div class="pr-paper ${v.win ? 'win' : 'lose'}"><div class="pp-mast">${esc(media)}</div>
+      <div class="pp-date">${esc(d.toLocaleDateString(TL.I18N ? TL.I18N.locale() : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</div>
+      <div class="pp-body"><i class="pp-photo" style="--c:${R.cols[0]}"></i><div><h3>«${esc(quote)}»</h3><p>${esc(S.manager)}, ${big.score >= 1 ? 'convincente' : big.score < 0 ? 'en el ojo del huracán' : 'sin mojarse demasiado'} tras el partido.</p></div></div>
+      <div class="pp-cols">${['vest', 'dir', 'afi', 'sala'].map(k => `<span class="${R.aud[k] > 0.4 ? 'up' : R.aud[k] < -0.4 ? 'dn' : ''}">${esc(line(k))}</span>`).join('')}</div></div>`;
   }
   function end() {
     const S = R.c.S;
+    stopClock();
     const panel = document.querySelector('#prensa .pr-panel');
-    const v = verdict(S, R);
+    const v = verdict2(S);
     const fame = muleSteps(S);
+    // El que te acompaña sale desgastado: cuanto más larga y caliente la sala, más (y si le hiciste contestar, más aún)
+    if (R.comp && S.players[R.comp.p.id]) {
+      const p = S.players[R.comp.p.id];
+      const n = R.goodN + R.badN + R.fu + 3;
+      const wear = Math.round(8 + n * 1.6 + (R.temp >= 70 ? 8 : 0) + (R.joker ? 0 : 5) + (R.comp.pers === 'timido' ? 5 : 0));
+      p.fit = Math.max(35, (p.fit == null ? 100 : p.fit) - wear);
+      if (R.temp >= 70 && TL.News && TL.News.fx) TL.News.fx.mor(p, -4);
+      fame.push(wear >= 22 ? `${p.short} sale de la sala exprimido: le costará rendir en los próximos días.` : `${p.short} acaba cansado de tanto micrófono.`);
+    }
     if (R.log.merch) fame.push(`Las camisetas con tu frase vuelan: +${U.money(R.log.merch)}.`);
     meter();
     panel.querySelector('.pr-q').innerHTML = `<small>Fin de la rueda de prensa</small><span class="pr-v ${v.win ? 'win' : 'lose'}">${esc(v.title)}</span> ${esc(v.text)}`;
-    panel.querySelector('.pr-as').innerHTML = `<ul class="pr-sum">${fame.map(x => `<li class="pr-fame">${esc(x)}</li>`).join('')}${summary(S, R.log).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    panel.querySelector('.pr-as').innerHTML = portada(S, v) + `<ul class="pr-sum">${fame.map(x => `<li class="pr-fame">${esc(x)}</li>`).join('')}${summary(S, R.log).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
       <button class="btn primary block" data-act="pr-close">Salir de la sala</button>`;
+    burst(v.win ? 4 : 8);
     G.save();
   }
   A['pr-close'] = () => {
-    R.timers.forEach(clearTimeout); R.timers = [];
+    R.timers.forEach(clearTimeout); R.timers = []; stopClock();
     cancelAnimationFrame(R.raf);
     const root = el('prensa'); if (root) root.remove();
     const cb = R.onDone; R.onDone = null;
