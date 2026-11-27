@@ -897,7 +897,7 @@
 
   const NEWS_IC = {
     liga: '⚽', fichajes: '🔁', polemica: '🔥', arbitraje: '⚖️', aficion: '📢', vestuario: '🚪', sucesos: '🚨',
-    tribunales: '🏛️', dopaje: '💉', redes: '📱', ocio: '🍸', mercado: '💼', club: '🏟️', positivo: '⭐', rumor: '👀'
+    opinion: '🖋️', tribunales: '🏛️', dopaje: '💉', redes: '📱', ocio: '🍸', mercado: '💼', club: '🏟️', positivo: '⭐', rumor: '👀'
   };
   function newsHtml(S, n) {
     const club = n.club >= 0 ? S.clubs[n.club] : null;
@@ -1102,6 +1102,7 @@
     if (!UI.canSpendDay(S)) { toast('Hoy hay partido: no te queda ningún día libre para eso.', true); return; }
     const r = TL.Locker.activity(S, k);
     toast(r.msg, !r.ok);
+    if (r.ok && TL.Persona) TL.Persona.signal(S, 'act:' + k);
     if (r.ok) {
       TL.FX && TL.FX.sparkle(el); TL.SFX && TL.SFX.success();
       UI.spendDay(S, { bbq: ['🍖', 'Barbacoa con la plantilla'], dayoff: ['🏖️', 'Día libre para todos'], retreat: ['⛺', 'Concentración'] }[k] || ['📅', 'Actividad']);

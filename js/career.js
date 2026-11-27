@@ -86,6 +86,7 @@
       `${S.manager} firma como entrenador de ${c.name}${mid ? ' con la temporada en marcha' : ''}. ` +
       (mid ? `Objetivo: ${S.board.text}.` : 'La directiva te comunicará el objetivo al empezar la temporada.'), 'board');
     if (st.back) S.board.conf = st.firedBefore ? 55 : 65;
+    if (st.firedBefore && TL.Persona) TL.Persona.milestone(S, 'vuelta');
     if (st.firedBefore) TL.News.add(S, 'club', `La vuelta de ${S.manager}`, `${c.name} llama al técnico que despidió. Él coge el teléfono. Esto huele a guion de Netflix.`, clubId, null, 'pos');
     else TL.News.add(S, 'club', `${S.manager} firma por ${c.name}`, `Deja ${old.name} para asumir un nuevo proyecto.`, clubId, null, 'pos');
     return { ok: true, msg: `¡Eres el nuevo entrenador de ${c.name}!` };
@@ -114,6 +115,7 @@
     const old = S.cv.find(x => x.club === oppId && x.end === 'fired');
     if (old && gf > ga && !c.revenge.includes(S.season + ':' + oppId)) {
       c.revenge.push(S.season + ':' + oppId);
+      if (TL.Persona) TL.Persona.signal(S, 'venganza');
       S.mgr.rep = U.clamp(rep(S) + 2, 0, 100);
       TL.News.add(S, 'club', `La venganza de ${S.manager}`, `El técnico que despidió ${S.clubs[oppId].name} vuelve y les gana ${gf}-${ga}. En el palco hay caras largas.`, S.user, null, 'pos');
     }
@@ -125,6 +127,7 @@
     // Redención: vuelves al club que te echó y cumples
     if (c.firedBefore && !c.redeemed && sum.pos <= sum.target) {
       c.redeemed = true;
+      if (TL.Persona) TL.Persona.signal(S, 'redencion');
       S.mgr.rep = U.clamp(rep(S) + 6, 0, 100);
       TL.News.add(S, 'positivo', `Redención completa`, `${S.manager} vuelve a ${c.name}, el club que le echó, y cumple el objetivo. Ya hay quien habla de película.`, S.user, null, 'pos');
     }

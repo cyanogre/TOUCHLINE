@@ -108,6 +108,7 @@
     delete S.com.offers[slot];
     (S.prensaFeed || (S.prensaFeed = [])).push({ kind: 'sponsor', week: S.week, season: S.season, brand: o.brand, risky: o.style === 'risky', sector: o.sector, slot }); if (S.prensaFeed.length > 8) S.prensaFeed.shift();   // para la rueda de prensa
     if (o.style === 'risky') S.com.fans = Math.round(S.com.fans * (o.sector === 'betting' ? 0.985 : 0.99));
+    if (o.style === 'risky' && TL.Persona) TL.Persona.signal(S, 'sponsor_riesgo');
     if (slot === 'stadium') {
       const c = S.clubs[S.user];
       S.com.oldStadium = c.stadium;
@@ -158,6 +159,7 @@
     if (id === 'stars') {
       W.squad(S, S.user).sort((a, b) => b.ovr - a.ovr).slice(0, 4).forEach(p => { p.mor = U.clamp((p.mor || 70) - 4, 0, 100); });
     }
+    if (TL.Persona) TL.Persona.signal(S, 'campana');
     return { ok: true, msg: `Campaña lanzada (${U.money(cost)})` };
   }
 

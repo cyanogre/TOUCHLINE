@@ -130,3 +130,11 @@ TL_I18N_ADD([
   ['Directiva, afición, vestuario, prensa y tu historial.', 'Board, fans, dressing room, press and your history.', 'Direction, supporters, vestiaire, presse et votre parcours.', 'Vorstand, Fans, Kabine, Presse und deine Laufbahn.', 'Dirigenza, tifosi, spogliatoio, stampa e la tua storia.']
 ]);
 TL_I18N_ADD([['‹ Inicio', '‹ Home', '‹ Accueil', '‹ Start', '‹ Home']]);
+TL_I18N_ADD([
+  ['Opinión', 'Opinion', 'Opinion', 'Meinung', 'Opinione'],
+  ['La columna de Garrido', 'Garrido’s column', 'La chronique de Garrido', 'Garridos Kolumne', 'La rubrica di Garrido'],
+  ['Biografía no autorizada', 'Unauthorised biography', 'Biographie non autorisée', 'Nicht autorisierte Biografie', 'Biografia non autorizzata'],
+  ['por Aurelio Garrido', 'by Aurelio Garrido', 'par Aurelio Garrido', 'von Aurelio Garrido', 'di Aurelio Garrido'],
+  ['Un mensaje del Profe', 'A message from the Prof', 'Un message du Prof', 'Eine Nachricht vom Prof', 'Un messaggio dal Prof'],
+  ['Un patrocinador se distancia', 'A sponsor distances itself', 'Un sponsor prend ses distances', 'Ein Sponsor geht auf Distanz', 'Uno sponsor prende le distanze']
+]);
