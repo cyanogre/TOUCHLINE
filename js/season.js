@@ -157,6 +157,7 @@
     for (const r of results) if (r.review) TL.Coach.store(S, r.review);
     TL.Locker.afterRound(S, results);
     TL.Staff.weekly(S);
+    if (TL.Staff.poach) TL.Staff.poach(S);
     // Historial para las gráficas: saldo y posición jornada a jornada
     S.hist = S.hist || { cash: [], pos: [] };
     const tabNow = table(S);
@@ -413,6 +414,7 @@
 
   /** Arranca la temporada siguiente tras endSeason. */
   function newSeason(S) {
+    if (TL.Staff && TL.Staff.newSeason) TL.Staff.newSeason(S);
     S.season++;
     S.week = 0;
     S.endDone = false;
