@@ -1292,8 +1292,9 @@
     if (resTab) {
       const bill = U.sum(sq, p => p.wage), cap = sq.filter(p => AC.atCap(p)).length;
       return pageTitle('Plantilla', `Filial · ${sq.length}/${AC.MAX_RES} jugadores`) + seg +
-        `<section class="card res-intro"><p>${S.gender === 'F' ? 'Las canteranas nuevas llegan aquí cada verano.' : 'Los canteranos nuevos llegan aquí cada verano.'} En el filial juegan cada semana y crecen como si estuvieran ${S.gender === 'F' ? 'cedidas' : 'cedidos'}, pero solo hasta cierto punto: el filial se les queda pequeño. ${S.gender === 'F' ? 'Para que lleguen a su techo, súbelas al primer equipo o cédelas.' : 'Para que lleguen a su techo, súbelos al primer equipo o cédelos.'} A los ${AC.PROMOTE_AGE} años suben obligatoriamente.</p>
+        `<section class="card res-intro"><p>${S.gender === 'F' ? 'Las canteranas nuevas llegan aquí cada verano.' : 'Los canteranos nuevos llegan aquí cada verano.'} El filial juega su propia liga cada semana: crece quien juega (y más si juega bien y en una categoría exigente); quien no juega, se estanca. Aun así, el filial se les queda pequeño a partir de cierto punto. ${S.gender === 'F' ? 'Para que lleguen a su techo, súbelas al primer equipo o cédelas.' : 'Para que lleguen a su techo, súbelos al primer equipo o cédelos.'} A los ${AC.PROMOTE_AGE} años suben obligatoriamente.</p>
           <p class="note">Cobran ${U.money(AC.RES_WAGE)}/sem hasta que les renuevas. ${S.gender === 'F' ? `Desde la ficha de cada jugadora puedes subirla o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarla.` : `Desde la ficha de cada jugador puedes subirle o, si tiene ${AC.DEMOTE_MAX_AGE} años o menos, bajarle.`}</p></section>
+        ${filialLeague(S)}
         <div class="kpis" style="margin:12px 0">
           <div class="kpi"><div class="k">Media</div><div class="v">${avg.toFixed(1)}</div></div>
           <div class="kpi"><div class="k">Ya no crecen aquí</div><div class="v">${cap}</div></div>
@@ -1814,6 +1815,27 @@
             <button class="btn sm ghost" data-act="staff-hire" data-id="${c.id}" data-m="haggle" title="Puede aceptar una rebaja… u ofenderse">Regatear</button>
             <button class="btn sm ghost" data-act="staff-hire" data-id="${c.id}" data-m="raise" title="Pagas un 15 % más y llega encantado">Pagar más</button></div></div>`).join('') : '<div class="empty">No quedan candidatos para este puesto. Vuelve en unas jornadas.</div>'}
         <p class="note mt">La calidad se paga: una promesa sale barata y mejora con los años; una estrella cuesta un dineral. Despedir a alguien cuesta lo que le queda de contrato. Al acabar el contrato te pedirá renovar según lo que valga entonces, y si es muy bueno otros clubes intentarán llevárselo.</p></section></div>`;
+  }
+  /** La liga del filial: categoría, puesto, resultados, clasificación y sus goleadores. */
+  function filialLeague(S) {
+    const AC = TL.Academy, lg = AC.lg && AC.lg(S);
+    if (!lg) return '<section class="card mt"><div class="card-head"><h2>Liga del filial</h2></div><p class="note">El filial empieza a competir en la primera jornada.</p></section>';
+    const T = AC.table(S), n = T.length, pos = T.findIndex(r => r.me) + 1, me = T[pos - 1];
+    const lr = lg.lastRes, nx = lg.fx[S.week] && lg.fx[S.week].find(m => lg.teams[m[0]].me || lg.teams[m[1]].me);
+    const around = T.map((r, i) => ({ r, i })).filter(({ i }) => i < 3 || Math.abs(i - (pos - 1)) <= 2 || i >= n - 2);
+    let last = -1;
+    const rows = around.map(({ r, i }) => { const gap = last >= 0 && i - last > 1 ? '<tr class="gap"><td colspan="5">…</td></tr>' : ''; last = i;
+      const zone = i < 2 && lg.div > 0 ? 'up' : i >= n - 3 && lg.div < 2 ? 'dn' : '';
+      return `${gap}<tr class="${r.me ? 'me' : ''} ${zone}"><td>${i + 1}</td><td class="l">${esc(r.n)}</td><td>${r.pj}</td><td>${r.gf - r.gc > 0 ? '+' : ''}${r.gf - r.gc}</td><td><b>${r.pts}</b></td></tr>`; }).join('');
+    const sc = Object.entries(lg.st).filter(([id]) => S.players[id] && S.players[id].res).map(([id, st]) => ({ p: S.players[id], st })).sort((a, b) => b.st[1] - a.st[1] || b.st[3] / b.st[0] - a.st[3] / a.st[0]).slice(0, 6);
+    return `<section class="card mt fil-lg"><div class="card-head"><h2>🏟️ ${esc(AC.DIVS[lg.div])}</h2><span class="muted">${pos}º de ${n} · ${me ? me.pts : 0} pts</span></div>
+      <div class="fil-strip">${lr ? `<div><small>Último</small><b>${lr.home ? 'vs' : 'en'} ${esc(lr.opp)}</b><span class="fil-res ${lr.gf > lr.ga ? 'w' : lr.gf < lr.ga ? 'l' : 'd'}">${lr.gf}-${lr.ga}</span></div>` : ''}
+        ${nx ? `<div><small>Próximo</small><b>${lg.teams[nx[0]].me ? 'vs ' + esc(lg.teams[nx[1]].n) : 'en ' + esc(lg.teams[nx[0]].n)}</b></div>` : ''}
+        ${me ? `<div class="hud-form">${me.form.slice(-5).map(f => `<i class="${f}">${f}</i>`).join('')}</div>` : ''}</div>
+      <table class="table fil-t"><thead><tr><th>#</th><th class="l">Equipo</th><th>PJ</th><th>DG</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="note">${lg.div > 0 ? 'Los 2 primeros ascienden. ' : ''}${lg.div < 2 ? 'Los 3 últimos descienden. ' : ''}Cuanto más alta la categoría, más crecen tus canteranos.</p>
+      ${sc.length ? `<div class="group-title">Quién está jugando</div><table class="table"><thead><tr><th class="l">Jugador</th><th>PJ</th><th>Goles</th><th>Asist.</th><th>Nota</th></tr></thead><tbody>
+        ${sc.map(({ p, st }) => `<tr data-act="player" data-id="${p.id}"><td class="l">${esc(p.short)} <small class="muted">${esc(F.POS_ES ? F.POS_ES[p.pos] : p.pos)}</small></td><td>${st[0]}</td><td>${st[1]}</td><td>${st[2]}</td><td>${(st[3] / Math.max(1, st[0])).toFixed(1)}</td></tr>`).join('')}</tbody></table>` : ''}</section>`;
   }
   A['staff-role'] = el => { UI.staffRole = el.dataset.k; UI.refresh(); };
   /** Presentación de un técnico nuevo: unas palabras, con su voz (fija según su nombre; las técnicas, más aguda). */
@@ -2465,6 +2487,7 @@
       </div>
       ${sum.left.length ? `<p class="note mt">Se van libres (fin de contrato): ${esc(sum.left.join(', '))}.</p>` : ''}
       ${sum.retired.length ? `<p class="note mt">Se retiran: ${esc(sum.retired.join(', '))}.</p>` : ''}
+      ${sum.filial ? `<p class="note mt">🌱 El filial termina ${sum.filial.pos}º de ${sum.filial.n} en ${esc(TL.Academy.DIVS[sum.filial.div])} y ${esc(sum.filial.what)}.</p>` : ''}
       ${sum.promoted && sum.promoted.length ? `<p class="note mt">Suben del filial al primer equipo (${TL.Academy.PROMOTE_AGE} años): ${esc(sum.promoted.join(', '))}.</p>` : ''}
       ${youth.length ? `<div class="group-title">${TL.Academy && TL.Academy.on(S) ? 'Llegan al filial' : 'Llegan de la cantera'}</div>${youth.map(p => playerRow(S, p, { act: 'noop', sub: `${p.age} años · potencial ${potTxt(S, p)}` })).join('')}` : ''}
       ${sum.lastChance ? '<p class="note bad mt">La directiva está muy descontenta, pero te da una última oportunidad. Otra temporada así y estarás fuera.</p>' : ''}

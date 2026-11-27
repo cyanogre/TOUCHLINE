@@ -140,8 +140,137 @@
    */
   function grow(S, p, ageF, morF, growth, youthSkill) {
     const room = Math.max(0, capOf(p) - p.ovr);
-    return room * 0.016 * ageF * 0.95 * morF * growth * youthSkill;
+    // Como en la vida real: crece el que juega (y más si juega bien y en una categoría exigente); el que no juega se estanca
+    const L = S.ac && S.ac.last, g = L && L[p.id];
+    const play = !L ? 1 : !g ? 0.45 : g.min >= 60 ? 1.2 + U.clamp((g.r - 6.5) * 0.15, -0.2, 0.3) : 0.85;
+    const lg = S.ac && S.ac.lg, divF = lg ? [1.12, 1, 0.9][lg.div] : 1;
+    return room * 0.016 * ageF * 0.95 * morF * growth * youthSkill * play * divF;
   }
 
-  TL.Academy = { RES_WAGE, CAP, PROMOTE_AGE, DEMOTE_MAX_AGE, MAX_RES, on, reserve, capOf, atCap, makeYouth, intake, start, promoteAged, fillFirst, MIN_FIRST, promote, demote, canDemote, grow };
+  // ------------------------------------------------------------ La liga del filial
+  // El filial compite de verdad: su propia liga (Primera, Segunda o Tercera Federación) contra otros filiales y
+  // clubes modestos, con calendario, resultados, clasificación, ascensos y descensos. Los rivales no tienen
+  // jugadores propios (solo un nivel); el filial juega con sus canteranos de verdad: minutos, goles, notas,
+  // cansancio y alguna lesión. Nunca puede estar en la misma categoría que el primer equipo.
+  const DIVS = ['Primera Federación', 'Segunda Federación', 'Tercera Federación'];
+  const TOWNS = ['CD Ribera', 'UD Sierra Alta', 'Atlético Vegalonga', 'CF Puerto Viejo', 'SD Robledal', 'Real Arenales', 'CD Monteluz', 'UD Campomar',
+    'CF Villanegra', 'Racing Costabrava', 'CD Pinarejo', 'UD Almenara', 'Deportivo Valdecruz', 'CF Torreblanca', 'SD Castrillo', 'Arenas de Río',
+    'CD Navalsol', 'UD Fuenteluna', 'Club Peñaroja', 'CF Lagunilla', 'Sporting Marisma', 'Atlético Mirasierra', 'CD Olmedilla', 'UD Barrancos'];
+  const lgOf = S => (S.ac && S.ac.lg && S.ac.lg.s === S.season ? S.ac.lg : null);
+  function firstLevel(S) {
+    const sq = W().squad(S, S.user).slice().sort((a, b) => b.ovr - a.ovr).slice(0, 14);
+    return sq.length ? U.sum(sq, p => p.ovr) / sq.length : 65;
+  }
+  /** Calendario de ida y vuelta (método del círculo). */
+  function roundRobin(n) {
+    const ids = Array.from({ length: n }, (_, i) => i), half = [];
+    for (let r = 0; r < n - 1; r++) {
+      const rd = [];
+      for (let i = 0; i < n / 2; i++) { const a = ids[i], b = ids[n - 1 - i]; rd.push(r % 2 ? [b, a, -1, -1] : [a, b, -1, -1]); }
+      half.push(rd);
+      ids.splice(1, 0, ids.pop());
+    }
+    return half.concat(half.map(rd => rd.map(([a, b]) => [b, a, -1, -1])));
+  }
+  function buildLeague(S) {
+    S.ac = S.ac || {};
+    const prev = S.ac.lg, rep = S.clubs[S.user].rep;
+    const div = prev ? (prev.next != null ? prev.next : prev.div) : rep >= 84 ? 0 : rep >= 70 ? 1 : 2;
+    let n = Math.round((S.fixtures ? S.fixtures.length : 38) / 2) + 1;
+    n = U.clamp(n % 2 ? n + 1 : n, 10, 22);
+    const base = firstLevel(S) - [17, 22, 27][div];
+    const own = S.clubs[S.user];
+    const bs = U.shuffle(W().userLeague(S).clubs.filter(id => id !== S.user).map(id => S.clubs[id])).slice(0, Math.floor(n / 2) - 1).map(c => `${c.short || c.name} B`);
+    const names = bs.concat(U.shuffle(TOWNS.slice())).slice(0, n - 1);
+    const teams = [{ n: `${own.short || own.name} B`, me: true, str: 0 }].concat(names.map(nm => ({ n: nm, str: Math.round((base + U.rand(-5, 5)) * 10) / 10 })));
+    U.shuffle(teams);
+    S.ac.lg = { s: S.season, div, teams, fx: roundRobin(n), st: {}, news: [] };
+    return S.ac.lg;
+  }
+  const meIdx = lg => lg.teams.findIndex(t => t.me);
+  /** El once del filial: los mejores disponibles; si faltan, juveniles de relleno (más flojos). */
+  function lineup(S) {
+    const avail = reserve(S).filter(p => !(p.inj > 0) && !(p.sus > 0)).sort((a, b) => (b.ovr * (0.6 + p01(b.fit))) - (a.ovr * (0.6 + p01(a.fit))));
+    const gk = avail.find(p => p.pos === 'GK');
+    const xi = (gk ? [gk] : []).concat(avail.filter(p => p !== gk && p.pos !== 'GK').slice(0, gk ? 10 : 11));
+    const bench = avail.filter(p => !xi.includes(p)).slice(0, 5);
+    const pad = Math.max(0, 11 - xi.length);
+    const str = xi.length ? (U.sum(xi, p => p.ovr * (0.85 + 0.15 * p01(p.fit))) + pad * 40) / 11 : 40;
+    return { xi, bench, str };
+  }
+  const p01 = f => U.clamp(((f == null ? 100 : f) - 40) / 60, 0, 1);
+  function score(a, b, home) {
+    const xa = 1.25 * Math.exp(0.05 * (a - b + (home ? 2.5 : -2.5))), xb = 1.25 * Math.exp(0.05 * (b - a + (home ? -2.5 : 2.5)));
+    return [U.poisson(U.clamp(xa, 0.15, 4.5)), U.poisson(U.clamp(xb, 0.15, 4.5))];
+  }
+  /** Una jornada del filial (la llama la temporada cada semana). */
+  function playRound(S) {
+    if (!on(S)) return null;
+    const lg = lgOf(S) || buildLeague(S), rd = lg.fx[S.week];
+    if (!rd) return null;
+    const me = meIdx(lg), L = lineup(S);
+    lg.teams[me].str = Math.round(L.str * 10) / 10;
+    S.ac.last = {};
+    let mine = null;
+    for (const m of rd) {
+      const [h, a] = m, sh = lg.teams[h].str, sa = lg.teams[a].str;
+      [m[2], m[3]] = score(sh, sa, true);
+      if (h === me || a === me) mine = m;
+    }
+    if (mine && L.xi.length) {
+      const home = mine[0] === me, gf = home ? mine[2] : mine[3], ga = home ? mine[3] : mine[2];
+      const subs = L.bench.slice(0, 3), mins = {};
+      L.xi.forEach(p => { mins[p.id] = 90; });
+      subs.forEach((p, k) => { const out = L.xi.filter(x => x.pos !== 'GK')[10 - 1 - k] || L.xi[L.xi.length - 1 - k]; if (out) { const m0 = U.int(55, 80); mins[out.id] = m0; mins[p.id] = 90 - m0; } });
+      const played = L.xi.concat(subs).filter(p => mins[p.id] > 0);
+      const gl = { 3: 5, 2: 2.4, 1: 0.7, 0: 0 };
+      const pickW = () => U.weighted(played, p => (gl[F.LINE[p.pos]] || 0.5) * (mins[p.id] / 90) * (0.6 + p.ovr / 100));
+      const G = {}, As = {};
+      for (let k = 0; k < gf; k++) { const s0 = pickW(); G[s0.id] = (G[s0.id] || 0) + 1; if (Math.random() < 0.7) { const a0 = pickW(); if (a0 !== s0) As[a0.id] = (As[a0.id] || 0) + 1; } }
+      const res = gf > ga ? 0.5 : gf < ga ? -0.4 : 0;
+      for (const p of played) {
+        const r = U.clamp(6.3 + res + (G[p.id] || 0) * 0.8 + (As[p.id] || 0) * 0.4 + (p.pos === 'GK' && ga === 0 ? 0.6 : 0) - (p.pos === 'GK' ? ga * 0.15 : 0) + U.rand(-0.6, 0.6) + (p.ovr - L.str) * 0.03, 4, 10);
+        const st = lg.st[p.id] || (lg.st[p.id] = [0, 0, 0, 0, 0]);
+        st[0]++; st[1] += G[p.id] || 0; st[2] += As[p.id] || 0; st[3] += r; st[4] += mins[p.id];
+        S.ac.last[p.id] = { min: mins[p.id], r: Math.round(r * 10) / 10 };
+        p.fit = U.clamp(Math.round(p.fit - 9 * mins[p.id] / 90), 35, 100);
+        if (mins[p.id] >= 45 && Math.random() < 0.012) p.inj = U.int(1, 4);
+        if ((G[p.id] || 0) >= 3) { TL.Game.mail(S, `Hat-trick de ${p.short} con el filial`, `${p.short} firma un hat-trick en el ${home ? `${lg.teams[me].n} ${gf}-${ga} ${lg.teams[mine[1]].n}` : `${lg.teams[mine[0]].n} ${ga}-${gf} ${lg.teams[me].n}`}. El entrenador del filial dice que «está para cosas mayores».`, 'good'); }
+      }
+      // El entrenador del filial recomienda subir a quien lo está bordando
+      const top = played.filter(p => lg.st[p.id] && lg.st[p.id][0] >= 5 && lg.st[p.id][3] / lg.st[p.id][0] >= 7.4 && !(lg.rec || []).includes(p.id));
+      if (top.length && Math.random() < 0.35) { const p = top[0]; (lg.rec = lg.rec || []).push(p.id); TL.Game.mail(S, `El filial pide paso para ${p.short}`, `El entrenador del filial te escribe: «${p.short} lleva semanas siendo el mejor. Aquí ya se le queda pequeño: súbelo o cédelo antes de que se estanque».`, 'club'); }
+      lg.lastRes = { s: S.season, w: S.week, home, opp: lg.teams[home ? mine[1] : mine[0]].n, gf, ga };
+    }
+    return mine;
+  }
+  function table(S) {
+    const lg = lgOf(S);
+    if (!lg) return [];
+    const rows = lg.teams.map((t, i) => ({ i, n: t.n, me: !!t.me, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0, form: [] }));
+    for (const rd of lg.fx) for (const [h, a, hg, ag] of rd) {
+      if (hg < 0) continue;
+      const H = rows[h], A = rows[a];
+      H.pj++; A.pj++; H.gf += hg; H.gc += ag; A.gf += ag; A.gc += hg;
+      if (hg > ag) { H.g++; A.p++; H.pts += 3; H.form.push('V'); A.form.push('D'); } else if (hg < ag) { A.g++; H.p++; A.pts += 3; H.form.push('D'); A.form.push('V'); } else { H.e++; A.e++; H.pts++; A.pts++; H.form.push('E'); A.form.push('E'); }
+    }
+    return rows.sort((x, y) => y.pts - x.pts || (y.gf - y.gc) - (x.gf - x.gc) || y.gf - x.gf);
+  }
+  /** Fin de temporada: ascenso, permanencia o descenso del filial. */
+  function leagueEnd(S) {
+    const lg = lgOf(S);
+    if (!lg) return null;
+    const T = table(S), n = T.length, pos = T.findIndex(r => r.me) + 1;
+    let next = lg.div, what = 'se mantiene';
+    if (pos <= 2 && lg.div > 0) { next = lg.div - 1; what = `asciende a ${DIVS[next]}`; }
+    else if (pos > n - 3 && lg.div < 2) { next = lg.div + 1; what = `desciende a ${DIVS[next]}`; }
+    lg.next = next;
+    (S.ac.hist = S.ac.hist || []).push({ s: S.season, div: lg.div, pos, n });
+    const best = Object.entries(lg.st).filter(([id]) => S.players[id]).sort((a, b) => b[1][1] - a[1][1])[0];
+    TL.Game.mail(S, `El filial acaba ${pos}º en ${DIVS[lg.div]}`, `El filial termina ${pos}º de ${n} y ${what}.${best && best[1][1] ? ` Máximo goleador: ${S.players[best[0]].short} (${best[1][1]}).` : ''}`, pos <= 2 ? 'good' : 'club');
+    if (TL.News && next !== lg.div) TL.News.add(S, 'club', `El filial del ${S.clubs[S.user].name} ${what}`, `Temporada ${pos <= 2 ? 'para enmarcar' : 'para olvidar'} en el filial, que terminó ${pos}º.`, S.user, null, pos <= 2 ? 'pos' : 'neg');
+    return { pos, n, what, div: lg.div, next };
+  }
+
+  TL.Academy = { DIVS, playRound, table, leagueEnd, lineup, lg: lgOf, buildLeague, RES_WAGE, CAP, PROMOTE_AGE, DEMOTE_MAX_AGE, MAX_RES, on, reserve, capOf, atCap, makeYouth, intake, start, promoteAged, fillFirst, MIN_FIRST, promote, demote, canDemote, grow };
 })();
