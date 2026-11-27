@@ -456,6 +456,10 @@
   function userLeague(S) { return S.leagues[S.clubs[S.user].league]; }
 
   // ------------------------------------------------------------ Guardado
+  // Estado de sistemas más nuevos que se guarda tal cual (personalidad, prensa, carrera, panel…). Cualquier sistema
+  // que guarde algo en S debe añadirse aquí o se pierde al recargar la partida.
+  const EXTRA = ['persona', 'mule', 'cv', 'hud', 'hudLore', 'romance', 'affair', 'prensaStats', 'prensaFeed', 'prensaRival', 'prensaPre',
+    'prensaPreDone', 'prensaBag', 'pressKnown', 'pressComp', 'pressMem', 'pressStyle', 'intel', 'coef', 'holdersNext', 'dedic'];
   function serialize(S) {
     const pb = [], pg = [];
     for (const p of S.players) {
@@ -478,7 +482,8 @@
       fixtures: S.fixtures, stats: S.stats, tactics: S.tactics, inbox: S.inbox, msgId: S.msgId,
       neg: S.neg, history: S.history, board: S.board, fin: S.fin, results: S.results || [],
       mgr: S.mgr, com: S.com, news: S.news, newsId: S.newsId, settings: S.settings, log: S.log, leader: S.leader,
-      over: !!S.over, fired: !!S.fired, savedAt: Date.now()
+      over: !!S.over, fired: !!S.fired, savedAt: Date.now(),
+      xs: EXTRA.reduce((o, k) => { if (S[k] != null) o[k] = S[k]; return o; }, {})
     };
   }
 
@@ -518,6 +523,7 @@
       cups: save.cups || null, lastOrder: save.lastOrder || null, titles: save.titles || [], staff: save.staff || [], staffMarket: save.staffMarket || null, hist: save.hist || null,
       over: save.over, fired: save.fired, ev: save.ev || null, ac: save.ac || null
     });
+    for (const k of EXTRA) if (save.xs && save.xs[k] != null) S[k] = save.xs[k];
     TL.Coach.restore(S, save.coaches);
     dirty(S);
     migrate(S);

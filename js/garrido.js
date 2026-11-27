@@ -55,20 +55,21 @@
     root.querySelector('.gar-n').textContent = `${I.k + 1}/${I.qs.length}`;
     root.querySelector('.gar-body').innerHTML = `<div class="gar-q">${esc(fillT(I.S, q.q))}</div>
       <div class="gar-as">${q.o.map((o, k) => `<button class="btn block gar-a" data-act="gar-a" data-k="${k}"><span>${esc(fillT(I.S, o.t))}</span>
-        <small>${STYLE[o.cat] ? STYLE[o.cat][0] + ' ' + esc(STYLE[o.cat][1]) : ''}</small></button>`).join('')}</div>`;
+        <small>${!STYLE[o.cat] ? '' : TL.Prensa && !TL.Prensa.styleKnown(I.S, o.cat) ? '❔ Sin probar' : STYLE[o.cat][0] + ' ' + esc(STYLE[o.cat][1])}</small></button>`).join('')}</div>`;
   }
   A['gar-a'] = b => {
     const q = I.qs[I.k], o = q && q.o[+b.dataset.k], S = I.S, P = PE();
     if (!o) return;
     // Lo que contestas también dice quién eres
     if (o.cat) P.signal(S, 'estilo:' + o.cat, 1.5);
+    const learned = o.cat && TL.Prensa && TL.Prensa.learnStyle ? TL.Prensa.learnStyle(S, o.cat) : null;
     if (o.sig) P.signal(S, o.sig);
     if (o.sigDom) { const d = P.dominant(S); if (d) P.signal(S, { [d]: o.sigDom }); }
     I.k++;
     const root = document.getElementById('garrido');
     root.querySelector('.gar-body').innerHTML = `<div class="gar-q done">${esc(fillT(S, q.q))}</div>
       <blockquote class="gar-me">«${esc(fillT(S, o.t))}»</blockquote>
-      <p class="gar-r">${esc(fillT(S, o.r || ''))}</p>
+      <p class="gar-r">${esc(fillT(S, o.r || ''))}</p>${learned ? `<p class="gar-learn">💡 ${esc(learned)}</p>` : ''}
       <button class="btn primary block" data-act="gar-next">${I.k < I.qs.length ? 'Siguiente pregunta' : 'Que escriba'}</button>`;
   };
   A['gar-next'] = () => ask();
