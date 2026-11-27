@@ -1788,23 +1788,32 @@
   function clubStaff(S) {
     const ST = TL.Staff;
     const stars = q => `<span class="stars-q">${'★'.repeat(q)}<i>${'★'.repeat(5 - q)}</i></span>`;
+    const T = (s) => ST.TRAITS[s.tr];
+    const yrs = n => (n > 1 ? `${n} temporadas` : 'última temporada');
     const cards = Object.entries(ST.ROLES).map(([role, R]) => {
       const s = ST.of(S, role);
       return `<div class="staff-slot ${s ? '' : 'empty'}"><div class="ss-ic">${R.icon}</div><div class="grow"><div class="ss-role">${R.name}</div>
-        ${s ? `<div class="ss-name">${esc(s.name)} ${stars(s.q)}</div><div class="note" style="margin:2px 0 0">${R.desc(s.q)} · ${U.money(s.wage)}/sem</div>`
+        ${s ? `<div class="ss-name">${esc(s.name)} ${stars(s.q)} <span class="sq-w">${ST.QWORD(s.r || 50)}</span></div>
+          <div class="note" style="margin:2px 0 0">${T(s) ? `<b>${esc(T(s).n)}</b> · ` : ''}${s.age ? s.age + ' años · ' : ''}contrato: ${yrs(s.yrs || 1)} · ${U.money(s.wage)}/sem</div>
+          <div class="note" style="margin:2px 0 0">${R.desc(s.q)}</div>`
           : `<div class="note" style="margin:2px 0 0">Vacante. ${R.desc(3).split('.')[0]}… con alguien bueno.</div>`}</div>
         ${s ? `<button class="btn sm danger" data-act="staff-fire" data-k="${role}">Despedir</button>` : ''}</div>`;
     }).join('');
     const sel = UI.staffRole || 'physio';
-    const cands = ST.market(S).filter(c => c.role === sel);
+    const cands = ST.market(S).filter(c => c.role === sel).sort((a, b) => a.wage - b.wage);
     const chips = Object.entries(ST.ROLES).map(([k, R]) => `<button class="chip ${sel === k ? 'on' : ''}" data-act="staff-role" data-k="${k}">${R.icon} ${R.name}</button>`).join('');
     return `<div class="grid two">
       <section class="card span2"><div class="card-head"><h2>Tu cuerpo técnico</h2><span class="muted">${U.money(ST.weeklyCost(S))}/sem</span></div><div class="staff-list">${cards}</div></section>
       <section class="card span2"><div class="card-head"><h2>Contratar</h2><span class="muted">Nuevos candidatos cada 6 jornadas</span></div>
         <div class="chips" style="margin-bottom:8px">${chips}</div>
-        ${cands.length ? cands.map(c => `<div class="staff-cand"><div class="grow"><b>${esc(c.name)}</b> <span class="note">${c.age} años</span><div>${stars(c.q)} <span class="note">${ST.ROLES[c.role].desc(c.q)}</span></div></div>
-          <div class="sc-buy"><span class="num">${U.money(c.wage)}/sem</span><button class="btn sm primary" data-act="staff-hire" data-id="${c.id}">Contratar</button></div></div>`).join('') : '<div class="empty">No quedan candidatos para este puesto. Vuelve en unas jornadas.</div>'}
-        <p class="note mt">Si el puesto ya está ocupado, el nuevo sustituye al actual (con una indemnización de 6 semanas de sueldo). Los veteranos que se retiran en tu club también pueden entrar aquí.</p></section></div>`;
+        ${cands.length ? cands.map(c => `<div class="staff-cand p-${c.prof}"><div class="grow"><b>${esc(c.name)}</b> <span class="note">${c.age} años</span>
+          <div><span class="sc-prof">${esc(ST.PROFILES[c.prof].n)}</span> ${stars(c.q)} <span class="sq-w">${ST.QWORD(c.r)}</span></div>
+          <div class="note"><b>${esc(ST.TRAITS[c.tr].n)}</b>: ${esc(ST.TRAITS[c.tr].d)} · pide ${c.yrs > 1 ? c.yrs + ' temporadas' : '1 temporada'}</div></div>
+          <div class="sc-buy"><span class="num">${U.money(c.wage)}/sem</span>
+            <button class="btn sm primary" data-act="staff-hire" data-id="${c.id}" data-m="accept">Contratar</button>
+            <button class="btn sm ghost" data-act="staff-hire" data-id="${c.id}" data-m="haggle" title="Puede aceptar una rebaja… u ofenderse">Regatear</button>
+            <button class="btn sm ghost" data-act="staff-hire" data-id="${c.id}" data-m="raise" title="Pagas un 15 % más y llega encantado">Pagar más</button></div></div>`).join('') : '<div class="empty">No quedan candidatos para este puesto. Vuelve en unas jornadas.</div>'}
+        <p class="note mt">La calidad se paga: una promesa sale barata y mejora con los años; una estrella cuesta un dineral. Despedir a alguien cuesta lo que le queda de contrato. Al acabar el contrato te pedirá renovar según lo que valga entonces, y si es muy bueno otros clubes intentarán llevárselo.</p></section></div>`;
   }
   A['staff-role'] = el => { UI.staffRole = el.dataset.k; UI.refresh(); };
   /** Presentación de un técnico nuevo: unas palabras, con su voz (fija según su nombre; las técnicas, más aguda). */
@@ -1831,10 +1840,11 @@
   }
   A['staff-hire'] = el => {
     const c = (TL.Staff.market(G.S) || []).find(x => x.id === el.dataset.id);
-    const r = TL.Staff.hire(G.S, el.dataset.id); toast(r.msg, !r.ok);
+    const r = TL.Staff.hire(G.S, el.dataset.id, el.dataset.m); toast(r.msg, !r.ok);
+    if (r.gone) { G.save(); UI.refresh(); }
     if (r.ok) { TL.SFX.success(); TL.FX.sparkle(el); G.save(); UI.refresh(); if (c) setTimeout(() => presentStaff(G.S, c), 600); }
   };
-  A['staff-fire'] = el => confirmBox(`¿Despedir al ${TL.Staff.ROLES[el.dataset.k].name.toLowerCase()}?`, 'Tendrás que pagar 6 semanas de sueldo de indemnización.', 'Despedir', () => { const r = TL.Staff.fire(G.S, el.dataset.k); toast(r.msg, !r.ok); G.save(); UI.refresh(); }, true);
+  A['staff-fire'] = el => confirmBox(`¿Despedir al ${TL.Staff.ROLES[el.dataset.k].name.toLowerCase()}?`, `Tendrás que pagar ${U.money(TL.Staff.severance(TL.Staff.of(G.S, el.dataset.k)))} de indemnización (lo que le queda de contrato).`, 'Despedir', () => { const r = TL.Staff.fire(G.S, el.dataset.k); toast(r.msg, !r.ok); G.save(); UI.refresh(); }, true);
 
   function clubSummary(S) {
     const c = S.clubs[S.user];

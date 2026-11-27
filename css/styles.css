@@ -2015,3 +2015,10 @@ body.shake-s { animation: shake-s .35s; }
 .gar-btn small { display: block; font-size: 11px; opacity: .7; text-transform: none; letter-spacing: 0; }
 .gar-btn { flex-direction: column; }
 .gar-done { font-family: Georgia, serif; font-style: italic; }
+.sq-w{font-size:11px;font-weight:700;opacity:.75;margin-left:4px}
+.sc-prof{display:inline-block;font:700 10px var(--font-c),sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.08);margin-right:4px}
+.staff-cand.p-star{border-color:rgba(253,230,138,.55);background:linear-gradient(120deg,rgba(253,230,138,.10),transparent 60%)}
+.staff-cand.p-star .sc-prof{background:rgba(253,230,138,.25);color:#fde68a}
+.staff-cand.p-joven .sc-prof{background:rgba(120,220,160,.18);color:#9fe8b8}
+.staff-cand.p-top .sc-prof{background:rgba(140,170,255,.2);color:#b8c8ff}
+.sc-buy{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
