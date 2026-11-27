@@ -374,6 +374,58 @@
   QS.push(...ROM);
   RESULT.push('rom1', 'rom2', 'rom3', 'rom4');
 
+  // ------------------------------------------------------------ Giros de guion: el lío a escondidas
+  // Muy de vez en cuando, con un flechazo en marcha, otra persona del vestuario también se fija en ti. Nunca hay
+  // botón de «aceptar»: es la prensa la que tira del hilo con rumores, y según cómo respondas se destapa o se apaga.
+  // Si se destapa: triángulo en el vestuario, moral por los suelos y alguien pide salir. Vale para entrenador con
+  // jugadora y para entrenadora con jugador (los textos no dan por hecho el género).
+  function affairMaybe(S) {
+    const r = S.romance;
+    if (S.affair || !r || r.stage < 2 || (r.done && !r.win) || Math.random() > 0.18) return;
+    const sq = W.squad(S, S.user).filter(p => p.id !== r.pid && p.age >= 20);
+    if (!sq.length) return;
+    S.affair = { pid: pick(sq).id, stage: 1, risk: 0.25, w: S.week, s: S.season };
+  }
+  const affAt = (S, stage, gap) => { const a = S.affair; return a && !a.done && a.stage === stage && S.players[a.pid] && S.romance && S.players[S.romance.pid] && ago(S, a) >= gap; };
+  const an = c => c.S.players[c.S.affair.pid].short;
+  const affStep = (dr, fx) => Object.assign({ arc: S => { const a = S.affair; a.risk = Math.max(0, a.risk + dr); a.stage++; a.w = S.week; a.s = S.season; } }, fx ? { fx } : {});
+  function affEnd(S, dr) {
+    const a = S.affair, r = S.romance, club = S.clubs[S.user];
+    const p = S.players[a.pid], q = r && S.players[r.pid];
+    a.done = true;
+    const calm = lv(S, 'pre1') * 0.08 + lv(S, 'dis3') * 0.05;
+    if (Math.random() < Math.max(0.05, a.risk + dr - calm)) {
+      a.exposed = true;
+      const N = TL.News.fx;
+      N.board(S, -3); N.fans(S, -0.006); N.teamMor(S, -2);
+      if (p) { N.mor(p, -15); p.listed = true; }
+      if (q) { N.mor(q, -18); if (r) { r.done = true; r.win = false; } }
+      TL.News.add(S, 'polemica', `Triángulo en el vestuario del ${club.name}`, `Salen a la luz las fotos de ${S.manager} con ${p ? p.short : 'alguien de la plantilla'}. ${q ? q.short : 'El vestuario'} no se lo toma nada bien y ${p ? p.short : 'una de las partes'} pide salir del club.`, club.id, a.pid, 'neg');
+      return 'Mañana estará en todas partes.';
+    }
+    TL.News.add(S, 'redes', 'El rumor se apaga', `Nadie consigue una sola foto. Lo del técnico del ${club.name} se queda en cotilleo de tertulia.`, club.id, null, 'pos');
+    return 'El rumor se desinfla. Nadie se lo compra.';
+  }
+  const AFF = [
+    { id: 'aff1', w: c => (affAt(c.S, 1, 2) ? 9 : 0), q: c => `Dicen que le han visto salir de un hotel con ${an(c)}, y no es ${rn(c)}. ¿Qué hay de cierto?`, o: () => [
+      Object.assign({ t: 'Concentración del equipo. Hay hoteles y hay rumores, y yo solo conozco los primeros.', g: 2 }, affStep(-0.08)),
+      Object.assign({ t: 'Era una reunión de nutrición. Muy… nutritiva.', g: 1 }, affStep(0.15, { fans: 0.002 })),
+      Object.assign({ t: 'Mi vida privada es mía. Y punto.', g: 1 }, affStep(0.05)),
+      Object.assign({ t: 'Ustedes ven cosas donde no las hay. Vayan al oculista.', g: 0 }, affStep(0.1, { board: -0.5 }))] },
+    { id: 'aff2', w: c => (affAt(c.S, 2, 3) ? 9 : 0), q: c => `${rn(c)} y ${an(c)} no se hablan en los entrenamientos. ¿Hay mal rollo en el vestuario?`, o: () => [
+      Object.assign({ t: 'Discusiones de fútbol: por dentro o por fuera. Lo arreglo yo.', g: 2 }, affStep(-0.06, { team: 0.3 })),
+      Object.assign({ t: 'Cada uno tiene sus amistades. No hace falta irse de cañas con todo el mundo.', g: 1 }, affStep(0.04)),
+      Object.assign({ t: 'Pregúntenselo directamente.', g: 0 }, affStep(0.15)),
+      Object.assign({ t: 'Aquí se viene a competir. Lo de fuera se queda fuera.', g: 2, need: ['dis3', 1] }, affStep(-0.12))] },
+    { id: 'aff3', w: c => (affAt(c.S, 3, 3) ? 9 : 0), q: c => `Última hora: un paparazzi asegura tener fotos suyas con ${an(c)}. ¿Algo que decir antes de que salgan?`, o: () => [
+      { t: 'Que las publiquen. Saldré yo con cara de cansado y un café. Poco más.', g: 2, arc: S => { S._affRx = affEnd(S, -0.1); } },
+      { t: 'Que se compren una cámara mejor.', g: 1, arc: S => { S._affRx = affEnd(S, 0.05); } },
+      { t: 'Sin comentarios.', g: 1, arc: S => { S._affRx = affEnd(S, 0); } },
+      { t: 'Hablaré con mis abogados esta misma noche.', g: 0, arc: S => { S._affRx = affEnd(S, 0.15); }, fx: { board: -0.5 } }] }
+  ];
+  QS.push(...AFF);
+  RESULT.push('aff1', 'aff2', 'aff3');
+
   // ------------------------------------------------------------ Variedad
   // Cada pregunta y cada respuesta se monta con entradillas y coletillas al azar (según el tono), así que entre las
   // ~150 frases base y estas piezas salen miles de combinaciones y nunca suena igual dos veces.
@@ -567,6 +619,7 @@
   function el(id) { return document.getElementById(id); }
 
   function open(S, m, me, onDone) {
+    affairMaybe(S);
     const c = context(S, m, me);
     R.c = c; R.qs = questions(c); R.k = 0; R.log = {}; R.onDone = onDone || null; R.streak = 0; R.best = 0; R.marks = []; R.grace = lv(S, 'pre1') + (S.me && S.me.st.lab >= 65 ? 1 : 0); R.muleUsed = false; R.twisted = null; R.inTwist = false;
     for (const k in c.feed) c.feed[k].asked = true;
@@ -612,7 +665,7 @@
     const panel = document.querySelector('#prensa .pr-panel');
     if (!q || R.best >= NEED_STREAK || NEED_STREAK - R.streak > R.qs.length - R.k) return end();
     meter();
-    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${q.id.startsWith('rom') ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(dressQ(qText(q, c)))}`;
+    panel.querySelector('.pr-q').innerHTML = `<small>${esc(pick(REPORTERS))} · ${esc(pick(MEDIA))} <span class="pr-n">${R.k + 1}/${R.qs.length}</span></small>${(q.id.startsWith('rom') || q.id.startsWith('aff')) ? '<img class="pr-gif" src="assets/almas/gif/flechazo.gif" alt="">' : ''}${esc(dressQ(qText(q, c)))}`;
     hands();
     const { shown, locked } = options(c.S, q, c);
     R.cur = shown;
@@ -646,7 +699,7 @@
   function answer(a) {
     R.cur = null;
     if (R.inTwist) { R.inTwist = false; a.react = settleTwist(R.c.S, a); }
-    if (a.arc) a.arc(R.c.S);
+    if (a.arc) { a.arc(R.c.S); if (R.c.S._affRx) { a.react = R.c.S._affRx; delete R.c.S._affRx; } }
     apply(R.c.S, a.fx, R.log);
     let g = a.g;
     if (g === 1 && R.grace > 0 && R.streak > 0) { R.grace--; g = 1.5; }
