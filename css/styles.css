@@ -2087,3 +2087,8 @@ body.shake-s { animation: shake-s .35s; }
 .hud-rum em.ok{color:#86efac;border:1px solid rgba(134,239,172,.4)}.hud-rum em.mid{color:#fde68a;border:1px solid rgba(253,230,138,.4)}.hud-rum em.bad{color:#fca5a5;border:1px solid rgba(252,165,165,.4)}
 .hud-row b.neg{color:#fca5a5}
 .hud-wipe{position:fixed;inset:0;width:100vw;height:100vh;z-index:160;cursor:pointer}
+.fil-strip{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:4px 0 10px}
+.fil-strip>div{display:flex;flex-direction:column}.fil-strip small{font-size:11px;opacity:.65}.fil-strip b{font-size:14px}
+.fil-res{font:800 18px var(--font-c)}.fil-res.w{color:#4ade80}.fil-res.l{color:#f87171}.fil-res.d{color:#fde68a}
+.fil-t tr.me td{background:rgba(184,245,61,.12);font-weight:700}.fil-t tr.up td:first-child{box-shadow:inset 3px 0 #4ade80}.fil-t tr.dn td:first-child{box-shadow:inset 3px 0 #f87171}
+.fil-t tr.gap td{text-align:center;opacity:.5;padding:0}

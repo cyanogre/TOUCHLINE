@@ -158,6 +158,7 @@
     TL.Locker.afterRound(S, results);
     TL.Staff.weekly(S);
     if (TL.Staff.poach) TL.Staff.poach(S);
+    if (TL.Academy && TL.Academy.playRound) TL.Academy.playRound(S);   // la jornada del filial, en su propia liga
     // Historial para las gráficas: saldo y posición jornada a jornada
     S.hist = S.hist || { cash: [], pos: [] };
     const tabNow = table(S);
@@ -339,7 +340,7 @@
     // Cantera
     // Tu club: los canteranos van al filial (js/academy.js); los de 23 suben al primer equipo
     sum.youth = [];
-    if (TL.Academy && TL.Academy.on(S)) { sum.promoted = TL.Academy.promoteAged(S).map(p => p.name); sum.youth = TL.Academy.intake(S); sum.called = TL.Academy.fillFirst(S).map(p => p.name); }
+    if (TL.Academy && TL.Academy.on(S)) { sum.filial = TL.Academy.leagueEnd(S); sum.promoted = TL.Academy.promoteAged(S).map(p => p.name); sum.youth = TL.Academy.intake(S); sum.called = TL.Academy.fillFirst(S).map(p => p.name); }
     for (const c of S.clubs) {
       if (c.id === S.user && TL.Academy && TL.Academy.on(S)) continue;
       const sq = W.squad(S, c.id);
