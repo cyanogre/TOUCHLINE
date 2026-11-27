@@ -174,6 +174,8 @@
     if (c.cash === 'poor' && S.clubs[S.user].cash > W().wageBill(S, S.user) * 6) return false;
     if (c.items && !st(S).items.length) return false;
     if (c.souls && !st(S).souls.length) return false;
+    // Tu personalidad (js/persona.js): solo cuenta la que ya se ha empezado a notar fuera
+    if (c.persona && !(TL.Persona && TL.Persona.is(S, c.persona))) return false;
     if (!p) return true;
     const L = LK();
     if (c.mor && !inR(p.mor == null ? 70 : p.mor, c.mor)) return false;
@@ -332,6 +334,7 @@
         case 'x': return U.money(inst.v.x || 0);
         case 'k': return it ? it.name : '';
         case 'pos': return p ? F.POS_ES[p.pos].toLowerCase() : '';
+        case 'mote': { const P = TL.Persona, d = P && P.dominant(S); return d ? P.moteOf(S, d) : S.manager; }
         default: return m;
       }
     });
@@ -446,6 +449,8 @@
     if (fx.list && p) { p.listed = true; chip(`${p.short}: en venta`, null); }
     if (fx.promise && p) { L.state(S).promises.push({ pid: p.id, apps0: (S.stats[p.id] || [0])[0], need: 2, until: S.week + 4 }); chip(`Promesa: 2 partidos de 4 para ${p.short}`, null); }
     if (fx.xp) TL.Manager.addXp(S, fx.xp);
+    // Lo que decides también dice quién eres (oculto: no deja etiqueta)
+    if (fx.sig && TL.Persona) TL.Persona.signal(S, fx.sig);
     if (fx.item) { const k = fx.item === 'k' ? inst.v.k : fx.item === 'random' ? randomItem(S) : fx.item; out.reward = giveItem(S, k); }
     if (fx.soul) {
       const k = fx.soul === 'k' ? inst.v.k : fx.soul === 'random' ? randomSoul(S, fx.equip ? p : null) : fx.soul;

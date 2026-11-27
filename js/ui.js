@@ -296,6 +296,7 @@
     },
     /** Llamado al pintar la pantalla: si cambia el momento y su carpeta tiene música, suena esa. */
     mood(S) {
+      if (Music.sc) return;   // una escena con música propia (la sala de prensa) manda hasta que se cierra
       const ctx = Music.context(S);
       if (ctx === Music.ctx) return;
       Music.ctx = ctx;
@@ -314,8 +315,33 @@
       const opts = list.length > 1 ? list.filter(u => u !== Music.cur) : list;
       return opts[Math.floor(Math.random() * opts.length)];
     },
+    /** Escena con su propia carpeta (assets/music/prensa, prensa-tensa, prensa-previa…). Si está vacía, prueba la
+     *  de reserva; si tampoco hay nada, sigue sonando lo que había. */
+    scene(dir, fallback) {
+      Music.sc = dir;
+      Music.bank(dir).then(list => {
+        if (Music.sc !== dir) return;
+        if (!list || !list.length) { if (fallback && fallback !== dir) Music.scene(fallback); return; }
+        if (list.includes(Music.cur)) { Music.el() && (Music.el().loop = list.length === 1); return; }
+        Music.play(Music.pick(list), list.length === 1);
+      });
+    },
+    /** Se acaba la escena: vuelve la música del momento de la carrera (o el tema del juego). */
+    unscene() {
+      if (!Music.sc) return;
+      const was = Music.banks[Music.sc] || [];
+      Music.sc = null; Music.ctx = null;
+      const ctx = Music.context(G.S);
+      Music.ctx = ctx;
+      if (ctx === 'tema') { Music.play(THEME, true); return; }
+      Music.bank(ctx).then(list => {
+        if (Music.sc || Music.ctx !== ctx) return;
+        if (list && list.length) { if (!list.includes(Music.cur)) Music.play(Music.pick(list), list.length === 1); }
+        else if (was.includes(Music.cur)) Music.play(THEME, true);
+      });
+    },
     next() {
-      const list = Music.banks[Music.ctx];
+      const list = Music.banks[Music.sc || Music.ctx];
       if (list && list.length) Music.play(Music.pick(list), list.length === 1);
       else Music.play(THEME, true);
     },
@@ -1999,15 +2025,20 @@
   function clubManager(S) {
     const MG = TL.Manager, m = S.mgr;
     const need = MG.xpToNext(m.level);
-    const tree = MG.TREE.map(br => `<section class="card branch"><div class="card-head"><h2>${br.icon} ${esc(br.name)}</h2></div>
+    const tree = MG.TREE.map(br => `<section class="card branch ${br.free ? 'sello' : ''}"><div class="card-head"><h2>${br.icon} ${esc(br.name)}</h2></div>
+      ${br.free ? '<p class="note sello-intro">Habilidades que solo existen para quien eres de verdad. Se abren cuando la prensa ya te ha puesto mote, y se duermen si cambias.</p>' : ''}
       ${br.nodes.map((n, i) => {
-        const l = MG.lvl(S, n.id), can = MG.can(S, n.id);
-        const pips = Array.from({ length: n.max }, (_, k) => `<i class="${k < l ? 'on' : ''}"></i>`).join('');
-        return `<div class="skill ${l ? 'has' : ''} ${!can.ok && !l && can.reason !== 'Sin puntos de habilidad' ? 'locked' : ''}">
-          <div class="row between"><b>${i + 1}. ${esc(n.name)}</b><span class="pips">${pips}</span></div>
+        const raw = MG.raw(S, n.id), l = MG.lvl(S, n.id), can = MG.can(S, n.id);
+        // Las de tu sello que no te corresponden no se enseñan: solo una pista
+        if (can.hidden) return `<div class="skill locked secret"><div class="row between"><b>???</b><span class="pips"><i></i></span></div>
+          <div class="note">${esc(n.pista || '')}</div></div>`;
+        const asleep = raw && !l;
+        const pips = Array.from({ length: n.max }, (_, k) => `<i class="${k < raw ? (asleep ? 'off' : 'on') : ''}"></i>`).join('');
+        return `<div class="skill ${l ? 'has' : ''} ${asleep ? 'asleep' : ''} ${can.closed ? 'closed' : ''} ${!can.ok && !raw && can.reason !== 'Sin puntos de habilidad' ? 'locked' : ''}">
+          <div class="row between"><b>${br.free ? '' : (i + 1) + '. '}${esc(n.name)}</b><span class="pips">${pips}</span></div>
           <div class="note">${esc(n.desc)}</div>
-          <div class="row between" style="margin-top:6px"><span class="faint" style="font-size:12px">${can.ok ? '' : esc(can.reason)}</span>
-          <button class="btn sm ${can.ok ? 'primary' : ''}" data-act="skill" data-id="${n.id}" ${can.ok ? '' : 'disabled'}>${l ? 'Mejorar' : 'Aprender'}</button></div></div>`;
+          <div class="row between" style="margin-top:6px"><span class="faint ${can.closed ? 'closed-why' : ''}" style="font-size:12px">${can.ok ? '' : esc(can.reason)}</span>
+          <button class="btn sm ${can.ok ? 'primary' : ''}" data-act="skill" data-id="${n.id}" ${can.ok ? '' : 'disabled'}>${raw ? 'Mejorar' : 'Aprender'}</button></div></div>`;
       }).join('')}</section>`).join('');
     return `<section class="card" style="margin-bottom:12px"><div class="row">
         <div class="mgr-badge num">${m.level}</div>
@@ -2429,6 +2460,7 @@
       ${sum.lastChance ? '<p class="note bad mt">La directiva está muy descontenta, pero te da una última oportunidad. Otra temporada así y estarás fuera.</p>' : ''}
       ${sum.fired ? '<p class="note bad mt">La directiva ha decidido prescindir de ti.</p>' : ''}
       <p class="note mt">Reputación de mánager: ${S.mgr.rep} (${sum.repDelta >= 0 ? '+' : ''}${Math.round(sum.repDelta)}).</p>
+      ${TL.Garrido ? TL.Garrido.button(S, sum) : ''}
       ${jobsHtml(S, sum.jobs, sum.fired)}
       <button class="btn primary block mt" data-act="season-next">${sum.fired ? 'Continuar' : `Empezar temporada ${U.seasonLabel(sum.season + 1)}`}</button>`,
     { onClose: () => { if (UI.seasonSum) A['season-next'](); } });
@@ -2658,7 +2690,7 @@
   }
   UI.lineupWarning = lineupWarning;
 
-  A['play-quick'] = () => UI.advance(playQuick);
+  A['play-quick'] = () => UI.advance(() => (TL.Prensa && TL.Prensa.preview ? TL.Prensa.preview(G.S, playQuick) : playQuick()));
   function playQuick() {
     const S = G.S;
     if (S.over) return;

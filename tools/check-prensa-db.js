@@ -46,7 +46,118 @@ soc.forEach(q => {
 });
 const G = DB.garrido;
 if (!G) err('falta garrido'); else { for (const k in G.columnas) G.columnas[k].forEach(str); for (const k in G.biografia) G.biografia[k].forEach(str); }
+// ---- Preguntas del partido y de la previa (las claves de `cuando` salen del propio código: FLAGS y flags de preContext)
+const root = path.join(__dirname, '..');
+const prensaJs = fs.readFileSync(path.join(root, 'js', 'prensa.js'), 'utf8');
+const block = (src, from, to) => { const i = src.indexOf(from); return i < 0 ? '' : src.slice(i, src.indexOf(to, i)); };
+const FLAGS = new Set([...block(prensaJs, 'const FLAGS = {', '\n  };').matchAll(/(\w+): c =>/g)].map(m => m[1]));
+const PFLAGS = new Set([...block(prensaJs, 'flags: { cupKO', '} };').matchAll(/(\w+):/g)].map(m => m[1]));
+const SKILLS = new Set([...fs.readFileSync(path.join(root, 'js', 'manager.js'), 'utf8').matchAll(/id: '(\w+)', name:/g)].map(m => m[1]));
+const REFS = ['penMiss', 'og', 'red', 'subGoal', 'hat', 'star', 'kid', 'inj', 'bolt', 'signing', 'sale', 'lateWin', 'guest'];
+const HOLES = { partido: ['rival', 'gf', 'ga', 'jug', 'next', 'staff', 'brand', 'camp', 'hatTipo', 'objetivo', 'tarjeta', 'yo', 'club'],
+  previa: ['rival', 'next', 'yo', 'club', 'pos', 'posr', 'figura', 'mi', 'ronda', 'quedan'] };
+function checkQs(kind, list, flags) {
+  const seen = new Set();
+  const cond = (w, c) => [].concat(c || []).forEach(k => { const key = String(k).replace(/^!/, ''); if (!flags.has(key)) err(`${w}: la situación «${key}» no existe`); });
+  const holes = (w, t) => { for (const m of String(t).matchAll(/\{(\w+)\}/g)) if (!HOLES[kind].includes(m[1])) err(`${w}: hueco {${m[1]}} desconocido`); };
+  (list || []).forEach(q => {
+    const w = `${kind} ${q.id}`;
+    if (seen.has(q.id)) err(`${w}: id repetido`); seen.add(q.id);
+    cond(w, q.cuando); if (q.peso && q.peso.si) cond(w, q.peso.si);
+    str(q.q); holes(w, q.q);
+    if (!q.o || q.o.length < 3) err(`${w}: al menos 3 respuestas`);
+    if (!(q.o || []).some(o => !o.need)) err(`${w}: hace falta alguna respuesta sin habilidad`);
+    (q.o || []).forEach((o, k) => {
+      answers++; str(o.t); holes(w, o.t); if (o.tno) { str(o.tno); holes(w, o.tno); cond(w, o.tsi); }
+      if (o.cat && !STYLES.includes(o.cat)) err(`${w} #${k}: estilo «${o.cat}»`);
+      if (kind === 'previa' && !o.cat) err(`${w} #${k}: en la previa cada respuesta lleva su estilo`);
+      if (o.g == null && !o.gsi) err(`${w} #${k}: falta g`);
+      if (o.gsi) cond(w, o.gsi[0]); if (o.fxsi) cond(w, o.fxsi[0]);
+      if (o.need && !SKILLS.has(o.need[0])) err(`${w} #${k}: la habilidad «${o.need[0]}» no existe`);
+      for (const fx of [o.fx, o.fxsi && o.fxsi[1], o.fxsi && o.fxsi[2]]) if (fx && fx.pl && !REFS.includes(String(fx.pl[0]).replace(/^@/, ''))) err(`${w} #${k}: jugador «${fx.pl[0]}» desconocido`);
+      if (o.pre) for (const kk in o.pre) if (!['own', 'rival'].includes(kk)) err(`${w} #${k}: pre.${kk} no existe`);
+    });
+  });
+}
+checkQs('partido', DB.partido, FLAGS);
+checkQs('previa', DB.previa, PFLAGS);
+if (!(DB.partido || []).length) err('falta partido.js');
+if (!(DB.previa || []).length) err('falta previa.js');
+
+// ---- Entrevista de fin de temporada
+const T = DB.temporada, OUT = ['great', 'good', 'bad', 'up', 'down', 'fired'];
+const sigOk = (w, sig) => { for (const k in sig || {}) if (!P[k] && !EMITTED.has(k)) err(`${w}: señal «${k}» no existe`); };
+const tq = (w, q) => { if (!q) return err(`${w}: falta`); str(q.q); (q.o || []).forEach((o, k) => { answers++; str(o.t); str(o.r); if (!STYLES.includes(o.cat)) err(`${w} #${k}: estilo «${o.cat}»`); if (!o.r) err(`${w} #${k}: falta la apostilla de Garrido (r)`); sigOk(w, o.sig); }); if ((q.o || []).length < 3) err(`${w}: al menos 3 respuestas`); };
+if (!T) err('falta temporada.js'); else {
+  for (const r of OUT) { if (!(T.intro[r] || []).length) err(`temporada: falta intro.${r}`); tq(`temporada balance.${r}`, T.balance[r]); if (!(T.titulos[r] || []).length) err(`temporada: faltan títulos de ${r}`); if (!(T.cierre[r] || []).length) err(`temporada: falta cierre.${r}`);
+    [].concat(T.intro[r] || [], T.titulos[r] || [], T.cierre[r] || []).forEach(str); }
+  (T.momento || []).forEach((q, k) => tq(`temporada momento ${k}`, q));
+  tq('temporada tu.known', T.tu && T.tu.known); tq('temporada tu.unknown', T.tu && T.tu.unknown);
+  tq('temporada futuro.stay', T.futuro && T.futuro.stay); tq('temporada futuro.fired', T.futuro && T.futuro.fired);
+  for (const id of ids) if (!T.persona[id] || !(T.persona[id].pos || []).length || !(T.persona[id].neg || []).length) err(`temporada: faltan los títulos propios de ${id}`);
+  for (const id in T.persona) { if (!P[id]) err(`temporada: personalidad «${id}» no existe`); [].concat(T.persona[id].pos || [], T.persona[id].neg || []).forEach(str); }
+}
+
+// ---- Eventos de personalidad (formato de data/game/eventos.js)
+const ectx = { window: {} }; vm.createContext(ectx);
+vm.runInContext(fs.readFileSync(path.join(root, 'data', 'game', 'eventos.js'), 'utf8'), ectx);
+vm.runInContext(fs.readFileSync(path.join(dir, 'eventos-personalidad.js'), 'utf8'), ectx);
+const allEv = ectx.window.TL_EVENTOS.events, mineEv = allEv.filter(e => e.cat === 'imagen');
+const evIds = {}; allEv.forEach(e => { evIds[e.id] = (evIds[e.id] || 0) + 1; });
+const evPer = {};
+mineEv.forEach(e => {
+  const w = `evento ${e.id}`;
+  if (evIds[e.id] > 1) err(`${w}: id repetido`);
+  const per = [].concat((e.club || {}).persona || []);
+  if (!per.length) err(`${w}: falta club.persona`);
+  per.forEach(id => { if (!P[id]) err(`${w}: personalidad «${id}» no existe`); evPer[id] = (evPer[id] || 0) + 1; });
+  str(e.t); str(e.b);
+  if ((e.o || []).length < 2) err(`${w}: al menos 2 opciones`);
+  (e.o || []).forEach((o, k) => { answers++; str(o.l); str(o.d); str(o.r); if (!o.fx || !o.fx.sig) err(`${w} #${k}: la opción no mueve tu personalidad (fx.sig)`); sigOk(w, o.fx && o.fx.sig);
+    if (((o.fx || {}).mor || (o.fx || {}).boss || (o.fx || {}).list) && !e.if) err(`${w} #${k}: efecto sobre un jugador sin elegir jugador (if)`); });
+  if (/\{[so]n?\}/.test(e.t + e.b + JSON.stringify(e.o)) && !e.if && e.who !== 'p') err(`${w}: usa {s}/{n} sin jugador`);
+});
+for (const id of ids) if (!evPer[id]) err(`eventos: «${id}» no tiene ningún evento propio`);
+
+// ---- Formas de preguntar (formas-*.js + el banco antiguo): claves que existan, huecos válidos y sin duplicados
+const bctx = { window: {} }; vm.createContext(bctx);
+const gdir = path.join(root, 'data', 'game');
+for (const f of fs.readdirSync(gdir).filter(f => /^prensa-frases-\d+\.js$/.test(f)).sort()) vm.runInContext(fs.readFileSync(path.join(gdir, f), 'utf8'), bctx);
+const BANKQ = bctx.window.TL_PRENSA || {};
+const FO = DB.formas || {};
+const JUG = new Set(['penMiss', 'og', 'red', 'subGoal', 'hat', 'star', 'kid', 'inj', 'bolt', 'signing', 'sale', 'lateWin']);
+const PHOLES = ['mote', 'club', 'yo', 'rival', 'pres'];
+let formas = 0, phr = 0;
+const pidOk = new Set((DB.partido || []).map(q => q.id)), vidOk = new Set((DB.previa || []).map(q => q.id)), sidOk = new Set(soc.map(q => q.id));
+for (const key in FO) {
+  const w = `formas ${key}`, list = FO[key] || [];
+  let holesOk;
+  if (pidOk.has(key)) holesOk = HOLES.partido; else if (vidOk.has(key)) holesOk = HOLES.previa;
+  else if (/^soc:/.test(key) && sidOk.has(key.slice(4))) holesOk = PHOLES;
+  else if (/^mote:/.test(key) && P[key.slice(5)]) holesOk = PHOLES;
+  else if (/^cap:(\w+):([012])$/.test(key) && P[key.split(':')[1]]) holesOk = PHOLES;
+  else { err(`${w}: no corresponde a ninguna pregunta`); continue; }
+  const baseQ = (pidOk.has(key) ? DB.partido.find(q => q.id === key) : vidOk.has(key) ? DB.previa.find(q => q.id === key) : null);
+  const seenT = new Set([].concat((BANKQ[key] && BANKQ[key].q) || [], baseQ ? [baseQ.q] : []));
+  list.forEach(t => {
+    formas++; str(t);
+    if (seenT.has(t)) err(`${w}: repetida «${t.slice(0, 50)}»`); seenT.add(t);
+    for (const m of String(t).matchAll(/\{(\w+)\}/g)) {
+      if (!holesOk.includes(m[1])) err(`${w}: hueco {${m[1]}} no vale aquí`);
+      if (m[1] === 'jug' && !JUG.has(key)) err(`${w}: {jug} en una pregunta sin jugador`);
+    }
+  });
+}
+// Total de formas distintas de hacer una pregunta (base + banco + formas)
+const nForms = k => 1 + (((BANKQ[k] || {}).q) || []).length + (FO[k] || []).length;
+(DB.partido || []).forEach(q => { phr += nForms(q.id); });
+(DB.previa || []).forEach(q => { phr += nForms(q.id); });
+soc.forEach(q => { phr += nForms('soc:' + q.id); });
+ids.forEach(id => { phr += nForms('mote:' + id); [0, 1, 2].forEach(k => { phr += nForms(`cap:${id}:${k}`); }); });
+
 console.log(`Personalidades: ${ids.length} · preguntas de sociedad: ${soc.length} · respuestas: ${answers} · textos: ${strings}`);
+console.log(`Formas de hacer las preguntas: ${phr} (nuevas en formas-*.js: ${formas})`);
+console.log(`Partido: ${(DB.partido || []).length} preguntas · previa: ${(DB.previa || []).length} · eventos de personalidad: ${mineEv.length} · situaciones: ${FLAGS.size} (partido), ${PFLAGS.size} (previa)`);
 console.log('Señales y a quién alimentan:');
 Object.keys(feeders).sort().forEach(k => console.log(`  ${k.padEnd(18)} → ${feeders[k].join(', ')}`));
 if (errs.length) { console.log(`\n${errs.length} errores:`); errs.forEach(e => console.log('  ✗ ' + e)); process.exit(1); }
